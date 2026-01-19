@@ -5,6 +5,10 @@ const nextConfig: NextConfig = {
 	typedRoutes: true,
 	reactCompiler: true,
 	transpilePackages: ["shiki"],
+	typescript: {
+		// Skip type checking during build - use `bun run check-types` instead
+		ignoreBuildErrors: true,
+	},
 };
 
 export default nextConfig;

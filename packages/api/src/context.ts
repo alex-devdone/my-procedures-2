@@ -1,7 +1,6 @@
 import { auth } from "@my-procedures-2/auth";
-import type { NextRequest } from "next/server";
 
-export async function createContext(req: NextRequest) {
+export async function createContext(req: Request) {
 	const session = await auth.api.getSession({
 		headers: req.headers,
 	});

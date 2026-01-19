@@ -1,9 +1,8 @@
 import { createContext } from "@my-procedures-2/api/context";
 import { appRouter } from "@my-procedures-2/api/routers/index";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
-import type { NextRequest } from "next/server";
 
-function handler(req: NextRequest) {
+function handler(req: Request) {
 	return fetchRequestHandler({
 		endpoint: "/api/trpc",
 		req,
