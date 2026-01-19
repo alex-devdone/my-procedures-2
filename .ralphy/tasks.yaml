@@ -1,0 +1,130 @@
+tasks:
+  # ============================================
+  # GROUP 1: Database Schema & Migration
+  # ============================================
+  - title: Update todo schema to add userId foreign key
+    description: |
+      File: packages/db/src/schema/todo.ts
+      - Import user table from auth schema
+      - Add userId column with foreign key reference to user.id
+      - Add index on userId for query performance
+      - Add todoRelations linking todo to user
+      - Update userRelations in auth.ts to include todos
+    parallel_group: 1
+
+  - title: Run database migration
+    description: |
+      Run: bun run db:generate && bun run db:push
+      - Generate migration for schema changes
+      - Push changes to database
+      - Verify migration succeeded
+    parallel_group: 2
+
+  # ============================================
+  # GROUP 2: Backend API - Protected Todo Routes
+  # ============================================
+  - title: Update todo router to use protectedProcedure
+    description: |
+      File: packages/api/src/routers/todo.ts
+      - Change all procedures from publicProcedure to protectedProcedure
+      - Filter getAll by ctx.session.user.id
+      - Add userId to create mutation from ctx.session.user.id
+      - Add ownership check to toggle and delete mutations
+      - Only allow users to modify their own todos
+    parallel_group: 3
+
+  # ============================================
+  # GROUP 3: Frontend Authentication UI
+  # ============================================
+  - title: Create auth client for frontend
+    description: |
+      File: apps/web/src/lib/auth-client.ts
+      - Set up Better-Auth client using createAuthClient
+      - Export signIn, signUp, signOut, useSession hooks
+      - Configure baseURL for API requests
+    parallel_group: 3
+
+  - title: Create login page
+    description: |
+      File: apps/web/src/app/(auth)/login/page.tsx
+      - Create login form with email/password fields
+      - Use Tanstack Form for form handling
+      - Call auth client signIn on submit
+      - Handle errors and loading states
+      - Add link to signup page
+      - Redirect to home on success
+    parallel_group: 4
+
+  - title: Create signup page
+    description: |
+      File: apps/web/src/app/(auth)/signup/page.tsx
+      - Create signup form with name, email, password fields
+      - Use Tanstack Form for form handling
+      - Call auth client signUp on submit
+      - Handle errors and loading states
+      - Add link to login page
+      - Redirect to home on success
+    parallel_group: 4
+
+  - title: Create auth layout with protected routes
+    description: |
+      File: apps/web/src/app/(auth)/layout.tsx
+      - Create layout for auth pages
+      - Redirect authenticated users away from login/signup
+    parallel_group: 4
+
+  # ============================================
+  # GROUP 4: Local Storage Service
+  # ============================================
+  - title: Create local storage service for todos
+    description: |
+      File: apps/web/src/lib/local-todo-storage.ts
+      - Create typed interface matching Todo schema (id, text, completed)
+      - Use crypto.randomUUID() for local IDs (string format)
+      - Implement CRUD operations: getAll, create, toggle, delete
+      - Store in localStorage under 'todos' key
+      - Handle JSON parse/stringify with error handling
+    parallel_group: 4
+
+  - title: Create todo storage abstraction hook
+    description: |
+      File: apps/web/src/hooks/use-todo-storage.ts
+      - Create useTodoStorage hook
+      - Check auth state using useSession
+      - If authenticated: use tRPC queries/mutations
+      - If not authenticated: use local storage service
+      - Provide unified interface: todos, create, toggle, delete, isLoading
+      - Handle optimistic updates for both modes
+    parallel_group: 5
+
+  # ============================================
+  # GROUP 5: UI Integration
+  # ============================================
+  - title: Create header with auth state
+    description: |
+      File: apps/web/src/components/header.tsx
+      - Show user name/email when authenticated
+      - Show logout button when authenticated
+      - Show login/signup links when not authenticated
+    parallel_group: 5
+
+  - title: Update todo components to use storage abstraction
+    description: |
+      - Update todo list component to use useTodoStorage hook
+      - Remove direct tRPC calls from todo components
+      - Add visual indicator for local vs synced todos (optional)
+      - Show message prompting login to sync todos
+    parallel_group: 6
+
+  # ============================================
+  # GROUP 6: Optional Enhancements
+  # ============================================
+  - title: Add sync local todos to database on login
+    description: |
+      File: apps/web/src/hooks/use-sync-todos.ts
+      - On successful login, check for local todos
+      - If local todos exist, prompt user to sync or discard
+      - Create tRPC mutation for bulk todo creation
+      - Clear local storage after successful sync
+      - Handle conflicts if user already has DB todos
+    parallel_group: 7

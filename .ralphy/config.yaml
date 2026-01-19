@@ -1,0 +1,40 @@
+# Ralphy Configuration
+# https://github.com/michaelshimeles/ralphy
+
+# Project info (auto-detected, edit if needed)
+project:
+  name: "my-procedures-2"
+  language: "TypeScript"
+  framework: "Next.js (Turborepo Monorepo)"
+  description: "Modern full-stack TypeScript monorepo built with Next.js, tRPC, Better-Auth, Drizzle ORM, and PostgreSQL"
+
+# Commands (auto-detected from package.json/pyproject.toml)
+commands:
+  test: ""
+  lint: "bun run check"
+  build: "bun run build"
+
+# Rules - instructions the AI MUST follow
+# These are injected into every prompt
+rules:
+  - "Always use TypeScript with strict mode enabled"
+  - "Use tRPC for all API endpoints to maintain end-to-end type safety"
+  - "Use Drizzle ORM for all database operations - never write raw SQL unless absolutely necessary"
+  - "Use Better-Auth for authentication - follow the patterns in packages/auth"
+  - "All API inputs must be validated with Zod schemas"
+  - "Follow Biome formatting and linting standards - run 'bun run check' before committing"
+  - "Use Bun as the package manager, not npm or yarn"
+  - "Follow the monorepo structure: apps/* for applications, packages/* for shared code"
+  - "Use TailwindCSS and shadcn/ui for styling - maintain consistency with existing components"
+  - "Add environment variables to both .env files and turbo.json env array"
+
+# Boundaries - files/folders the AI should not modify
+boundaries:
+  never_touch:
+    - "node_modules/**"
+    - "*.lock"
+    - "bun.lockb"
+    - ".next/**"
+    - "dist/**"
+    - ".turbo/**"
+    - "apps/web/.env.local"
