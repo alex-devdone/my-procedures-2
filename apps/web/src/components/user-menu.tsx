@@ -25,9 +25,14 @@ export default function UserMenu() {
 
 	if (!session) {
 		return (
-			<Link href="/login">
-				<Button variant="outline">Sign In</Button>
-			</Link>
+			<div className="flex items-center gap-2">
+				<Link href="/login">
+					<Button variant="outline">Sign In</Button>
+				</Link>
+				<Link href="/signup">
+					<Button>Sign Up</Button>
+				</Link>
+			</div>
 		);
 	}
 
