@@ -1,7 +1,7 @@
 "use client";
 
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { Loader2, Trash2 } from "lucide-react";
+import { Cloud, HardDrive, Loader2, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -14,58 +14,73 @@ import {
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { trpc } from "@/utils/trpc";
+import { useTodoStorage } from "@/hooks/use-todo-storage";
 
 export default function TodosPage() {
 	const [newTodoText, setNewTodoText] = useState("");
+	const { todos, create, toggle, deleteTodo, isLoading, isAuthenticated } =
+		useTodoStorage();
+	const [isCreating, setIsCreating] = useState(false);
 
-	const todos = useQuery(trpc.todo.getAll.queryOptions());
-	const createMutation = useMutation(
-		trpc.todo.create.mutationOptions({
-			onSuccess: () => {
-				todos.refetch();
-				setNewTodoText("");
-			},
-		}),
-	);
-	const toggleMutation = useMutation(
-		trpc.todo.toggle.mutationOptions({
-			onSuccess: () => {
-				todos.refetch();
-			},
-		}),
-	);
-	const deleteMutation = useMutation(
-		trpc.todo.delete.mutationOptions({
-			onSuccess: () => {
-				todos.refetch();
-			},
-		}),
-	);
-
-	const handleAddTodo = (e: React.FormEvent) => {
+	const handleAddTodo = async (e: React.FormEvent) => {
 		e.preventDefault();
 		if (newTodoText.trim()) {
-			createMutation.mutate({ text: newTodoText });
+			setIsCreating(true);
+			await create(newTodoText);
+			setNewTodoText("");
+			setIsCreating(false);
 		}
 	};
 
-	const handleToggleTodo = (id: number, completed: boolean) => {
-		toggleMutation.mutate({ id, completed: !completed });
+	const handleToggleTodo = (id: number | string, completed: boolean) => {
+		toggle(id, !completed);
 	};
 
-	const handleDeleteTodo = (id: number) => {
-		deleteMutation.mutate({ id });
+	const handleDeleteTodo = (id: number | string) => {
+		deleteTodo(id);
 	};
 
 	return (
 		<div className="mx-auto w-full max-w-md py-10">
 			<Card>
 				<CardHeader>
-					<CardTitle>Todo List</CardTitle>
-					<CardDescription>Manage your tasks efficiently</CardDescription>
+					<div className="flex items-center justify-between">
+						<div>
+							<CardTitle>Todo List</CardTitle>
+							<CardDescription>Manage your tasks efficiently</CardDescription>
+						</div>
+						<div
+							className="flex items-center gap-1.5 text-muted-foreground"
+							title={
+								isAuthenticated
+									? "Synced to cloud"
+									: "Stored locally on this device"
+							}
+						>
+							{isAuthenticated ? (
+								<>
+									<Cloud className="h-4 w-4" />
+									<span className="text-xs">Synced</span>
+								</>
+							) : (
+								<>
+									<HardDrive className="h-4 w-4" />
+									<span className="text-xs">Local</span>
+								</>
+							)}
+						</div>
+					</div>
 				</CardHeader>
 				<CardContent>
+					{!isAuthenticated && (
+						<div className="mb-4 rounded-md bg-muted p-3 text-muted-foreground text-sm">
+							<Link href="/login" className="font-medium underline">
+								Sign in
+							</Link>{" "}
+							to sync your todos across devices.
+						</div>
+					)}
+
 					<form
 						onSubmit={handleAddTodo}
 						className="mb-6 flex items-center space-x-2"
@@ -74,13 +89,10 @@ export default function TodosPage() {
 							value={newTodoText}
 							onChange={(e) => setNewTodoText(e.target.value)}
 							placeholder="Add a new task..."
-							disabled={createMutation.isPending}
+							disabled={isCreating}
 						/>
-						<Button
-							type="submit"
-							disabled={createMutation.isPending || !newTodoText.trim()}
-						>
-							{createMutation.isPending ? (
+						<Button type="submit" disabled={isCreating || !newTodoText.trim()}>
+							{isCreating ? (
 								<Loader2 className="h-4 w-4 animate-spin" />
 							) : (
 								"Add"
@@ -88,15 +100,17 @@ export default function TodosPage() {
 						</Button>
 					</form>
 
-					{todos.isLoading ? (
+					{isLoading ? (
 						<div className="flex justify-center py-4">
 							<Loader2 className="h-6 w-6 animate-spin" />
 						</div>
-					) : todos.data?.length === 0 ? (
-						<p className="py-4 text-center">No todos yet. Add one above!</p>
+					) : todos.length === 0 ? (
+						<p className="py-4 text-center text-muted-foreground">
+							No todos yet. Add one above!
+						</p>
 					) : (
 						<ul className="space-y-2">
-							{todos.data?.map((todo) => (
+							{todos.map((todo) => (
 								<li
 									key={todo.id}
 									className="flex items-center justify-between rounded-md border p-2"

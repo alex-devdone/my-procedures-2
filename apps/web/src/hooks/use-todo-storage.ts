@@ -26,6 +26,7 @@ interface UseTodoStorageReturn {
 	toggle: (id: number | string, completed: boolean) => Promise<void>;
 	deleteTodo: (id: number | string) => Promise<void>;
 	isLoading: boolean;
+	isAuthenticated: boolean;
 }
 
 let localTodosListeners: Array<() => void> = [];
@@ -211,5 +212,6 @@ export function useTodoStorage(): UseTodoStorageReturn {
 		toggle,
 		deleteTodo,
 		isLoading,
+		isAuthenticated,
 	};
 }
