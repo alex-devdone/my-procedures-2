@@ -9,7 +9,10 @@
 			"default": "./src/*.ts"
 		}
 	},
-	"scripts": {},
+	"scripts": {
+		"test": "vitest",
+		"test:run": "vitest run"
+	},
 	"dependencies": {
 		"@my-procedures-2/auth": "workspace:*",
 		"@my-procedures-2/db": "workspace:*",
@@ -24,6 +27,7 @@
 	},
 	"devDependencies": {
 		"@my-procedures-2/config": "workspace:*",
-		"typescript": "catalog:"
+		"typescript": "catalog:",
+		"vitest": "^4.0.17"
 	}
 }

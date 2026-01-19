@@ -87,6 +87,7 @@
       "devDependencies": {
         "@my-procedures-2/config": "workspace:*",
         "typescript": "catalog:",
+        "vitest": "^4.0.17",
       },
     },
     "packages/auth": {
