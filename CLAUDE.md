@@ -20,6 +20,11 @@ bun run db:push               # Push schema changes to database
 bun run db:studio             # Open Drizzle Studio (database UI)
 bun run db:generate           # Generate Drizzle migrations
 bun run db:migrate            # Apply migrations
+
+# Testing
+bun run test                  # Run all tests once
+bun run test:watch            # Run tests in watch mode
+bun run test:coverage         # Run tests with coverage report
 ```
 
 ## Architecture
@@ -95,6 +100,44 @@ apps/web/src/app/api/todo/     # Example: todo entity
 **Always run before committing:**
 ```bash
 bun run check && bun run check-types
+```
+
+## Testing
+
+**Framework:** Vitest with React Testing Library
+
+**Test files:** Place test files alongside source files with `.test.ts` or `.test.tsx` extension.
+
+```
+src/
+  components/
+    ui/
+      button.tsx
+      button.test.tsx    # Component tests
+  lib/
+    utils.ts
+    utils.test.ts        # Unit tests
+```
+
+**Running tests:**
+- `bun run test` — Run all tests once (CI mode)
+- `bun run test:watch` — Watch mode for development
+- `bun run test:coverage` — Generate coverage report (outputs to `apps/web/coverage/`)
+
+**Test configuration:** `apps/web/vitest.config.ts`
+
+**Writing tests:**
+```tsx
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
+import { MyComponent } from "./my-component";
+
+describe("MyComponent", () => {
+  it("renders correctly", () => {
+    render(<MyComponent />);
+    expect(screen.getByRole("button")).toBeInTheDocument();
+  });
+});
 ```
 
 ## Environment Variables

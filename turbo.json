@@ -38,6 +38,20 @@
 		},
 		"db:generate": {
 			"cache": false
+		},
+		"test": {
+			"cache": false,
+			"persistent": true
+		},
+		"test:run": {
+			"dependsOn": ["^build"],
+			"inputs": ["$TURBO_DEFAULT$", "vitest.config.ts", "vitest.setup.ts"],
+			"outputs": []
+		},
+		"test:coverage": {
+			"dependsOn": ["^build"],
+			"inputs": ["$TURBO_DEFAULT$", "vitest.config.ts", "vitest.setup.ts"],
+			"outputs": ["coverage/**"]
 		}
 	}
 }
