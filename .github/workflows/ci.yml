@@ -38,8 +38,8 @@ jobs:
         env:
           # Required env vars for build
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET || 'test-secret-key-for-ci-builds-only-min-32-chars' }}
-          BETTER_AUTH_URL: http://localhost:3001
-          CORS_ORIGIN: http://localhost:3001
+          BETTER_AUTH_URL: http://localhost:4757
+          CORS_ORIGIN: http://localhost:4757
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
           DIRECT_URL: postgresql://postgres:postgres@localhost:5432/postgres
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co

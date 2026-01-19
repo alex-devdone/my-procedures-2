@@ -28,7 +28,7 @@ bun run db:migrate            # Apply migrations
 
 ```
 apps/
-  web/                         # Next.js 16 fullstack app (port 3001)
+  web/                         # Next.js 16 fullstack app (port 4757)
     src/app/                   # App Router pages and API routes
       api/:entityName/         # Entity-based API modules (see below)
     src/components/            # React components (shadcn/ui in ui/)

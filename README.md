@@ -43,7 +43,7 @@ Then, run the development server:
 bun run dev
 ```
 
-Open [http://localhost:3001](http://localhost:3001) in your browser to see the fullstack application.
+Open [http://localhost:4757](http://localhost:4757) in your browser to see the fullstack application.
 
 ## Git Hooks and Formatting
 
