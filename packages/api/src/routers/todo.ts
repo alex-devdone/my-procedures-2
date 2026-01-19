@@ -64,4 +64,31 @@ export const todoRouter = router({
 
 			return await db.delete(todo).where(eq(todo.id, input.id));
 		}),
+
+	bulkCreate: protectedProcedure
+		.input(
+			z.object({
+				todos: z.array(
+					z.object({
+						text: z.string().min(1),
+						completed: z.boolean(),
+					}),
+				),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			if (input.todos.length === 0) {
+				return { count: 0 };
+			}
+
+			const values = input.todos.map((t) => ({
+				text: t.text,
+				completed: t.completed,
+				userId: ctx.session.user.id,
+			}));
+
+			await db.insert(todo).values(values);
+
+			return { count: input.todos.length };
+		}),
 });

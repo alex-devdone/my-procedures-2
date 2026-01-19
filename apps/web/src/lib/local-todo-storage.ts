@@ -66,3 +66,8 @@ export function deleteTodo(id: string): boolean {
 	localStorage.setItem(STORAGE_KEY, JSON.stringify(todos));
 	return true;
 }
+
+export function clearAll(): void {
+	if (typeof window === "undefined") return;
+	localStorage.removeItem(STORAGE_KEY);
+}
