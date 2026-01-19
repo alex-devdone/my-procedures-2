@@ -1,0 +1,51 @@
+import { trpc } from "@/utils/trpc";
+
+// ============================================================================
+// Query Options
+// ============================================================================
+
+/**
+ * Get query options for fetching all todos.
+ */
+export function getAllTodosQueryOptions() {
+	return trpc.todo.getAll.queryOptions();
+}
+
+/**
+ * Get query key for todo list.
+ */
+export function getTodosQueryKey() {
+	return trpc.todo.getAll.queryKey();
+}
+
+// ============================================================================
+// Mutation Options
+// ============================================================================
+
+/**
+ * Get mutation options for creating a todo.
+ */
+export function getCreateTodoMutationOptions() {
+	return trpc.todo.create.mutationOptions();
+}
+
+/**
+ * Get mutation options for toggling a todo.
+ */
+export function getToggleTodoMutationOptions() {
+	return trpc.todo.toggle.mutationOptions();
+}
+
+/**
+ * Get mutation options for deleting a todo.
+ */
+export function getDeleteTodoMutationOptions() {
+	return trpc.todo.delete.mutationOptions();
+}
+
+/**
+ * Get mutation options for bulk creating todos.
+ */
+export function getBulkCreateTodosMutationOptions() {
+	return trpc.todo.bulkCreate.mutationOptions();
+}
