@@ -9,6 +9,7 @@ export {
 } from "./todo.api";
 // Hooks
 export { useSyncTodos, useTodoStorage } from "./todo.hooks";
+// Types
 export type {
 	BulkCreateTodosInput,
 	BulkCreateTodosOutput,
@@ -29,3 +30,25 @@ export {
 	deleteTodoInputSchema,
 	toggleTodoInputSchema,
 } from "./todo.types";
+export type { FilterType, TodoStats } from "./todo.utils";
+// Utils (pure functions for filtering, sorting, stats)
+export {
+	applyOptimisticCreate,
+	applyOptimisticDelete,
+	applyOptimisticToggle,
+	calculateTodoStats,
+	createOptimisticTodo,
+	filterTodos,
+	filterTodosBySearch,
+	filterTodosByStatus,
+	getCurrentGreeting,
+	getMotivationMessage,
+	getRecentTodos,
+	getTimeBasedGreeting,
+	hasLocalTodosToSync,
+	normalizeLocalTodo,
+	normalizeLocalTodos,
+	normalizeRemoteTodo,
+	normalizeRemoteTodos,
+	prepareTodosForSync,
+} from "./todo.utils";
