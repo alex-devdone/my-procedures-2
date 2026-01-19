@@ -41,3 +41,8 @@ jobs:
           DIRECT_URL: postgresql://postgres:postgres@localhost:5432/postgres
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV4YW1wbGUiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTY0MjU4MTYwMCwiZXhwIjoxOTU4MTU3NjAwfQ.test
+
+      - name: Notify Vercel
+        uses: vercel/repository-dispatch/actions/status@v1
+        with:
+          name: Vercel - my-procedures-2-web: lint and build
