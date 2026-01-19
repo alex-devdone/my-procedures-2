@@ -11,6 +11,10 @@ bun run check || exit 1
 echo "→ Running type checks..."
 bun run check-types || exit 1
 
+# Run tests
+echo "→ Running tests..."
+bun run test || exit 1
+
 # Run build
 echo "→ Running build..."
 bun run build || exit 1

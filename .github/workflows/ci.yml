@@ -33,6 +33,9 @@ jobs:
       - name: Run type checking
         run: bun run check-types
 
+      - name: Run tests
+        run: bun run test
+
       - name: Build
         run: bun run build
         env:
