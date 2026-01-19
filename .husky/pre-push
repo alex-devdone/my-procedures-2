@@ -1,0 +1,18 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "Running pre-push checks..."
+
+# Run linting
+echo "→ Running linting..."
+bun run check || exit 1
+
+# Run type checking
+echo "→ Running type checks..."
+bun run check-types || exit 1
+
+# Run build
+echo "→ Running build..."
+bun run build || exit 1
+
+echo "✓ All pre-push checks passed!"
