@@ -1,3 +1,3 @@
 {
-  "extends": "@my-procedures-2/config/tsconfig.base.json"
+	"extends": "@my-procedures-2/config/tsconfig.base.json"
 }

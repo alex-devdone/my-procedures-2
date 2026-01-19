@@ -1,24 +1,24 @@
 {
-  "name": "@my-procedures-2/auth",
-  "type": "module",
-  "exports": {
-    ".": {
-      "default": "./src/index.ts"
-    },
-    "./*": {
-      "default": "./src/*.ts"
-    }
-  },
-  "scripts": {},
-  "dependencies": {
-    "@my-procedures-2/db": "workspace:*",
-    "@my-procedures-2/env": "workspace:*",
-    "better-auth": "catalog:",
-    "dotenv": "catalog:",
-    "zod": "catalog:"
-  },
-  "devDependencies": {
-    "@my-procedures-2/config": "workspace:*",
-    "typescript": "catalog:"
-  }
+	"name": "@my-procedures-2/auth",
+	"type": "module",
+	"exports": {
+		".": {
+			"default": "./src/index.ts"
+		},
+		"./*": {
+			"default": "./src/*.ts"
+		}
+	},
+	"scripts": {},
+	"dependencies": {
+		"@my-procedures-2/db": "workspace:*",
+		"@my-procedures-2/env": "workspace:*",
+		"better-auth": "catalog:",
+		"dotenv": "catalog:",
+		"zod": "catalog:"
+	},
+	"devDependencies": {
+		"@my-procedures-2/config": "workspace:*",
+		"typescript": "catalog:"
+	}
 }
