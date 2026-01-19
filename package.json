@@ -1,0 +1,55 @@
+{
+  "name": "my-procedures-2",
+  "private": true,
+  "workspaces": {
+    "packages": [
+      "apps/*",
+      "packages/*"
+    ],
+    "catalog": {
+      "dotenv": "^17.2.2",
+      "zod": "^4.1.13",
+      "typescript": "^5",
+      "next": "^16.1.1",
+      "@trpc/server": "^11.7.2",
+      "@trpc/client": "^11.7.2",
+      "better-auth": "^1.4.9",
+      "drizzle-orm": "^0.45.1",
+      "@types/pg": "^8.16.0"
+    }
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "check-types": "turbo check-types",
+    "dev:native": "turbo -F native dev",
+    "dev:web": "turbo -F web dev",
+    "db:push": "turbo -F @my-procedures-2/db db:push",
+    "db:studio": "turbo -F @my-procedures-2/db db:studio",
+    "db:generate": "turbo -F @my-procedures-2/db db:generate",
+    "db:migrate": "turbo -F @my-procedures-2/db db:migrate",
+    "check": "biome check --write .",
+    "prepare": "husky"
+  },
+  "dependencies": {
+    "@my-procedures-2/env": "workspace:*",
+    "dotenv": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.2.0",
+    "@my-procedures-2/config": "workspace:*",
+    "@types/node": "^22.13.14",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.1.2",
+    "turbo": "^2.6.3",
+    "typescript": "catalog:"
+  },
+  "lint-staged": {
+    "*.{js,ts,cjs,mjs,d.cts,d.mts,jsx,tsx,json,jsonc}": [
+      "biome check --write ."
+    ]
+  },
+  "packageManager": "bun@1.3.1"
+}

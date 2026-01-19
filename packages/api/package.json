@@ -1,0 +1,29 @@
+{
+  "name": "@my-procedures-2/api",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {},
+  "dependencies": {
+    "@my-procedures-2/auth": "workspace:*",
+    "@my-procedures-2/db": "workspace:*",
+    "@my-procedures-2/env": "workspace:*",
+    "@trpc/client": "catalog:",
+    "@trpc/server": "catalog:",
+    "@types/pg": "catalog:",
+    "dotenv": "catalog:",
+    "drizzle-orm": "catalog:",
+    "next": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@my-procedures-2/config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}
