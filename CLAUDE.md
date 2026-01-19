@@ -104,6 +104,8 @@ bun run check && bun run check-types
 
 ## Testing
 
+### Unit Tests
+
 **Framework:** Vitest with React Testing Library
 
 **Test files:** Place test files alongside source files with `.test.ts` or `.test.tsx` extension.
@@ -138,6 +140,42 @@ describe("MyComponent", () => {
     expect(screen.getByRole("button")).toBeInTheDocument();
   });
 });
+```
+
+### E2E Tests
+
+**Framework:** Playwright
+
+**Test files:** Place E2E test files in `apps/web/e2e/` with `.spec.ts` extension.
+
+```
+apps/web/e2e/
+  home.spec.ts           # Home page tests
+  auth.spec.ts           # Authentication flow tests
+```
+
+**Running E2E tests:**
+- `bun run test:e2e` — Run all E2E tests (headless)
+- `bun run test:e2e -- --ui` — Open Playwright UI mode (from apps/web)
+- `bun run test:e2e -- --headed` — Run tests in headed browsers (from apps/web)
+
+**Test configuration:** `apps/web/playwright.config.ts`
+
+**Writing E2E tests:**
+```ts
+import { expect, test } from "@playwright/test";
+
+test.describe("Feature", () => {
+  test("should work correctly", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.locator("main")).toBeVisible();
+  });
+});
+```
+
+**First-time setup:**
+```bash
+cd apps/web && bunx playwright install
 ```
 
 ## Environment Variables
