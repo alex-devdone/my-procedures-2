@@ -234,12 +234,10 @@ export function useTodoStorage(): UseTodoStorageReturn {
 		}));
 	}, [isAuthenticated, remoteTodos, localTodos]);
 
+	// Initial loading state - only true during first data fetch
+	// Does NOT include mutation pending states to allow optimistic updates to render
 	const isLoading =
-		isSessionPending ||
-		(isAuthenticated && isRemoteTodosLoading) ||
-		createMutation.isPending ||
-		toggleMutation.isPending ||
-		deleteMutation.isPending;
+		isSessionPending || (isAuthenticated && isRemoteTodosLoading);
 
 	return {
 		todos,

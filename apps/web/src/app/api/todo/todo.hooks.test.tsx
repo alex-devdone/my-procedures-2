@@ -285,7 +285,7 @@ describe("useTodoStorage", () => {
 	});
 
 	describe("Loading State", () => {
-		it("combines all loading states correctly", () => {
+		it("returns isLoading true when session is pending", () => {
 			mockUseSession.mockReturnValue({
 				data: null,
 				isPending: true, // Session pending
@@ -296,6 +296,47 @@ describe("useTodoStorage", () => {
 			});
 
 			expect(result.current.isLoading).toBe(true);
+		});
+
+		it("returns isLoading false when session resolved and not authenticated", () => {
+			mockUseSession.mockReturnValue({
+				data: null,
+				isPending: false,
+			});
+
+			const { result } = renderHook(() => useTodoStorage(), {
+				wrapper: createWrapper(),
+			});
+
+			// Should be false because we're not fetching remote todos in guest mode
+			expect(result.current.isLoading).toBe(false);
+		});
+
+		it("does not include mutation pending states in isLoading (allows optimistic updates)", async () => {
+			// Start with some local todos
+			const localTodos = [{ id: "uuid-1", text: "Task 1", completed: false }];
+			mockLocalStorage.todos = JSON.stringify(localTodos);
+
+			mockUseSession.mockReturnValue({
+				data: null,
+				isPending: false,
+			});
+
+			const { result } = renderHook(() => useTodoStorage(), {
+				wrapper: createWrapper(),
+			});
+
+			// isLoading should be false before toggle
+			expect(result.current.isLoading).toBe(false);
+
+			// Start toggle mutation (don't await to check isLoading during mutation)
+			act(() => {
+				result.current.toggle("uuid-1", true);
+			});
+
+			// isLoading should STILL be false during mutation - this allows optimistic updates
+			// to render immediately without showing loading skeleton
+			expect(result.current.isLoading).toBe(false);
 		});
 	});
 
