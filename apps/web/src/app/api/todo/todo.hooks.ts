@@ -37,6 +37,14 @@ import type {
 
 let localTodosListeners: Array<() => void> = [];
 
+// Cached snapshot to prevent infinite loops in useSyncExternalStore
+// React requires getSnapshot to return a cached value when data hasn't changed
+let cachedLocalTodos: LocalTodo[] = [];
+let cachedLocalTodosJson = "";
+
+// Cached empty array for server snapshot (must be stable reference)
+const emptyLocalTodos: LocalTodo[] = [];
+
 function subscribeToLocalTodos(callback: () => void) {
 	localTodosListeners.push(callback);
 	return () => {
@@ -51,11 +59,20 @@ function notifyLocalTodosListeners() {
 }
 
 function getLocalTodosSnapshot(): LocalTodo[] {
-	return localTodoStorage.getAll();
+	const todos = localTodoStorage.getAll();
+	const todosJson = JSON.stringify(todos);
+
+	// Only return a new reference if the data actually changed
+	if (todosJson !== cachedLocalTodosJson) {
+		cachedLocalTodosJson = todosJson;
+		cachedLocalTodos = todos;
+	}
+
+	return cachedLocalTodos;
 }
 
 function getLocalTodosServerSnapshot(): LocalTodo[] {
-	return [];
+	return emptyLocalTodos;
 }
 
 // ============================================================================

@@ -1,7 +1,4 @@
 tasks:
-  # ============================================
-  # GROUP 1: Database Schema & Migration
-  # ============================================
   - title: Update todo schema to add userId foreign key
     description: |
       File: packages/db/src/schema/todo.ts
@@ -11,7 +8,7 @@ tasks:
       - Add todoRelations linking todo to user
       - Update userRelations in auth.ts to include todos
     parallel_group: 1
-
+    completed: true
   - title: Run database migration
     description: |
       Run: bun run db:generate && bun run db:push
@@ -19,10 +16,7 @@ tasks:
       - Push changes to database
       - Verify migration succeeded
     parallel_group: 2
-
-  # ============================================
-  # GROUP 2: Backend API - Protected Todo Routes
-  # ============================================
+    completed: true
   - title: Update todo router to use protectedProcedure
     description: |
       File: packages/api/src/routers/todo.ts
@@ -32,10 +26,7 @@ tasks:
       - Add ownership check to toggle and delete mutations
       - Only allow users to modify their own todos
     parallel_group: 3
-
-  # ============================================
-  # GROUP 3: Frontend Authentication UI
-  # ============================================
+    completed: true
   - title: Create auth client for frontend
     description: |
       File: apps/web/src/lib/auth-client.ts
@@ -43,7 +34,7 @@ tasks:
       - Export signIn, signUp, signOut, useSession hooks
       - Configure baseURL for API requests
     parallel_group: 3
-
+    completed: true
   - title: Create login page
     description: |
       File: apps/web/src/app/(auth)/login/page.tsx
@@ -54,7 +45,7 @@ tasks:
       - Add link to signup page
       - Redirect to home on success
     parallel_group: 4
-
+    completed: true
   - title: Create signup page
     description: |
       File: apps/web/src/app/(auth)/signup/page.tsx
@@ -65,17 +56,14 @@ tasks:
       - Add link to login page
       - Redirect to home on success
     parallel_group: 4
-
+    completed: true
   - title: Create auth layout with protected routes
     description: |
       File: apps/web/src/app/(auth)/layout.tsx
       - Create layout for auth pages
       - Redirect authenticated users away from login/signup
     parallel_group: 4
-
-  # ============================================
-  # GROUP 4: Local Storage Service
-  # ============================================
+    completed: true
   - title: Create local storage service for todos
     description: |
       File: apps/web/src/lib/local-todo-storage.ts
@@ -85,7 +73,7 @@ tasks:
       - Store in localStorage under 'todos' key
       - Handle JSON parse/stringify with error handling
     parallel_group: 4
-
+    completed: true
   - title: Create todo storage abstraction hook
     description: |
       File: apps/web/src/hooks/use-todo-storage.ts
@@ -96,10 +84,7 @@ tasks:
       - Provide unified interface: todos, create, toggle, delete, isLoading
       - Handle optimistic updates for both modes
     parallel_group: 5
-
-  # ============================================
-  # GROUP 5: UI Integration
-  # ============================================
+    completed: true
   - title: Create header with auth state
     description: |
       File: apps/web/src/components/header.tsx
@@ -107,7 +92,7 @@ tasks:
       - Show logout button when authenticated
       - Show login/signup links when not authenticated
     parallel_group: 5
-
+    completed: true
   - title: Update todo components to use storage abstraction
     description: |
       - Update todo list component to use useTodoStorage hook
@@ -115,10 +100,7 @@ tasks:
       - Add visual indicator for local vs synced todos (optional)
       - Show message prompting login to sync todos
     parallel_group: 6
-
-  # ============================================
-  # GROUP 6: Optional Enhancements
-  # ============================================
+    completed: true
   - title: Add sync local todos to database on login
     description: |
       File: apps/web/src/hooks/use-sync-todos.ts
@@ -128,3 +110,173 @@ tasks:
       - Clear local storage after successful sync
       - Handle conflicts if user already has DB todos
     parallel_group: 7
+    completed: true
+  - title: Refactor to entity-based API structure
+    description: |
+      Reorganize frontend API code into entity-based modules:
+
+      For each entity (e.g., todo, user), create:
+      - apps/web/src/app/api/:entityName/:entityName.types.ts
+        - Define TypeScript types/interfaces for the entity
+        - Export input/output schemas using Zod
+      - apps/web/src/app/api/:entityName/:entityName.api.ts
+        - tRPC query/mutation wrapper functions
+        - API client methods for the entity
+      - apps/web/src/app/api/:entityName/:entityName.hooks.ts
+        - React Query hooks using tRPC
+        - Custom hooks for entity operations (CRUD)
+        - Optimistic update logic
+
+      Start with todo entity:
+      - apps/web/src/app/api/todo/todo.types.ts
+      - apps/web/src/app/api/todo/todo.api.ts
+      - apps/web/src/app/api/todo/todo.hooks.ts
+
+      Migrate existing useTodoStorage hook logic to new structure
+    parallel_group: 8
+    completed: true
+  - title: Update CLAUDE.md with entity-based API structure
+    description: |
+      File: CLAUDE.md
+      - Document the new entity-based API structure pattern
+      - Add to Architecture section:
+        apps/web/src/app/api/:entityName/
+          :entityName.types.ts   # TypeScript types and Zod schemas
+          :entityName.api.ts     # tRPC client wrappers
+          :entityName.hooks.ts   # React Query hooks
+      - Explain the pattern for adding new entities
+      - Update any outdated references to hook locations
+    parallel_group: 9
+    completed: true
+  - title: Fix useSyncExternalStore infinite loop in todo.hooks.ts
+    description: >
+      File: apps/web/src/app/api/todo/todo.hooks.ts
+
+
+      Error: "The result of getServerSnapshot should be cached to avoid an
+      infinite loop"
+
+      Location: useTodoStorage hook, line 74
+
+
+      Fix:
+
+      - Cache getLocalTodosServerSnapshot return value (define outside component
+      or use useCallback)
+
+      - Ensure getLocalTodosSnapshot is also stable (memoized or defined
+      outside)
+
+      - subscribeToLocalTodos should be stable reference
+
+
+      React requires these functions to return cached/stable values to prevent
+
+      re-renders triggering new subscriptions in an infinite loop.
+    parallel_group: 8
+    completed: true
+  - title: Change default dev port to 4757
+    description: |
+      Update the development server to use port 4757:
+      - apps/web/package.json: update dev script to use --port 4757
+      - Update CLAUDE.md if it mentions the port
+      - Update any hardcoded localhost URLs (auth config, etc.)
+    parallel_group: 8
+    completed: true
+  - title: Redesign app UI/UX using frontend-design skill
+    description: |
+      Use /frontend-design skill to create a polished, distinctive design:
+
+      Navigation & Flow:
+      - Design clear navigation structure (sidebar, header, or tabs)
+      - Create intuitive user flow: landing -> auth -> dashboard -> todos
+      - Add visual hierarchy for primary/secondary actions
+
+      Pages to design:
+      - Landing page: compelling hero, feature highlights, CTA
+      - Auth pages: clean login/signup forms with social proof
+      - Dashboard: overview with key metrics/quick actions
+      - Todos page: modern task list with filters, search, categories
+
+      Design requirements:
+      - Consistent visual language across all pages
+      - Responsive design (mobile-first approach)
+      - Accessible color contrast and focus states
+      - Micro-interactions and transitions
+      - Empty states and loading skeletons
+      - Error states with helpful messages
+
+      Avoid generic AI aesthetics - aim for distinctive, production-grade design
+    parallel_group: 10
+    completed: true
+  - title: Set up unit testing infrastructure
+    description: |
+      Set up testing framework for the monorepo:
+      - Install Vitest (or Jest) and React Testing Library
+      - Configure test scripts in root package.json (bun run test)
+      - Set up test config for apps/web (vitest.config.ts)
+      - Add coverage reporting
+      - Update CLAUDE.md with test commands
+    parallel_group: 11
+    completed: true
+  - title: Extract business logic into testable hooks/utilities
+    description: |
+      Refactor to separate business logic from UI for testability:
+
+      Identify and extract:
+      - Form validation logic -> apps/web/src/hooks/use-form-validation.ts
+      - Auth state management -> apps/web/src/hooks/use-auth-state.ts
+      - Todo filtering/sorting -> apps/web/src/app/api/todo/todo.utils.ts
+      - Local storage sync logic -> pure functions in todo.utils.ts
+      - Error handling patterns -> apps/web/src/hooks/use-error-handler.ts
+
+      Principles:
+      - Separate pure business logic from React hooks where possible
+      - Keep hooks thin (orchestration only, delegate to pure functions)
+      - Make dependencies injectable for easier mocking
+    parallel_group: 11
+    completed: true
+  - title: Write unit tests for business logic
+    description: |
+      Write comprehensive unit tests for extracted logic:
+
+      Test files to create:
+      - apps/web/src/app/api/todo/todo.hooks.test.ts
+        - useTodoStorage hook behavior
+        - Optimistic update logic
+        - Local vs authenticated mode switching
+      - apps/web/src/app/api/todo/todo.utils.test.ts
+        - Todo filtering/sorting functions
+        - Local storage helpers
+      - apps/web/src/hooks/use-auth-state.test.ts
+        - Auth state transitions
+        - Session handling
+      - packages/api/src/routers/todo.test.ts
+        - tRPC procedure logic (mock db)
+
+      Coverage targets:
+      - Hooks: test all state transitions and edge cases
+      - Utils: 100% coverage on pure functions
+      - API: test authorization and validation logic
+    parallel_group: 12
+    completed: true
+  - title: Fix 403 INVALID_ORIGIN error in Better-Auth
+    description: |
+      Error: {code: "INVALID_ORIGIN", message: "Invalid origin"}
+
+      This is a CORS/origin validation error from Better-Auth.
+
+      Likely causes:
+      - BETTER_AUTH_URL in .env doesn't match actual origin
+      - CORS_ORIGIN env var is incorrect or missing
+      - Port mismatch after changing to 4757
+
+      Fix:
+      - Update apps/web/.env:
+        - BETTER_AUTH_URL=http://localhost:4757
+        - CORS_ORIGIN=http://localhost:4757
+      - Check packages/auth/src/index.ts for trustedOrigins config
+      - Verify auth client baseURL in apps/web/src/lib/auth-client.ts
+      - Restart dev server after env changes
+    parallel_group: 8
+    completed: true

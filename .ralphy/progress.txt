@@ -1,2 +1,23 @@
 # Ralphy Progress Log
 
+- [✓] 2026-01-19 20:55 - Update todo schema to add userId foreign key
+- [✓] 2026-01-19 20:56 - Run database migration
+- [✓] 2026-01-19 20:59 - Update todo router to use protectedProcedure
+- [✓] 2026-01-19 21:01 - Create auth client for frontend
+- [✓] 2026-01-19 21:05 - Create login page
+- [✓] 2026-01-19 21:05 - Create signup page
+- [✓] 2026-01-19 21:06 - Create auth layout with protected routes
+- [✓] 2026-01-19 21:07 - Create local storage service for todos
+- [✓] 2026-01-19 21:11 - Create todo storage abstraction hook
+- [✓] 2026-01-19 21:12 - Create header with auth state
+- [✓] 2026-01-19 21:15 - Update todo components to use storage abstraction
+- [✓] 2026-01-19 21:18 - Add sync local todos to database on login
+- [✓] 2026-01-19 21:22 - Refactor to entity-based API structure
+- [✓] 2026-01-19 21:24 - Update CLAUDE.md with entity-based API structure
+- [✓] 2026-01-19 21:24 - Fix useSyncExternalStore infinite loop in todo.hooks.ts
+- [✓] 2026-01-19 21:26 - Change default dev port to 4757
+- [✓] 2026-01-19 21:39 - Redesign app UI/UX using frontend-design skill
+- [✓] 2026-01-19 21:43 - Set up unit testing infrastructure
+- [✓] 2026-01-19 21:50 - Extract business logic into testable hooks/utilities
+- [✓] 2026-01-19 21:58 - Write unit tests for business logic
+- [✓] 2026-01-19 21:58 - Fix 403 INVALID_ORIGIN error in Better-Auth
