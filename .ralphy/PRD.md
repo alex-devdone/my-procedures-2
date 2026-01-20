@@ -74,8 +74,8 @@ Frontend API wrappers for folders. Can proceed after Phase 2.
 
 UI components for folder management. Can proceed after Phase 3.
 
-- [ ] Create `apps/web/src/components/folders/folder-sidebar.tsx` - sidebar with folder list and quick actions
-- [ ] Add unit tests for FolderSidebar component in `apps/web/src/components/folders/folder-sidebar.test.tsx`
+- [x] Create `apps/web/src/components/folders/folder-sidebar.tsx` - sidebar with folder list and quick actions
+- [x] Add unit tests for FolderSidebar component in `apps/web/src/components/folders/folder-sidebar.test.tsx`
 - [ ] Create `apps/web/src/components/folders/folder-create-dialog.tsx` - modal for creating folders with name/color
 - [ ] Add unit tests for FolderCreateDialog in `apps/web/src/components/folders/folder-create-dialog.test.tsx`
 - [ ] Create `apps/web/src/components/folders/folder-edit-dialog.tsx` - modal for editing/deleting folders
