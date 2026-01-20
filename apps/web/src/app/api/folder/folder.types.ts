@@ -44,13 +44,14 @@ export interface Folder {
 
 /**
  * Remote folder from the database (via tRPC).
+ * Note: createdAt is serialized as ISO string over JSON.
  */
 export interface RemoteFolder {
 	id: number;
 	name: string;
 	color: string;
 	userId: string;
-	createdAt: Date;
+	createdAt: string;
 	order: number;
 }
 
@@ -135,7 +136,8 @@ export type UpdateFolderInput = z.infer<typeof updateFolderInputSchema>;
 export type DeleteFolderInput = z.infer<typeof deleteFolderInputSchema>;
 export type ReorderFolderInput = z.infer<typeof reorderFolderInputSchema>;
 
-export type LocalCreateFolderInput = z.infer<
+// Use z.input for the input type (before .default() is applied)
+export type LocalCreateFolderInput = z.input<
 	typeof localCreateFolderInputSchema
 >;
 export type LocalUpdateFolderInput = z.infer<

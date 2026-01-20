@@ -45,3 +45,9 @@
 - [✓] 2026-01-20 23:25 - Create folder.types.ts with TypeScript types (Folder, RemoteFolder, LocalFolder, FolderColor) and Zod schemas
 - [✓] 2026-01-20 23:25 - Add unit tests for folder types/schemas (43 tests) in folder.types.test.ts
 - [✓] 2026-01-20 23:28 - Create folder.api.ts with tRPC query/mutation options (getAllFoldersQueryOptions, getFoldersQueryKey, create/update/delete/reorder mutation options)
+
+- [✓] 2026-01-20 23:44 - Create folder.hooks.ts with useFolderStorage React hook (dual-mode: localStorage for guests, tRPC for authenticated)
+- [✓] 2026-01-20 23:44 - Implement optimistic updates for folder CRUD operations (create, update, delete, reorder)
+- [✓] 2026-01-20 23:44 - Add unit tests for folder hooks (20 tests) in folder.hooks.test.tsx
+- [✓] 2026-01-20 23:44 - Create local-folder-storage.ts for localStorage folder management (getAll, create, update, delete, reorder, clearAll)
+- [✓] 2026-01-20 23:44 - Fix RemoteFolder type to use createdAt: string (ISO serialization over JSON)
