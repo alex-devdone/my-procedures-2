@@ -60,3 +60,6 @@
 - [✓] 2026-01-21 00:00 - Create Dialog UI component (apps/web/src/components/ui/dialog.tsx) using @base-ui/react/dialog
 - [✓] 2026-01-21 00:02 - Create FolderCreateDialog component (apps/web/src/components/folders/folder-create-dialog.tsx) with name input, color picker, and live preview
 - [✓] 2026-01-21 00:02 - Add unit tests for FolderCreateDialog (78 tests) in apps/web/src/components/folders/folder-create-dialog.test.tsx
+
+- [✓] 2026-01-21 00:17 - Create FolderEditDialog component (apps/web/src/components/folders/folder-edit-dialog.tsx) with name/color editing, delete confirmation, and live preview
+- [✓] 2026-01-21 00:17 - Add unit tests for FolderEditDialog (96 tests) in apps/web/src/components/folders/folder-edit-dialog.test.tsx
