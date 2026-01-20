@@ -1,5 +1,6 @@
 {
   "lockfileVersion": 1,
+  "configVersion": 0,
   "workspaces": {
     "": {
       "name": "my-procedures-2",
@@ -123,6 +124,7 @@
         "@types/pg": "catalog:",
         "drizzle-kit": "^0.31.8",
         "typescript": "catalog:",
+        "vitest": "^4.0.17",
       },
     },
     "packages/env": {

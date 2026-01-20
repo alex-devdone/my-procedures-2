@@ -32,8 +32,8 @@ Flowdo is a full-stack TypeScript monorepo using Next.js 16, tRPC, Drizzle ORM w
 
 Foundation layer - all subsequent phases depend on these schema changes.
 
-- [ ] Create `packages/db/src/schema/folder.ts` with folder table (id, name, color, userId, createdAt, order)
-- [ ] Add unit tests for folder schema validation in `packages/db/src/schema/folder.test.ts`
+- [x] Create `packages/db/src/schema/folder.ts` with folder table (id, name, color, userId, createdAt, order)
+- [x] Add unit tests for folder schema validation in `packages/db/src/schema/folder.test.ts`
 - [ ] Update `packages/db/src/schema/todo.ts` to add scheduling fields (dueDate, reminderAt, recurringPattern, folderId)
 - [ ] Add unit tests for updated todo schema in `packages/db/src/schema/todo.test.ts`
 - [ ] Create `packages/db/src/schema/subtask.ts` with subtask table (id, text, completed, todoId, order)

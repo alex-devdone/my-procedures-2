@@ -1,5 +1,6 @@
 import { relations } from "drizzle-orm";
 import { boolean, index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { folder } from "./folder";
 import { todo } from "./todo";
 
 export const user = pgTable("user", {
@@ -78,6 +79,7 @@ export const userRelations = relations(user, ({ many }) => ({
 	sessions: many(session),
 	accounts: many(account),
 	todos: many(todo),
+	folders: many(folder),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({

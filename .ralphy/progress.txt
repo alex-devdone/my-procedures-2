@@ -25,3 +25,6 @@
 - [✓] 2026-01-19 22:15 - Set up Playwright for E2E testing
 - [✓] 2026-01-19 23:19 - Write E2E tests for todo CRUD operations
 - [✓] 2026-01-19 23:35 - Fix todo toggle causing full list reload
+
+- [✓] 2026-01-20 22:54 - Create folder schema (packages/db/src/schema/folder.ts) with id, name, color, userId, createdAt, order
+- [✓] 2026-01-20 22:54 - Add unit tests for folder schema validation (packages/db/src/schema/folder.test.ts)
