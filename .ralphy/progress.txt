@@ -30,3 +30,5 @@
 - [✓] 2026-01-20 22:54 - Add unit tests for folder schema validation (packages/db/src/schema/folder.test.ts)
 - [✓] 2026-01-20 22:57 - Update todo schema with scheduling fields (dueDate, reminderAt, recurringPattern, folderId) and indexes
 - [✓] 2026-01-20 22:57 - Add unit tests for updated todo schema (packages/db/src/schema/todo.test.ts)
+- [✓] 2026-01-20 23:01 - Create subtask schema (packages/db/src/schema/subtask.ts) with id, text, completed, todoId, order
+- [✓] 2026-01-20 23:01 - Add unit tests for subtask schema (packages/db/src/schema/subtask.test.ts)
