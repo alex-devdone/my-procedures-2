@@ -66,7 +66,7 @@ Frontend API wrappers for folders. Can proceed after Phase 2.
 - [x] Add unit tests for folder hooks in `apps/web/src/app/api/folder/folder.hooks.test.ts`
 - [x] Create `apps/web/src/app/api/folder/index.ts` barrel export
 - [x] Create `apps/web/src/lib/local-folder-storage.ts` for localStorage folder management (guests)
-- [ ] Add unit tests for local folder storage in `apps/web/src/lib/local-folder-storage.test.ts`
+- [x] Add unit tests for local folder storage in `apps/web/src/lib/local-folder-storage.test.ts`
 
 ---
 

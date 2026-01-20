@@ -52,3 +52,4 @@
 - [✓] 2026-01-20 23:44 - Create local-folder-storage.ts for localStorage folder management (getAll, create, update, delete, reorder, clearAll)
 - [✓] 2026-01-20 23:44 - Fix RemoteFolder type to use createdAt: string (ISO serialization over JSON)
 - [✓] 2026-01-20 23:47 - Create folder barrel export (apps/web/src/app/api/folder/index.ts) with types, schemas, API functions, and hooks
+- [✓] 2026-01-20 23:50 - Add unit tests for local folder storage (35 tests) in apps/web/src/lib/local-folder-storage.test.ts
