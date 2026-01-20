@@ -4,6 +4,7 @@ export interface LocalTodo {
 	id: string;
 	text: string;
 	completed: boolean;
+	folderId?: string | null;
 }
 
 function isLocalTodoArray(data: unknown): data is LocalTodo[] {
@@ -14,7 +15,10 @@ function isLocalTodoArray(data: unknown): data is LocalTodo[] {
 			item !== null &&
 			typeof item.id === "string" &&
 			typeof item.text === "string" &&
-			typeof item.completed === "boolean",
+			typeof item.completed === "boolean" &&
+			(item.folderId === undefined ||
+				item.folderId === null ||
+				typeof item.folderId === "string"),
 	);
 }
 
@@ -35,12 +39,13 @@ export function getAll(): LocalTodo[] {
 	}
 }
 
-export function create(text: string): LocalTodo {
+export function create(text: string, folderId?: string | null): LocalTodo {
 	const todos = getAll();
 	const newTodo: LocalTodo = {
 		id: crypto.randomUUID(),
 		text,
 		completed: false,
+		folderId: folderId ?? null,
 	};
 	todos.push(newTodo);
 	localStorage.setItem(STORAGE_KEY, JSON.stringify(todos));
@@ -65,6 +70,19 @@ export function deleteTodo(id: string): boolean {
 	todos.splice(index, 1);
 	localStorage.setItem(STORAGE_KEY, JSON.stringify(todos));
 	return true;
+}
+
+export function updateFolder(
+	id: string,
+	folderId: string | null,
+): LocalTodo | null {
+	const todos = getAll();
+	const todo = todos.find((t) => t.id === id);
+	if (!todo) return null;
+
+	todo.folderId = folderId;
+	localStorage.setItem(STORAGE_KEY, JSON.stringify(todos));
+	return todo;
 }
 
 export function clearAll(): void {

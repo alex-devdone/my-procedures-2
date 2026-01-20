@@ -12,16 +12,22 @@ export interface Todo {
 	id: number | string;
 	text: string;
 	completed: boolean;
+	folderId?: number | string | null;
 }
 
 /**
  * Remote todo from the database (via tRPC).
+ * Includes scheduling fields from the database schema.
  */
 export interface RemoteTodo {
 	id: number;
 	text: string;
 	completed: boolean;
 	userId: string;
+	folderId: number | null;
+	dueDate: string | null;
+	reminderAt: string | null;
+	recurringPattern?: unknown;
 }
 
 /**
@@ -31,6 +37,7 @@ export interface LocalTodo {
 	id: string;
 	text: string;
 	completed: boolean;
+	folderId?: string | null;
 }
 
 // ============================================================================
@@ -39,6 +46,7 @@ export interface LocalTodo {
 
 export const createTodoInputSchema = z.object({
 	text: z.string().min(1, "Todo text is required"),
+	folderId: z.number().nullable().optional(),
 });
 
 export const toggleTodoInputSchema = z.object({
@@ -55,8 +63,14 @@ export const bulkCreateTodosInputSchema = z.object({
 		z.object({
 			text: z.string().min(1),
 			completed: z.boolean(),
+			folderId: z.number().nullable().optional(),
 		}),
 	),
+});
+
+export const updateTodoFolderInputSchema = z.object({
+	id: z.number(),
+	folderId: z.number().nullable(),
 });
 
 // ============================================================================
@@ -67,6 +81,7 @@ export type CreateTodoInput = z.infer<typeof createTodoInputSchema>;
 export type ToggleTodoInput = z.infer<typeof toggleTodoInputSchema>;
 export type DeleteTodoInput = z.infer<typeof deleteTodoInputSchema>;
 export type BulkCreateTodosInput = z.infer<typeof bulkCreateTodosInputSchema>;
+export type UpdateTodoFolderInput = z.infer<typeof updateTodoFolderInputSchema>;
 
 // ============================================================================
 // Output Types
@@ -92,13 +107,23 @@ export interface SyncPromptState {
 // Hook Return Types
 // ============================================================================
 
+/** Selected folder ID type - can be "inbox" for unassigned todos, or a folder ID */
+export type SelectedFolderId = "inbox" | number | string;
+
 export interface UseTodoStorageReturn {
 	todos: Todo[];
-	create: (text: string) => Promise<void>;
+	create: (text: string, folderId?: number | string | null) => Promise<void>;
 	toggle: (id: number | string, completed: boolean) => Promise<void>;
 	deleteTodo: (id: number | string) => Promise<void>;
+	updateFolder: (
+		id: number | string,
+		folderId: number | string | null,
+	) => Promise<void>;
 	isLoading: boolean;
 	isAuthenticated: boolean;
+	selectedFolderId: SelectedFolderId;
+	setSelectedFolderId: (folderId: SelectedFolderId) => void;
+	filteredTodos: Todo[];
 }
 
 export interface UseSyncTodosReturn {

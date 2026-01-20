@@ -63,3 +63,10 @@
 
 - [✓] 2026-01-21 00:17 - Create FolderEditDialog component (apps/web/src/components/folders/folder-edit-dialog.tsx) with name/color editing, delete confirmation, and live preview
 - [✓] 2026-01-21 00:17 - Add unit tests for FolderEditDialog (96 tests) in apps/web/src/components/folders/folder-edit-dialog.test.tsx
+
+- [✓] 2026-01-21 00:32 - Update todo list component (apps/web/src/app/todos/page.tsx) to integrate folder sidebar with filtering
+- [✓] 2026-01-21 00:32 - Add folderId support to Todo types (apps/web/src/app/api/todo/todo.types.ts) with SelectedFolderId type
+- [✓] 2026-01-21 00:32 - Update useTodoStorage hook to handle folder filtering with selectedFolderId state and filteredTodos
+- [✓] 2026-01-21 00:32 - Add updateFolder mutation to todo hooks for moving todos between folders
+- [✓] 2026-01-21 00:32 - Update local-todo-storage.ts to support folderId in create and updateFolder operations
+- [✓] 2026-01-21 00:32 - Add unit tests for folder filtering in todo hooks (32 tests) testing selectedFolderId, filteredTodos, and updateFolder

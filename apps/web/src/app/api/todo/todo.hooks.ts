@@ -20,10 +20,12 @@ import {
 	getDeleteTodoMutationOptions,
 	getTodosQueryKey,
 	getToggleTodoMutationOptions,
+	getUpdateTodoFolderMutationOptions,
 } from "./todo.api";
 import type {
 	LocalTodo,
 	RemoteTodo,
+	SelectedFolderId,
 	SyncAction,
 	SyncPromptState,
 	Todo,
@@ -83,10 +85,14 @@ function getLocalTodosServerSnapshot(): LocalTodo[] {
  * Unified hook for managing todos with dual-mode support:
  * - Authenticated users: todos stored remotely via tRPC
  * - Guest users: todos stored locally in browser localStorage
+ *
+ * Also provides folder filtering capabilities.
  */
 export function useTodoStorage(): UseTodoStorageReturn {
 	const { data: session, isPending: isSessionPending } = useSession();
 	const isAuthenticated = !!session?.user;
+	const [selectedFolderId, setSelectedFolderId] =
+		useState<SelectedFolderId>("inbox");
 
 	const localTodos = useSyncExternalStore(
 		subscribeToLocalTodos,
@@ -108,7 +114,7 @@ export function useTodoStorage(): UseTodoStorageReturn {
 	// Create mutation with optimistic updates
 	const createMutation = useMutation({
 		mutationFn: getCreateTodoMutationOptions().mutationFn,
-		onMutate: async (newTodo: { text: string }) => {
+		onMutate: async (newTodo: { text: string; folderId?: number | null }) => {
 			await queryClient.cancelQueries({ queryKey });
 
 			const previousTodos = queryClient.getQueryData<RemoteTodo[]>(queryKey);
@@ -120,6 +126,7 @@ export function useTodoStorage(): UseTodoStorageReturn {
 					text: newTodo.text,
 					completed: false,
 					userId: session?.user?.id ?? "",
+					folderId: newTodo.folderId ?? null,
 				},
 			]);
 
@@ -183,12 +190,57 @@ export function useTodoStorage(): UseTodoStorageReturn {
 		},
 	});
 
+	// Update folder mutation with optimistic updates
+	const updateFolderMutation = useMutation({
+		mutationFn: getUpdateTodoFolderMutationOptions().mutationFn,
+		onMutate: async ({
+			id,
+			folderId,
+		}: {
+			id: number;
+			folderId: number | null;
+		}) => {
+			await queryClient.cancelQueries({ queryKey });
+
+			const previousTodos = queryClient.getQueryData<RemoteTodo[]>(queryKey);
+
+			queryClient.setQueryData<RemoteTodo[]>(queryKey, (old) =>
+				old?.map((todo) => (todo.id === id ? { ...todo, folderId } : todo)),
+			);
+
+			return { previousTodos };
+		},
+		onError: (_err, _variables, context) => {
+			if (context?.previousTodos) {
+				queryClient.setQueryData(queryKey, context.previousTodos);
+			}
+		},
+		onSettled: () => {
+			refetchRemoteTodos();
+		},
+	});
+
 	const create = useCallback(
-		async (text: string) => {
+		async (text: string, folderId?: number | string | null) => {
+			// Convert folderId to appropriate type for storage
+			const numericFolderId =
+				folderId === "inbox" || folderId === null || folderId === undefined
+					? null
+					: typeof folderId === "string"
+						? folderId // Keep as string for local storage
+						: folderId;
+
 			if (isAuthenticated) {
-				await createMutation.mutateAsync({ text });
+				await createMutation.mutateAsync({
+					text,
+					folderId:
+						typeof numericFolderId === "number" ? numericFolderId : null,
+				});
 			} else {
-				localTodoStorage.create(text);
+				localTodoStorage.create(
+					text,
+					typeof numericFolderId === "string" ? numericFolderId : null,
+				);
 				notifyLocalTodosListeners();
 			}
 		},
@@ -219,20 +271,52 @@ export function useTodoStorage(): UseTodoStorageReturn {
 		[isAuthenticated, deleteMutation],
 	);
 
+	const updateFolder = useCallback(
+		async (id: number | string, folderId: number | string | null) => {
+			if (isAuthenticated) {
+				await updateFolderMutation.mutateAsync({
+					id: id as number,
+					folderId: typeof folderId === "number" ? folderId : null,
+				});
+			} else {
+				localTodoStorage.updateFolder(
+					id as string,
+					typeof folderId === "string" ? folderId : null,
+				);
+				notifyLocalTodosListeners();
+			}
+		},
+		[isAuthenticated, updateFolderMutation],
+	);
+
 	const todos: Todo[] = useMemo(() => {
 		if (isAuthenticated) {
 			return (remoteTodos ?? []).map((t) => ({
 				id: t.id,
 				text: t.text,
 				completed: t.completed,
+				folderId: t.folderId,
 			}));
 		}
 		return localTodos.map((t) => ({
 			id: t.id,
 			text: t.text,
 			completed: t.completed,
+			folderId: t.folderId ?? null,
 		}));
 	}, [isAuthenticated, remoteTodos, localTodos]);
+
+	// Filter todos by selected folder
+	const filteredTodos: Todo[] = useMemo(() => {
+		if (selectedFolderId === "inbox") {
+			// Inbox shows todos without a folder
+			return todos.filter(
+				(todo) => todo.folderId === null || todo.folderId === undefined,
+			);
+		}
+		// Filter by specific folder ID
+		return todos.filter((todo) => todo.folderId === selectedFolderId);
+	}, [todos, selectedFolderId]);
 
 	// Initial loading state - only true during first data fetch
 	// Does NOT include mutation pending states to allow optimistic updates to render
@@ -244,8 +328,12 @@ export function useTodoStorage(): UseTodoStorageReturn {
 		create,
 		toggle,
 		deleteTodo,
+		updateFolder,
 		isLoading,
 		isAuthenticated,
+		selectedFolderId,
+		setSelectedFolderId,
+		filteredTodos,
 	};
 }
 

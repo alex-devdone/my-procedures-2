@@ -147,6 +147,9 @@ export function createOptimisticTodo(text: string, userId: string): RemoteTodo {
 		text,
 		completed: false,
 		userId,
+		folderId: null,
+		dueDate: null,
+		reminderAt: null,
 	};
 }
 

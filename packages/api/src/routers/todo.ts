@@ -14,11 +14,17 @@ export const todoRouter = router({
 	}),
 
 	create: protectedProcedure
-		.input(z.object({ text: z.string().min(1) }))
+		.input(
+			z.object({
+				text: z.string().min(1),
+				folderId: z.number().nullable().optional(),
+			}),
+		)
 		.mutation(async ({ ctx, input }) => {
 			return await db.insert(todo).values({
 				text: input.text,
 				userId: ctx.session.user.id,
+				folderId: input.folderId ?? null,
 			});
 		}),
 
@@ -65,6 +71,34 @@ export const todoRouter = router({
 			return await db.delete(todo).where(eq(todo.id, input.id));
 		}),
 
+	updateFolder: protectedProcedure
+		.input(
+			z.object({
+				id: z.number(),
+				folderId: z.number().nullable(),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			const [existing] = await db
+				.select()
+				.from(todo)
+				.where(
+					and(eq(todo.id, input.id), eq(todo.userId, ctx.session.user.id)),
+				);
+
+			if (!existing) {
+				throw new TRPCError({
+					code: "NOT_FOUND",
+					message: "Todo not found or you do not have permission to modify it",
+				});
+			}
+
+			return await db
+				.update(todo)
+				.set({ folderId: input.folderId })
+				.where(eq(todo.id, input.id));
+		}),
+
 	bulkCreate: protectedProcedure
 		.input(
 			z.object({
@@ -72,6 +106,7 @@ export const todoRouter = router({
 					z.object({
 						text: z.string().min(1),
 						completed: z.boolean(),
+						folderId: z.number().nullable().optional(),
 					}),
 				),
 			}),
@@ -85,6 +120,7 @@ export const todoRouter = router({
 				text: t.text,
 				completed: t.completed,
 				userId: ctx.session.user.id,
+				folderId: t.folderId ?? null,
 			}));
 
 			await db.insert(todo).values(values);

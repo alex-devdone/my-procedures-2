@@ -6,6 +6,7 @@ export {
 	getDeleteTodoMutationOptions,
 	getTodosQueryKey,
 	getToggleTodoMutationOptions,
+	getUpdateTodoFolderMutationOptions,
 } from "./todo.api";
 // Hooks
 export { useSyncTodos, useTodoStorage } from "./todo.hooks";
@@ -17,10 +18,12 @@ export type {
 	DeleteTodoInput,
 	LocalTodo,
 	RemoteTodo,
+	SelectedFolderId,
 	SyncAction,
 	SyncPromptState,
 	Todo,
 	ToggleTodoInput,
+	UpdateTodoFolderInput,
 	UseSyncTodosReturn,
 	UseTodoStorageReturn,
 } from "./todo.types";
@@ -29,6 +32,7 @@ export {
 	createTodoInputSchema,
 	deleteTodoInputSchema,
 	toggleTodoInputSchema,
+	updateTodoFolderInputSchema,
 } from "./todo.types";
 export type { FilterType, TodoStats } from "./todo.utils";
 // Utils (pure functions for filtering, sorting, stats)

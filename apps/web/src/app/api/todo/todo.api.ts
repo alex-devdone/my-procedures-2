@@ -49,3 +49,10 @@ export function getDeleteTodoMutationOptions() {
 export function getBulkCreateTodosMutationOptions() {
 	return trpc.todo.bulkCreate.mutationOptions();
 }
+
+/**
+ * Get mutation options for updating a todo's folder.
+ */
+export function getUpdateTodoFolderMutationOptions() {
+	return trpc.todo.updateFolder.mutationOptions();
+}
