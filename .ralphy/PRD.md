@@ -40,7 +40,7 @@ Foundation layer - all subsequent phases depend on these schema changes.
 - [x] Add unit tests for subtask schema in `packages/db/src/schema/subtask.test.ts`
 - [x] Update `packages/db/src/schema/index.ts` to export folder and subtask schemas and relations
 - [x] Generate Drizzle migrations with `bun run db:generate`
-- [ ] Apply migrations to database with `bun run db:migrate`
+- [x] Apply migrations to database with `bun run db:push`
 
 ---
 
