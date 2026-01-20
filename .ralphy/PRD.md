@@ -38,7 +38,7 @@ Foundation layer - all subsequent phases depend on these schema changes.
 - [x] Add unit tests for updated todo schema in `packages/db/src/schema/todo.test.ts`
 - [x] Create `packages/db/src/schema/subtask.ts` with subtask table (id, text, completed, todoId, order)
 - [x] Add unit tests for subtask schema in `packages/db/src/schema/subtask.test.ts`
-- [ ] Update `packages/db/src/schema/index.ts` to export folder and subtask schemas and relations
+- [x] Update `packages/db/src/schema/index.ts` to export folder and subtask schemas and relations
 - [ ] Generate Drizzle migrations with `bun run db:generate`
 - [ ] Apply migrations to database with `bun run db:migrate`
 

@@ -11,6 +11,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 import { folder } from "./folder";
+import { subtask } from "./subtask";
 
 export interface RecurringPattern {
 	type: "daily" | "weekly" | "monthly" | "yearly" | "custom";
@@ -45,7 +46,7 @@ export const todo = pgTable(
 	],
 );
 
-export const todoRelations = relations(todo, ({ one }) => ({
+export const todoRelations = relations(todo, ({ one, many }) => ({
 	user: one(user, {
 		fields: [todo.userId],
 		references: [user.id],
@@ -54,4 +55,5 @@ export const todoRelations = relations(todo, ({ one }) => ({
 		fields: [todo.folderId],
 		references: [folder.id],
 	}),
+	subtasks: many(subtask),
 }));
