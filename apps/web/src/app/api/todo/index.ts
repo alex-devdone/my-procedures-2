@@ -9,7 +9,11 @@ export {
 	getUpdateTodoFolderMutationOptions,
 } from "./todo.api";
 // Hooks
-export { useSyncTodos, useTodoStorage } from "./todo.hooks";
+export {
+	notifyLocalTodosListeners,
+	useSyncTodos,
+	useTodoStorage,
+} from "./todo.hooks";
 // Types
 export type {
 	BulkCreateTodosInput,

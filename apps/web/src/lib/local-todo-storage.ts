@@ -89,3 +89,25 @@ export function clearAll(): void {
 	if (typeof window === "undefined") return;
 	localStorage.removeItem(STORAGE_KEY);
 }
+
+/**
+ * Clears the folderId of all todos that belong to a specific folder.
+ * Used when a folder is deleted to move its todos to Inbox.
+ */
+export function clearFolderFromTodos(folderId: string): number {
+	const todos = getAll();
+	let updatedCount = 0;
+
+	for (const todo of todos) {
+		if (todo.folderId === folderId) {
+			todo.folderId = null;
+			updatedCount++;
+		}
+	}
+
+	if (updatedCount > 0) {
+		localStorage.setItem(STORAGE_KEY, JSON.stringify(todos));
+	}
+
+	return updatedCount;
+}

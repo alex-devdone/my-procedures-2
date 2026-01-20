@@ -54,7 +54,7 @@ function subscribeToLocalTodos(callback: () => void) {
 	};
 }
 
-function notifyLocalTodosListeners() {
+export function notifyLocalTodosListeners() {
 	for (const listener of localTodosListeners) {
 		listener();
 	}

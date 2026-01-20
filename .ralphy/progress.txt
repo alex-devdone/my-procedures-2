@@ -70,3 +70,17 @@
 - [✓] 2026-01-21 00:32 - Add updateFolder mutation to todo hooks for moving todos between folders
 - [✓] 2026-01-21 00:32 - Update local-todo-storage.ts to support folderId in create and updateFolder operations
 - [✓] 2026-01-21 00:32 - Add unit tests for folder filtering in todo hooks (32 tests) testing selectedFolderId, filteredTodos, and updateFolder
+
+- [✓] 2026-01-21 00:51 - Create E2E tests for folder CRUD (25 tests) in apps/web/e2e/folders.spec.ts:
+  - Create folder with name and color
+  - Edit folder name and color
+  - Delete folder with confirmation
+  - Move todos to Inbox when folder is deleted
+  - Assign todos to folders
+  - Filter todos by folder
+  - Persist folders after page reload
+  - Multiple folders management
+  - Empty state handling
+- [✓] 2026-01-21 00:51 - Add clearFolderFromTodos function to local-todo-storage.ts to move todos to Inbox when folder is deleted
+- [✓] 2026-01-21 00:51 - Update folder hooks to clear todo folderId when folder is deleted in localStorage mode
+- [✓] 2026-01-21 00:51 - Export notifyLocalTodosListeners from todo hooks for cross-module notifications

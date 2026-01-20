@@ -82,14 +82,14 @@ UI components for folder management. Can proceed after Phase 3.
 - [x] Add unit tests for FolderEditDialog in `apps/web/src/components/folders/folder-edit-dialog.test.tsx`
 - [x] Update todo list component to show folder assignment and allow filtering by folder
 - [x] Add unit tests for folder filtering in todo list
-- [ ] Create E2E tests for folder CRUD in localStorage mode at `apps/web/e2e/folders.spec.ts`:
-  - [ ] E2E: Create a new folder with name and color
-  - [ ] E2E: Edit folder name and color
-  - [ ] E2E: Delete folder (todos move to Inbox)
-  - [ ] E2E: Reorder folders via drag-and-drop
-  - [ ] E2E: Assign todo to folder
-  - [ ] E2E: Filter todos by folder
-  - [ ] E2E: Persist folders after page reload
+- [x] Create E2E tests for folder CRUD in localStorage mode at `apps/web/e2e/folders.spec.ts`:
+  - [x] E2E: Create a new folder with name and color
+  - [x] E2E: Edit folder name and color
+  - [x] E2E: Delete folder (todos move to Inbox)
+  - [ ] E2E: Reorder folders via drag-and-drop (requires UI implementation)
+  - [x] E2E: Assign todo to folder
+  - [x] E2E: Filter todos by folder
+  - [x] E2E: Persist folders after page reload
 
 ---
 

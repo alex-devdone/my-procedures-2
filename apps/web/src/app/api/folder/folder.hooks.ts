@@ -2,8 +2,10 @@
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { notifyLocalTodosListeners } from "@/app/api/todo";
 import { useSession } from "@/lib/auth-client";
 import * as localFolderStorage from "@/lib/local-folder-storage";
+import * as localTodoStorage from "@/lib/local-todo-storage";
 import { queryClient } from "@/utils/trpc";
 
 import {
@@ -287,8 +289,12 @@ export function useFolderStorage(): UseFolderStorageReturn {
 			if (isAuthenticated) {
 				await deleteMutation.mutateAsync({ id: id as number });
 			} else {
+				// Move todos from this folder to Inbox (clear their folderId)
+				localTodoStorage.clearFolderFromTodos(id as string);
 				localFolderStorage.deleteFolder(id as string);
+				// Notify both folder and todo listeners to update the UI
 				notifyLocalFoldersListeners();
+				notifyLocalTodosListeners();
 			}
 		},
 		[isAuthenticated, deleteMutation],
