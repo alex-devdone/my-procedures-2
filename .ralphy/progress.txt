@@ -33,3 +33,4 @@
 - [✓] 2026-01-20 23:01 - Create subtask schema (packages/db/src/schema/subtask.ts) with id, text, completed, todoId, order
 - [✓] 2026-01-20 23:01 - Add unit tests for subtask schema (packages/db/src/schema/subtask.test.ts)
 - [✓] 2026-01-20 23:03 - Update schema index to export folder and subtask schemas, add subtasks relation to todoRelations
+- [✓] 2026-01-20 23:13 - Generate Drizzle migrations (0001_easy_sally_floyd.sql) for folder, subtask tables and todo scheduling fields
