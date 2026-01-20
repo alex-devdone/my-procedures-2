@@ -76,8 +76,8 @@ UI components for folder management. Can proceed after Phase 3.
 
 - [x] Create `apps/web/src/components/folders/folder-sidebar.tsx` - sidebar with folder list and quick actions
 - [x] Add unit tests for FolderSidebar component in `apps/web/src/components/folders/folder-sidebar.test.tsx`
-- [ ] Create `apps/web/src/components/folders/folder-create-dialog.tsx` - modal for creating folders with name/color
-- [ ] Add unit tests for FolderCreateDialog in `apps/web/src/components/folders/folder-create-dialog.test.tsx`
+- [x] Create `apps/web/src/components/folders/folder-create-dialog.tsx` - modal for creating folders with name/color
+- [x] Add unit tests for FolderCreateDialog in `apps/web/src/components/folders/folder-create-dialog.test.tsx`
 - [ ] Create `apps/web/src/components/folders/folder-edit-dialog.tsx` - modal for editing/deleting folders
 - [ ] Add unit tests for FolderEditDialog in `apps/web/src/components/folders/folder-edit-dialog.test.tsx`
 - [ ] Update todo list component to show folder assignment and allow filtering by folder
