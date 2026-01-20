@@ -10,9 +10,10 @@ project:
 
 # Commands (auto-detected from package.json/pyproject.toml)
 commands:
-  test: ""
+  test: "bun run test"
   lint: "bun run check"
   build: "bun run build"
+  test:e2e: "bun run test:e2e"
 
 # Rules - instructions the AI MUST follow
 # These are injected into every prompt
