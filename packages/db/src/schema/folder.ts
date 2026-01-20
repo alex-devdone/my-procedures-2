@@ -8,6 +8,7 @@ import {
 	timestamp,
 } from "drizzle-orm/pg-core";
 import { user } from "./auth";
+import { todo } from "./todo";
 
 export const folder = pgTable(
 	"folder",
@@ -24,9 +25,10 @@ export const folder = pgTable(
 	(table) => [index("folder_userId_idx").on(table.userId)],
 );
 
-export const folderRelations = relations(folder, ({ one }) => ({
+export const folderRelations = relations(folder, ({ one, many }) => ({
 	user: one(user, {
 		fields: [folder.userId],
 		references: [user.id],
 	}),
+	todos: many(todo),
 }));

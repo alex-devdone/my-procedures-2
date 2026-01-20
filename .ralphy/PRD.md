@@ -34,8 +34,8 @@ Foundation layer - all subsequent phases depend on these schema changes.
 
 - [x] Create `packages/db/src/schema/folder.ts` with folder table (id, name, color, userId, createdAt, order)
 - [x] Add unit tests for folder schema validation in `packages/db/src/schema/folder.test.ts`
-- [ ] Update `packages/db/src/schema/todo.ts` to add scheduling fields (dueDate, reminderAt, recurringPattern, folderId)
-- [ ] Add unit tests for updated todo schema in `packages/db/src/schema/todo.test.ts`
+- [x] Update `packages/db/src/schema/todo.ts` to add scheduling fields (dueDate, reminderAt, recurringPattern, folderId)
+- [x] Add unit tests for updated todo schema in `packages/db/src/schema/todo.test.ts`
 - [ ] Create `packages/db/src/schema/subtask.ts` with subtask table (id, text, completed, todoId, order)
 - [ ] Add unit tests for subtask schema in `packages/db/src/schema/subtask.test.ts`
 - [ ] Update `packages/db/src/schema/index.ts` to export folder and subtask schemas and relations

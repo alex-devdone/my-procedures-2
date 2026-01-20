@@ -28,3 +28,5 @@
 
 - [✓] 2026-01-20 22:54 - Create folder schema (packages/db/src/schema/folder.ts) with id, name, color, userId, createdAt, order
 - [✓] 2026-01-20 22:54 - Add unit tests for folder schema validation (packages/db/src/schema/folder.test.ts)
+- [✓] 2026-01-20 22:57 - Update todo schema with scheduling fields (dueDate, reminderAt, recurringPattern, folderId) and indexes
+- [✓] 2026-01-20 22:57 - Add unit tests for updated todo schema (packages/db/src/schema/todo.test.ts)
