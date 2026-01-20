@@ -52,6 +52,10 @@
 			"dependsOn": ["^build"],
 			"inputs": ["$TURBO_DEFAULT$", "vitest.config.ts", "vitest.setup.ts"],
 			"outputs": ["coverage/**"]
+		},
+		"test:e2e": {
+			"cache": false,
+			"inputs": ["$TURBO_DEFAULT$", "playwright.config.ts"]
 		}
 	}
 }
