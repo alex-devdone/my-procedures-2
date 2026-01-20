@@ -41,3 +41,6 @@
 - [✓] 2026-01-20 23:21 - Add folder router to main tRPC router (packages/api/src/routers/index.ts)
 - [✓] 2026-01-20 23:21 - Add Zod validation schemas for folder inputs (folderColorSchema, createFolderInputSchema, updateFolderInputSchema, deleteFolderInputSchema, reorderFolderInputSchema)
 - [✓] 2026-01-20 23:21 - Add missing drizzle-orm exports (gt, gte, lt, lte) to packages/db/src/index.ts
+
+- [✓] 2026-01-20 23:25 - Create folder.types.ts with TypeScript types (Folder, RemoteFolder, LocalFolder, FolderColor) and Zod schemas
+- [✓] 2026-01-20 23:25 - Add unit tests for folder types/schemas (43 tests) in folder.types.test.ts

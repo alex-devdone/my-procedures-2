@@ -59,8 +59,8 @@ Backend API layer for folders. Can proceed after Phase 1.
 
 Frontend API wrappers for folders. Can proceed after Phase 2.
 
-- [ ] Create `apps/web/src/app/api/folder/folder.types.ts` with TypeScript types and Zod schemas
-- [ ] Add unit tests for folder types/schemas in `apps/web/src/app/api/folder/folder.types.test.ts`
+- [x] Create `apps/web/src/app/api/folder/folder.types.ts` with TypeScript types and Zod schemas
+- [x] Add unit tests for folder types/schemas in `apps/web/src/app/api/folder/folder.types.test.ts`
 - [ ] Create `apps/web/src/app/api/folder/folder.api.ts` with tRPC query/mutation options
 - [ ] Create `apps/web/src/app/api/folder/folder.hooks.ts` with React hooks and optimistic updates
 - [ ] Add unit tests for folder hooks in `apps/web/src/app/api/folder/folder.hooks.test.ts`
