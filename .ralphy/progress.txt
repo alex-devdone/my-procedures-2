@@ -35,3 +35,9 @@
 - [✓] 2026-01-20 23:03 - Update schema index to export folder and subtask schemas, add subtasks relation to todoRelations
 - [✓] 2026-01-20 23:13 - Generate Drizzle migrations (0001_easy_sally_floyd.sql) for folder, subtask tables and todo scheduling fields
 - [✓] 2026-01-20 23:25 - Apply database schema changes using db:push (folder, subtask tables and todo scheduling fields)
+
+- [✓] 2026-01-20 23:21 - Create folder router (packages/api/src/routers/folder.ts) with CRUD procedures: list, create, update, delete, reorder
+- [✓] 2026-01-20 23:21 - Add unit tests for folder router (packages/api/src/routers/folder.test.ts) with 58 tests
+- [✓] 2026-01-20 23:21 - Add folder router to main tRPC router (packages/api/src/routers/index.ts)
+- [✓] 2026-01-20 23:21 - Add Zod validation schemas for folder inputs (folderColorSchema, createFolderInputSchema, updateFolderInputSchema, deleteFolderInputSchema, reorderFolderInputSchema)
+- [✓] 2026-01-20 23:21 - Add missing drizzle-orm exports (gt, gte, lt, lte) to packages/db/src/index.ts

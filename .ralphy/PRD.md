@@ -48,10 +48,10 @@ Foundation layer - all subsequent phases depend on these schema changes.
 
 Backend API layer for folders. Can proceed after Phase 1.
 
-- [ ] Create `packages/api/src/routers/folder.ts` with CRUD procedures (list, create, update, delete, reorder)
-- [ ] Add unit tests for folder router in `packages/api/src/routers/folder.test.ts`
-- [ ] Add folder router to main tRPC router in `packages/api/src/index.ts`
-- [ ] Add Zod validation schemas for folder inputs in router
+- [x] Create `packages/api/src/routers/folder.ts` with CRUD procedures (list, create, update, delete, reorder)
+- [x] Add unit tests for folder router in `packages/api/src/routers/folder.test.ts`
+- [x] Add folder router to main tRPC router in `packages/api/src/index.ts`
+- [x] Add Zod validation schemas for folder inputs in router
 
 ---
 
