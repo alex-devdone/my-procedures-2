@@ -280,3 +280,90 @@ tasks:
       - Restart dev server after env changes
     parallel_group: 8
     completed: true
+  - title: Set up Playwright for E2E testing
+    description: |
+      Install and configure Playwright for end-to-end tests:
+      - Install @playwright/test
+      - Create playwright.config.ts with base URL (localhost:4757)
+      - Add e2e test scripts to package.json (bun run test:e2e)
+      - Configure test directory (e2e/ or tests/e2e/)
+      - Set up GitHub Actions workflow for E2E tests
+      - Update CLAUDE.md with E2E test commands
+    parallel_group: 11
+    completed: true
+  - title: Write E2E tests for todo CRUD operations
+    description: |
+      File: e2e/todo.spec.ts (or tests/e2e/todo.spec.ts)
+
+      Test todo functionality using localStorage flow (unauthenticated):
+
+      Create todo:
+      - Navigate to /todos
+      - Enter todo text in input field
+      - Submit form (click button or press Enter)
+      - Verify todo appears in list
+      - Verify todo persists after page reload (localStorage)
+
+      Complete todo:
+      - Click checkbox/toggle on existing todo
+      - Verify visual state change (strikethrough, checked)
+      - Verify completed state persists after reload
+
+      Edit todo (if edit feature exists):
+      - Click edit button or double-click todo
+      - Modify text
+      - Save changes
+      - Verify updated text displays
+
+      Delete todo:
+      - Click delete button on todo
+      - Verify todo removed from list
+      - Verify deletion persists after reload
+
+      Edge cases:
+      - Empty todo submission (should be prevented)
+      - Multiple todos CRUD operations
+      - Clear all completed (if feature exists)
+    parallel_group: 12
+    completed: true
+  - title: Fix todo toggle causing full list reload
+    description: >
+      Issue: Checking/unchecking a todo reloads the entire list instead of
+
+      updating smoothly in place.
+
+
+      Root cause investigation:
+
+      - Check if optimistic updates are implemented in todo.hooks.ts
+
+      - Check if query invalidation is too aggressive (invalidating on every
+      mutation)
+
+      - Check if the todo list component is re-mounting instead of re-rendering
+
+
+      Fix approach:
+
+      - Implement proper optimistic updates in toggleTodo mutation:
+        - onMutate: update cache immediately with new completed state
+        - onError: rollback to previous state
+        - onSettled: invalidate to sync with server (or skip if optimistic is reliable)
+      - Use setQueryData to update specific todo in cache instead of refetching
+      all
+
+      - Consider using React.memo or key optimization to prevent unnecessary
+      re-renders
+
+      - Add CSS transition for checkbox state change
+
+
+      Files to check:
+
+      - apps/web/src/app/api/todo/todo.hooks.ts (toggle mutation)
+
+      - apps/web/src/app/todos/page.tsx (todo list rendering)
+
+      - apps/web/src/components/todo-item.tsx (if exists)
+    parallel_group: 13
+    completed: true

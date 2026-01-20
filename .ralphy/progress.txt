@@ -21,3 +21,7 @@
 - [✓] 2026-01-19 21:50 - Extract business logic into testable hooks/utilities
 - [✓] 2026-01-19 21:58 - Write unit tests for business logic
 - [✓] 2026-01-19 21:58 - Fix 403 INVALID_ORIGIN error in Better-Auth
+
+- [✓] 2026-01-19 22:15 - Set up Playwright for E2E testing
+- [✓] 2026-01-19 23:19 - Write E2E tests for todo CRUD operations
+- [✓] 2026-01-19 23:35 - Fix todo toggle causing full list reload
