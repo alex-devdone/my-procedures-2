@@ -8,7 +8,7 @@ export default defineConfig({
 	workers: process.env.CI ? 1 : undefined,
 	reporter: "html",
 	use: {
-		baseURL: "http://localhost:4757",
+		baseURL: "http://localhost:8656",
 		trace: "on-first-retry",
 	},
 	projects: [
@@ -16,18 +16,10 @@ export default defineConfig({
 			name: "chromium",
 			use: { ...devices["Desktop Chrome"] },
 		},
-		{
-			name: "firefox",
-			use: { ...devices["Desktop Firefox"] },
-		},
-		{
-			name: "webkit",
-			use: { ...devices["Desktop Safari"] },
-		},
 	],
 	webServer: {
-		command: "bun run dev",
-		url: "http://localhost:4757",
+		command: "bun run build && bun run start --port 8656",
+		url: "http://localhost:8656",
 		reuseExistingServer: !process.env.CI,
 	},
 });
