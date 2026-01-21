@@ -305,3 +305,24 @@
   - UpdateSchedule input validation
   - GetDueInRange input validation
   - Scheduling business logic (date conversion, update data preparation, filtering by date range, bulk create with scheduling)
+
+- [✓] 2026-01-21 04:15 - Create packages/api/src/lib/recurring.ts with cron-style pattern parsing and next occurrence calculation:
+  - recurringPatternSchema Zod schema for validating recurring patterns
+  - RecurringPattern TypeScript type
+  - isPatternExpired() function to check if pattern has reached end conditions (endDate or max occurrences)
+  - getNextOccurrence() function to calculate next occurrence date for any pattern type
+  - Support for daily, weekly (with specific days), monthly (with specific day of month), yearly, and custom patterns
+  - Support for intervals (every N days/weeks/months/years)
+  - parseRecurringDescription() function to parse human-readable descriptions like "every Monday", "daily", "every 2 weeks"
+  - formatRecurringPattern() function to format patterns as human-readable strings
+- [✓] 2026-01-21 04:15 - Add unit tests for recurring pattern logic (99 tests) in packages/api/src/lib/recurring.test.ts covering:
+  - Schema validation for all pattern types and fields
+  - isPatternExpired() with endDate and occurrences limits
+  - getNextOccurrence() for daily, weekly, monthly, yearly, and custom patterns
+  - Weekly patterns with specific days of week
+  - Monthly patterns with day-of-month handling (including months with fewer days)
+  - Yearly patterns with month and day specification
+  - Pattern interval handling
+  - End condition checks (endDate and occurrences)
+  - parseRecurringDescription() for various natural language inputs
+  - formatRecurringPattern() for human-readable output

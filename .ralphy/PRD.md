@@ -152,8 +152,8 @@ Backend API updates for todo scheduling. Can proceed after Phase 1.
 
 - [x] Update `packages/api/src/routers/todo.ts` to handle dueDate, reminderAt, recurringPattern fields
 - [x] Add unit tests for scheduling fields in todo router `packages/api/src/routers/todo.test.ts`
-- [ ] Create `packages/api/src/lib/recurring.ts` with cron-style pattern parsing and next occurrence calculation
-- [ ] Add unit tests for recurring pattern logic in `packages/api/src/lib/recurring.test.ts`
+- [x] Create `packages/api/src/lib/recurring.ts` with cron-style pattern parsing and next occurrence calculation
+- [x] Add unit tests for recurring pattern logic in `packages/api/src/lib/recurring.test.ts`
 - [x] Add procedure to get todos due within a time range (for reminder checking)
 - [ ] Add procedure to complete recurring todo (creates next occurrence, marks current complete)
 
