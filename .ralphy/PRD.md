@@ -195,7 +195,7 @@ UI for setting due dates, reminders, and recurring patterns. Can proceed after P
   - [x] E2E: Create daily recurring todo
   - [x] E2E: Create weekly recurring todo with specific days
   - [x] E2E: Create monthly recurring todo
-  - [ ] E2E: Complete recurring todo and verify next occurrence created
+  - [x] E2E: Complete recurring todo and verify next occurrence created
   - [x] E2E: Show overdue styling for past-due todos
   - [x] E2E: Persist scheduling data after page reload
 

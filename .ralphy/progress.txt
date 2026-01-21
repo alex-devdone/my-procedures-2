@@ -1052,3 +1052,20 @@
   - All 130 E2E tests pass
   - Build succeeds
 
+- [✓] 2026-01-21 15:30 - Phase 10: E2E test for completing recurring todos:
+  - Implemented completeRecurring function in local-todo-storage.ts with:
+    - isPatternExpired() to check if pattern has reached end conditions
+    - getNextOccurrence() to calculate next occurrence date for all pattern types (daily, weekly, monthly, yearly, custom)
+    - completeRecurring() to mark current todo complete and create next occurrence
+    - Support for reminder offset preservation
+    - Support for folder preservation
+  - Updated todo.hooks.ts toggle function to use completeRecurring for recurring todos in guest mode
+  - Created E2E tests (4 tests) in apps/web/e2e/scheduling.spec.ts covering:
+    - Complete daily recurring todo and verify next occurrence created with "Tomorrow" due date
+    - Complete weekly recurring todo and verify next occurrence created
+    - Non-recurring todo does not create next occurrence
+    - Folder and text preserved when creating next occurrence
+  - All 1859 unit tests pass
+  - All E2E tests pass (134 total including 4 new)
+  - Linting passes
+

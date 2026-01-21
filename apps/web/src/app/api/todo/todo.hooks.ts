@@ -318,7 +318,17 @@ export function useTodoStorage(): UseTodoStorageReturn {
 			if (isAuthenticated) {
 				await toggleMutation.mutateAsync({ id: id as number, completed });
 			} else {
-				localTodoStorage.toggle(id as string);
+				// For recurring todos being completed, use completeRecurring to create next occurrence
+				const localTodos = localTodoStorage.getAll();
+				const todo = localTodos.find((t) => t.id === id);
+
+				if (todo?.recurringPattern && completed) {
+					// Complete the recurring todo and create next occurrence
+					localTodoStorage.completeRecurring(id as string);
+				} else {
+					// Regular toggle for non-recurring todos or unchecking
+					localTodoStorage.toggle(id as string);
+				}
 				notifyLocalTodosListeners();
 			}
 		},

@@ -614,6 +614,208 @@ test.describe("Scheduling functionality (localStorage mode)", () => {
 		});
 	});
 
+	test.describe("Complete recurring todo and verify next occurrence", () => {
+		test("should create next occurrence when completing daily recurring todo", async ({
+			page,
+		}) => {
+			const todoText = "Daily recurring task";
+			const todoItem = await createTodo(page, todoText);
+
+			// Store the original todo's testid for later reference
+			const originalTodoTestId = await todoItem.getAttribute("data-testid");
+
+			await openSchedulePopover(todoItem);
+
+			// Set due date to today
+			await page.click('[data-testid="date-picker-trigger"]');
+			await page.click('[data-testid="date-picker-preset-today"]');
+
+			// Set daily recurring
+			await page.click('[data-testid="recurring-picker-trigger"]');
+			await page.click('[data-testid="recurring-picker-preset-daily"]');
+			await page.keyboard.press("Escape");
+
+			// Verify the todo has due date badge showing "Today" and recurring indicator
+			await expect(
+				todoItem.locator('[data-testid="due-date-badge"]'),
+			).toContainText("Today");
+			await expect(
+				todoItem.locator('[data-testid="recurring-indicator"]'),
+			).toBeVisible();
+
+			// Complete the todo by clicking the toggle
+			await todoItem.locator('[data-testid="todo-toggle"]').click();
+
+			// The original todo (using specific testid) should be marked as completed
+			const originalTodo = page.locator(
+				`[data-testid="${originalTodoTestId}"]`,
+			);
+			await expect(
+				originalTodo.locator('[data-testid="todo-toggle"]'),
+			).toHaveAttribute("aria-label", "Mark as incomplete");
+
+			// A new todo with the same text should be created for the next occurrence
+			// There should now be 2 todos with the same text
+			const todosWithText = page
+				.locator('[data-testid^="todo-item-"]')
+				.filter({ hasText: todoText });
+			await expect(todosWithText).toHaveCount(2);
+
+			// Find the new uncompleted todo
+			const newTodoItem = page
+				.locator('[data-testid^="todo-item-"]')
+				.filter({ hasText: todoText })
+				.filter({
+					has: page.locator(
+						'[data-testid="todo-toggle"][aria-label="Mark as complete"]',
+					),
+				});
+			await expect(newTodoItem).toBeVisible();
+
+			// The new todo should have a due date badge showing "Tomorrow"
+			await expect(
+				newTodoItem.locator('[data-testid="due-date-badge"]'),
+			).toContainText("Tomorrow");
+
+			// The new todo should also have the recurring indicator
+			await expect(
+				newTodoItem.locator('[data-testid="recurring-indicator"]'),
+			).toBeVisible();
+		});
+
+		test("should create next occurrence when completing weekly recurring todo", async ({
+			page,
+		}) => {
+			const todoText = "Weekly recurring task";
+			const todoItem = await createTodo(page, todoText);
+
+			// Store the original todo's testid for later reference
+			const originalTodoTestId = await todoItem.getAttribute("data-testid");
+
+			await openSchedulePopover(todoItem);
+
+			// Set due date to today
+			await page.click('[data-testid="date-picker-trigger"]');
+			await page.click('[data-testid="date-picker-preset-today"]');
+
+			// Set weekly recurring
+			await page.click('[data-testid="recurring-picker-trigger"]');
+			await page.click('[data-testid="recurring-picker-preset-weekly"]');
+			await page.keyboard.press("Escape");
+
+			// Complete the todo
+			await todoItem.locator('[data-testid="todo-toggle"]').click();
+
+			// The original todo should be marked as completed
+			const originalTodo = page.locator(
+				`[data-testid="${originalTodoTestId}"]`,
+			);
+			await expect(
+				originalTodo.locator('[data-testid="todo-toggle"]'),
+			).toHaveAttribute("aria-label", "Mark as incomplete");
+
+			// There should now be 2 todos with the same text
+			const todosWithText = page
+				.locator('[data-testid^="todo-item-"]')
+				.filter({ hasText: todoText });
+			await expect(todosWithText).toHaveCount(2);
+
+			// A new uncompleted todo should be created
+			const newTodoItem = page
+				.locator('[data-testid^="todo-item-"]')
+				.filter({ hasText: todoText })
+				.filter({
+					has: page.locator(
+						'[data-testid="todo-toggle"][aria-label="Mark as complete"]',
+					),
+				});
+			await expect(newTodoItem).toBeVisible();
+
+			// The new todo should have a due date badge (7 days from now)
+			await expect(
+				newTodoItem.locator('[data-testid="due-date-badge"]'),
+			).toBeVisible();
+
+			// The new todo should have the recurring indicator
+			await expect(
+				newTodoItem.locator('[data-testid="recurring-indicator"]'),
+			).toBeVisible();
+		});
+
+		test("should not create next occurrence for non-recurring todo", async ({
+			page,
+		}) => {
+			const todoText = "Non-recurring task";
+			const todoItem = await createTodo(page, todoText);
+			await openSchedulePopover(todoItem);
+
+			// Set due date but no recurring pattern
+			await page.click('[data-testid="date-picker-trigger"]');
+			await page.click('[data-testid="date-picker-preset-today"]');
+			await page.keyboard.press("Escape");
+
+			// Complete the todo
+			await todoItem.locator('[data-testid="todo-toggle"]').click();
+
+			// There should only be one todo with this text (now completed)
+			const todosWithText = page
+				.locator('[data-testid^="todo-item-"]')
+				.filter({ hasText: todoText });
+			await expect(todosWithText).toHaveCount(1);
+
+			// That todo should be completed
+			await expect(
+				todosWithText.locator('[data-testid="todo-toggle"]'),
+			).toHaveAttribute("aria-label", "Mark as incomplete");
+		});
+
+		test("should preserve todo text and folder when creating next occurrence", async ({
+			page,
+		}) => {
+			// First create a folder via the add folder button in sidebar
+			await page.click('[data-testid="create-folder-button"]');
+			await page.fill('[data-testid="folder-name-input"]', "Work");
+			await page.click('[data-testid="folder-create-submit"]');
+			await expect(
+				page
+					.locator('[data-testid^="folder-item-"]')
+					.filter({ hasText: "Work" }),
+			).toBeVisible();
+
+			// Select the folder
+			await page
+				.locator('[data-testid^="folder-item-"]')
+				.filter({ hasText: "Work" })
+				.click();
+
+			// Create a recurring todo in the folder
+			const todoText = "Folder recurring task";
+			const todoItem = await createTodo(page, todoText);
+			await openSchedulePopover(todoItem);
+
+			// Set due date and recurring
+			await page.click('[data-testid="date-picker-trigger"]');
+			await page.click('[data-testid="date-picker-preset-today"]');
+			await page.click('[data-testid="recurring-picker-trigger"]');
+			await page.click('[data-testid="recurring-picker-preset-daily"]');
+			await page.keyboard.press("Escape");
+
+			// Complete the todo
+			await todoItem.locator('[data-testid="todo-toggle"]').click();
+
+			// The new todo should still be in the Work folder (visible on this page)
+			const newTodoItem = page
+				.locator('[data-testid^="todo-item-"]')
+				.filter({ hasText: todoText })
+				.filter({
+					has: page.locator(
+						'[data-testid="todo-toggle"][aria-label="Mark as complete"]',
+					),
+				});
+			await expect(newTodoItem).toBeVisible();
+		});
+	});
+
 	test.describe("Schedule display in todo list", () => {
 		test("should show due date badge on todo item", async ({ page }) => {
 			const todoItem = await createTodo(page, "Task with due date badge");
