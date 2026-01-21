@@ -165,3 +165,26 @@
   - updateFolder(): folderId updates, move to Inbox (null), persistence
   - clearAll(): localStorage removal, SSR safety
   - clearFolderFromTodos(): batch folderId clearing when folder is deleted
+
+- [✓] 2026-01-21 02:10 - Create SubtaskList component (apps/web/src/components/subtasks/subtask-list.tsx) with:
+  - SubtaskList component using useSubtaskStorage hook for dual-mode support
+  - StandaloneSubtaskList component for direct subtask prop passing (useful for testing)
+  - Checkbox toggle for subtask completion with accessible labels
+  - Delete button for each subtask with confirmation
+  - Loading skeleton state during data fetch
+  - Empty state message when no subtasks exist
+  - Completed styling with strikethrough text
+  - Read-only mode support (disables checkboxes and hides delete buttons)
+  - onAllCompleted and onUncompleted callbacks for auto-complete parent todo logic
+  - Support for both string (local) and numeric (remote) subtask IDs
+- [✓] 2026-01-21 02:10 - Add unit tests for SubtaskList (35 tests) in apps/web/src/components/subtasks/subtask-list.test.tsx covering:
+  - Rendering: empty state, subtask list, custom className
+  - Loading state: skeleton display and hiding
+  - Checkbox toggle: checkbox rendering, checked state, toggle callback
+  - Delete subtask: button rendering, delete callback, accessible name
+  - Completed styling: strikethrough for completed, no strikethrough for incomplete
+  - Read-only mode: hidden delete buttons, disabled checkboxes (aria-disabled)
+  - Auto-complete callbacks: onAllCompleted when all done, onUncompleted when unchecked
+  - Accessibility: list landmark, semantic list items, checkbox labels
+  - Numeric IDs: handling numeric subtask IDs, toggle/delete with numeric IDs
+  - StandaloneSubtaskList: rendering, loading, interactions, callbacks, read-only mode

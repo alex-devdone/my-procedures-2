@@ -125,8 +125,8 @@ Frontend API wrappers for subtasks. Can proceed after Phase 5.
 
 UI components for subtask management. Can proceed after Phase 6.
 
-- [ ] Create `apps/web/src/components/subtasks/subtask-list.tsx` - renders list of subtasks within a todo
-- [ ] Add unit tests for SubtaskList in `apps/web/src/components/subtasks/subtask-list.test.tsx`
+- [x] Create `apps/web/src/components/subtasks/subtask-list.tsx` - renders list of subtasks within a todo
+- [x] Add unit tests for SubtaskList in `apps/web/src/components/subtasks/subtask-list.test.tsx`
 - [ ] Create `apps/web/src/components/subtasks/subtask-item.tsx` - single subtask with checkbox and delete
 - [ ] Add unit tests for SubtaskItem in `apps/web/src/components/subtasks/subtask-item.test.tsx`
 - [ ] Create `apps/web/src/components/subtasks/subtask-add-input.tsx` - inline input for adding subtasks
