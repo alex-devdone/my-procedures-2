@@ -4,11 +4,13 @@ import {
 	AlertCircle,
 	CalendarDays,
 	FolderIcon,
+	GripVertical,
 	Inbox,
 	MoreHorizontal,
 	Plus,
 	Sun,
 } from "lucide-react";
+import { useCallback, useState } from "react";
 import type { Folder, FolderColor } from "@/app/api/folder";
 import { useFolderStorage } from "@/app/api/folder";
 import { Button } from "@/components/ui/button";
@@ -97,6 +99,8 @@ export interface FolderSidebarProps {
 	onEditFolder?: (folder: Folder) => void;
 	/** Callback when the "Delete" option is clicked for a folder */
 	onDeleteFolder?: (folder: Folder) => void;
+	/** Callback when folders are reordered via drag-and-drop */
+	onReorderFolders?: (folderIds: (string | number)[]) => void;
 	/** Additional CSS classes */
 	className?: string;
 }
@@ -108,6 +112,7 @@ export interface FolderSidebarProps {
  * - Smart views (Today, Upcoming, Overdue)
  * - Inbox (default view for todos without a folder)
  * - List of user folders with color indicators
+ * - Drag-and-drop folder reordering (when 2+ folders exist)
  * - Create folder button
  * - Edit/Delete actions via dropdown menu
  * - Loading skeleton state
@@ -119,9 +124,90 @@ export function FolderSidebar({
 	onCreateFolder,
 	onEditFolder,
 	onDeleteFolder,
+	onReorderFolders,
 	className,
 }: FolderSidebarProps) {
-	const { folders, isLoading } = useFolderStorage();
+	const { folders, isLoading, reorder } = useFolderStorage();
+	const [draggedFolderId, setDraggedFolderId] = useState<
+		string | number | null
+	>(null);
+	const [dragOverFolderId, setDragOverFolderId] = useState<
+		string | number | null
+	>(null);
+
+	const handleDragStart = useCallback(
+		(e: React.DragEvent, folderId: string | number) => {
+			setDraggedFolderId(folderId);
+			// Set effectAllowed if dataTransfer is available (not available in some test environments)
+			if (e.dataTransfer) {
+				e.dataTransfer.effectAllowed = "move";
+			}
+		},
+		[],
+	);
+
+	const handleDragOver = useCallback(
+		(e: React.DragEvent, folderId: string | number) => {
+			e.preventDefault();
+			if (draggedFolderId === folderId) return;
+			setDragOverFolderId(folderId);
+		},
+		[draggedFolderId],
+	);
+
+	const handleDragLeave = useCallback(() => {
+		setDragOverFolderId(null);
+	}, []);
+
+	const handleDrop = useCallback(
+		async (e: React.DragEvent, targetFolderId: string | number) => {
+			e.preventDefault();
+			setDragOverFolderId(null);
+
+			if (draggedFolderId === null || draggedFolderId === targetFolderId) {
+				setDraggedFolderId(null);
+				return;
+			}
+
+			// Find the current indices
+			const draggedIndex = folders.findIndex((f) => f.id === draggedFolderId);
+			const targetIndex = folders.findIndex((f) => f.id === targetFolderId);
+
+			if (draggedIndex === -1 || targetIndex === -1) {
+				setDraggedFolderId(null);
+				return;
+			}
+
+			// Create new order
+			const newFolders = [...folders];
+			const [draggedFolder] = newFolders.splice(draggedIndex, 1);
+			newFolders.splice(targetIndex, 0, draggedFolder);
+
+			// Update orders (assign sequential order values)
+			const reorderedFolders = newFolders.map((folder, index) => ({
+				...folder,
+				order: index,
+			}));
+
+			// Call the reorder callback if provided
+			if (onReorderFolders) {
+				onReorderFolders(reorderedFolders.map((f) => f.id));
+			}
+
+			// Reorder each folder to its new position
+			for (const folder of reorderedFolders) {
+				await reorder(folder.id, folder.order);
+			}
+
+			setDraggedFolderId(null);
+		},
+		[draggedFolderId, folders, reorder, onReorderFolders],
+	);
+
+	const handleDragEnd = useCallback(() => {
+		setDraggedFolderId(null);
+		setDragOverFolderId(null);
+	}, []);
 
 	return (
 		<aside
@@ -218,6 +304,14 @@ export function FolderSidebar({
 								onSelect={() => onSelectFolder?.(folder.id)}
 								onEdit={() => onEditFolder?.(folder)}
 								onDelete={() => onDeleteFolder?.(folder)}
+								isDraggable={folders.length > 1}
+								isDragging={draggedFolderId === folder.id}
+								isDragOver={dragOverFolderId === folder.id}
+								onDragStart={(e) => handleDragStart(e, folder.id)}
+								onDragOver={(e) => handleDragOver(e, folder.id)}
+								onDragLeave={handleDragLeave}
+								onDrop={(e) => handleDrop(e, folder.id)}
+								onDragEnd={handleDragEnd}
 							/>
 						))}
 					</ul>
@@ -250,6 +344,14 @@ interface FolderItemProps {
 	onSelect: () => void;
 	onEdit: () => void;
 	onDelete: () => void;
+	isDraggable: boolean;
+	isDragging: boolean;
+	isDragOver: boolean;
+	onDragStart: (e: React.DragEvent) => void;
+	onDragOver: (e: React.DragEvent) => void;
+	onDragLeave: () => void;
+	onDrop: (e: React.DragEvent) => void;
+	onDragEnd: () => void;
 }
 
 function FolderItem({
@@ -258,21 +360,49 @@ function FolderItem({
 	onSelect,
 	onEdit,
 	onDelete,
+	isDraggable,
+	isDragging,
+	isDragOver,
+	onDragStart,
+	onDragOver,
+	onDragLeave,
+	onDrop,
+	onDragEnd,
 }: FolderItemProps) {
 	return (
-		<li className="group relative">
+		<li
+			className={cn(
+				"group relative",
+				isDragging && "opacity-50",
+				isDragOver && "border-accent border-b-2",
+			)}
+		>
 			<button
 				type="button"
+				draggable={isDraggable}
 				onClick={onSelect}
+				onDragStart={onDragStart}
+				onDragOver={onDragOver}
+				onDragLeave={onDragLeave}
+				onDrop={onDrop}
+				onDragEnd={onDragEnd}
 				className={cn(
 					"flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left font-medium text-sm transition-colors",
 					isSelected
 						? "bg-sidebar-accent text-sidebar-accent-foreground"
 						: "text-sidebar-foreground hover:bg-sidebar-accent/50",
+					isDraggable && "cursor-grab active:cursor-grabbing",
 				)}
 				data-testid={`folder-item-${folder.id}`}
+				data-draggable={isDraggable ? "true" : undefined}
 				aria-current={isSelected ? "page" : undefined}
 			>
+				{isDraggable && (
+					<GripVertical
+						className="h-4 w-4 text-muted-foreground"
+						aria-hidden="true"
+					/>
+				)}
 				<FolderIcon
 					className={cn("h-4 w-4", folderColorClasses[folder.color])}
 				/>

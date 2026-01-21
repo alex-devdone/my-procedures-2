@@ -625,4 +625,104 @@ describe("FolderSidebar", () => {
 			expect(onSelectFolder).toHaveBeenCalledWith(456);
 		});
 	});
+
+	describe("Drag-and-Drop Reordering", () => {
+		it("shows drag handle when 2+ folders exist", () => {
+			const folders = [
+				createMockFolder({ id: "folder-1", name: "First", order: 0 }),
+				createMockFolder({ id: "folder-2", name: "Second", order: 1 }),
+			];
+
+			mockUseFolderStorage.mockReturnValue({
+				...defaultMockReturn,
+				folders,
+			});
+
+			const { container } = render(<FolderSidebar />);
+
+			const folderItems = screen.getAllByTestId(/^folder-item-/);
+			expect(folderItems).toHaveLength(2);
+
+			// Each folder item should have draggable attribute when 2+ folders
+			folderItems.forEach((item) => {
+				expect(item).toHaveAttribute("draggable", "true");
+			});
+
+			// Each folder should have a GripVertical icon (drag handle)
+			const gripIcons = container.querySelectorAll(
+				'svg[class*="grip-vertical"]',
+			);
+			expect(gripIcons.length).toBeGreaterThan(0);
+		});
+
+		it("does not show drag handle when only 1 folder exists", () => {
+			const folders = [
+				createMockFolder({ id: "folder-1", name: "Only", order: 0 }),
+			];
+
+			mockUseFolderStorage.mockReturnValue({
+				...defaultMockReturn,
+				folders,
+			});
+
+			render(<FolderSidebar />);
+
+			const folderItem = screen.getByTestId("folder-item-folder-1");
+			expect(folderItem).toHaveAttribute("draggable", "false");
+		});
+
+		it("renders folder items with cursor-grab class when draggable", () => {
+			const folders = [
+				createMockFolder({ id: "folder-1", name: "First", order: 0 }),
+				createMockFolder({ id: "folder-2", name: "Second", order: 1 }),
+			];
+
+			mockUseFolderStorage.mockReturnValue({
+				...defaultMockReturn,
+				folders,
+			});
+
+			render(<FolderSidebar />);
+
+			const folderItems = screen.getAllByTestId(/^folder-item-/);
+			folderItems.forEach((item) => {
+				// Check for cursor-grab class (indicates draggable)
+				expect(item).toHaveClass(/cursor-grab/);
+			});
+		});
+
+		it("does not have cursor-grab class when not draggable", () => {
+			const folders = [
+				createMockFolder({ id: "folder-1", name: "Only", order: 0 }),
+			];
+
+			mockUseFolderStorage.mockReturnValue({
+				...defaultMockReturn,
+				folders,
+			});
+
+			render(<FolderSidebar />);
+
+			const folderItem = screen.getByTestId("folder-item-folder-1");
+			// Should not have cursor-grab when not draggable
+			expect(folderItem).not.toHaveClass(/cursor-grab/);
+		});
+
+		it("passes onReorderFolders callback prop", () => {
+			const onReorderFolders = vi.fn();
+			const folders = [
+				createMockFolder({ id: "folder-1", name: "First", order: 0 }),
+			];
+
+			mockUseFolderStorage.mockReturnValue({
+				...defaultMockReturn,
+				folders,
+			});
+
+			// Just verify the component accepts the prop without error
+			expect(() => {
+				render(<FolderSidebar onReorderFolders={onReorderFolders} />);
+			}).not.toThrow();
+		});
+	});
 });

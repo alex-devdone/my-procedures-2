@@ -886,4 +886,177 @@ test.describe("Folder functionality (localStorage mode)", () => {
 			).toBeVisible();
 		});
 	});
+
+	test.describe("Drag-and-Drop Reordering", () => {
+		test.beforeEach(async ({ page }) => {
+			// Create three folders for testing
+			await page.click('[data-testid="create-folder-button"]');
+			await page.fill('[data-testid="folder-name-input"]', "First Folder");
+			await page.locator('label:has([data-testid="folder-color-red"])').click();
+			await page.click('[data-testid="folder-create-submit"]');
+
+			await page.click('[data-testid="create-folder-button"]');
+			await page.fill('[data-testid="folder-name-input"]', "Second Folder");
+			await page
+				.locator('label:has([data-testid="folder-color-blue"])')
+				.click();
+			await page.click('[data-testid="folder-create-submit"]');
+
+			await page.click('[data-testid="create-folder-button"]');
+			await page.fill('[data-testid="folder-name-input"]', "Third Folder");
+			await page
+				.locator('label:has([data-testid="folder-color-green"])')
+				.click();
+			await page.click('[data-testid="folder-create-submit"]');
+
+			// Wait for all folders to be visible
+			await expect(
+				page
+					.locator('[data-testid="folder-sidebar"]')
+					.getByText("First Folder"),
+			).toBeVisible();
+			await expect(
+				page
+					.locator('[data-testid="folder-sidebar"]')
+					.getByText("Second Folder"),
+			).toBeVisible();
+			await expect(
+				page
+					.locator('[data-testid="folder-sidebar"]')
+					.getByText("Third Folder"),
+			).toBeVisible();
+		});
+
+		test("should show drag handles when multiple folders exist", async ({
+			page,
+		}) => {
+			// Get all folder buttons
+			const folderButtons = await page
+				.locator('button[data-testid^="folder-item-"]')
+				.all();
+
+			// Each folder should be draggable when there are 2+ folders
+			for (const button of folderButtons) {
+				await expect(button).toHaveAttribute("draggable", "true");
+			}
+		});
+
+		test("should reorder folders via drag-and-drop", async ({ page }) => {
+			// Get the folder buttons in order
+			const folders = await page
+				.locator('button[data-testid^="folder-item-"]')
+				.all();
+
+			const firstFolder = folders[0];
+			const secondFolder = folders[1];
+
+			// Get the initial order of folder names
+			const initialOrder = await page
+				.locator('nav[aria-label="Navigation"] ul')
+				.locator('button[data-testid^="folder-item-"]')
+				.allTextContents();
+
+			// Drag first folder to second position
+			await firstFolder.dragTo(secondFolder);
+
+			// Wait for drag operation to complete
+			await page.waitForTimeout(100);
+
+			// Get the new order
+			const newOrder = await page
+				.locator('nav[aria-label="Navigation"] ul')
+				.locator('button[data-testid^="folder-item-"]')
+				.allTextContents();
+
+			// The order should have changed
+			// Note: After dragging "First Folder" to "Second Folder" position,
+			// "First Folder" should appear after "Second Folder"
+			// or they should swap positions
+			expect(newOrder).not.toEqual(initialOrder);
+		});
+
+		test("should persist folder order after page reload", async ({ page }) => {
+			// Get the folder buttons
+			const folders = await page
+				.locator('button[data-testid^="folder-item-"]')
+				.all();
+
+			// Drag the first folder to the last position
+			const firstFolder = folders[0];
+			const lastFolder = folders[2];
+
+			// Get initial order before drag
+			const initialOrder = await page
+				.locator('nav[aria-label="Navigation"] ul')
+				.locator('button[data-testid^="folder-item-"]')
+				.allTextContents();
+
+			// Perform drag and drop
+			await firstFolder.dragTo(lastFolder);
+
+			// Wait for drag to complete
+			await page.waitForTimeout(100);
+
+			// Get the order after drag
+			const orderAfterDrag = await page
+				.locator('nav[aria-label="Navigation"] ul')
+				.locator('button[data-testid^="folder-item-"]')
+				.allTextContents();
+
+			// Order should have changed
+			expect(orderAfterDrag).not.toEqual(initialOrder);
+
+			// Reload the page
+			await page.reload();
+			await page.waitForSelector('[data-testid="folder-sidebar"]');
+
+			// Get the order after reload
+			const orderAfterReload = await page
+				.locator('nav[aria-label="Navigation"] ul')
+				.locator('button[data-testid^="folder-item-"]')
+				.allTextContents();
+
+			// Order should persist
+			expect(orderAfterReload).toEqual(orderAfterDrag);
+		});
+
+		test("should not be draggable when only one folder exists", async ({
+			page,
+		}) => {
+			// Delete two folders to leave only one
+			const folderButtons = await page
+				.locator('button[data-testid^="folder-item-"]')
+				.all();
+
+			// Delete the second folder
+			const secondFolderId = await folderButtons[1]
+				.getAttribute("data-testid")
+				.then((id) => id?.replace("folder-item-", ""));
+			await folderButtons[1].hover();
+			await page.click(`[data-testid="folder-actions-${secondFolderId}"]`);
+			await page.click(`[data-testid="folder-edit-${secondFolderId}"]`);
+			await page.click('[data-testid="folder-delete-button"]');
+			await page.click('[data-testid="folder-delete-confirm"]');
+
+			// Delete the third folder
+			const remainingFolderButtons = await page
+				.locator('button[data-testid^="folder-item-"]')
+				.all();
+			const thirdFolderId = await remainingFolderButtons[1]
+				.getAttribute("data-testid")
+				.then((id) => id?.replace("folder-item-", ""));
+			await remainingFolderButtons[1].hover();
+			await page.click(`[data-testid="folder-actions-${thirdFolderId}"]`);
+			await page.click(`[data-testid="folder-edit-${thirdFolderId}"]`);
+			await page.click('[data-testid="folder-delete-button"]');
+			await page.click('[data-testid="folder-delete-confirm"]');
+
+			// Now only one folder should remain
+			const loneFolder = page.locator('button[data-testid^="folder-item-"]');
+			await expect(loneFolder).toHaveCount(1);
+
+			// It should not be draggable
+			await expect(loneFolder).toHaveAttribute("draggable", "false");
+		});
+	});
 });
