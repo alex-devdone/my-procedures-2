@@ -212,11 +212,11 @@ Notification system for due reminders. Can proceed after Phase 10.
 - [x] Create `apps/web/src/components/notifications/reminder-toast.tsx` - in-app toast component for reminders
 - [x] Add unit tests for ReminderToast in `apps/web/src/components/notifications/reminder-toast.test.tsx`
 - [x] Integrate reminder checker into app layout to run on authenticated pages
-- [ ] Create E2E tests for reminder notifications in localStorage mode at `apps/web/e2e/reminders.spec.ts`:
-  - [ ] E2E: Request browser notification permission
-  - [ ] E2E: Show in-app toast when reminder is due
-  - [ ] E2E: Dismiss reminder toast
-  - [ ] E2E: Click reminder toast to navigate to todo
+- [x] Create E2E tests for reminder notifications in localStorage mode at `apps/web/e2e/reminders.spec.ts`:
+  - [x] E2E: Request browser notification permission
+  - [x] E2E: Show in-app toast when reminder is due
+  - [x] E2E: Dismiss reminder toast
+  - [x] E2E: Click reminder toast to navigate to todo
 
 ---
 

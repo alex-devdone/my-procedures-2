@@ -621,3 +621,12 @@
   - Integrated ReminderProvider into Providers component (apps/web/src/components/providers.tsx):
     - Wrapped children with ReminderProvider inside QueryClientProvider
     - Enables automatic reminder checking for all pages in the app
+
+- [✓] 2026-01-21 07:50 - Create E2E tests for reminder notifications (12 tests) in apps/web/e2e/reminders.spec.ts:
+  - Request browser notification permission: detect API support, report permission state
+  - Show in-app toast when reminder is due: single reminder, multiple reminders, overdue styling, skip completed todos
+  - Dismiss reminder toast: dismiss button, no re-show after reload
+  - Click reminder toast to navigate to todo: view button visibility, dismiss on interaction
+  - Reminder toast displays correct information: due date info, icon display
+  - Helper functions for creating todos with due reminders directly in localStorage
+  - Tests use localStorage key "todos" (not "flowdo_todos") matching local-todo-storage.ts
