@@ -6,6 +6,7 @@ import { useCallback, useMemo, useState } from "react";
 
 import type { RecurringPattern } from "@/app/api/todo";
 import { Button } from "@/components/ui/button";
+import { useNotifications } from "@/hooks/use-notifications";
 import { cn } from "@/lib/utils";
 
 import {
@@ -127,6 +128,7 @@ export function TodoSchedulePopover({
 	compact = false,
 }: TodoSchedulePopoverProps) {
 	const [open, setOpen] = useState(false);
+	const { permission, requestPermission } = useNotifications();
 
 	const handleDueDateChange = useCallback(
 		(dueDate: Date | null) => {
@@ -149,22 +151,30 @@ export function TodoSchedulePopover({
 
 	const handleReminderChange = useCallback(
 		(reminderAt: Date | null) => {
+			// Request notification permission when setting a reminder
+			if (reminderAt && permission === "default") {
+				requestPermission();
+			}
 			onChange({
 				...value,
 				reminderAt,
 			});
 		},
-		[onChange, value],
+		[onChange, value, permission, requestPermission],
 	);
 
 	const handleRecurringChange = useCallback(
 		(recurringPattern: RecurringPattern | null) => {
+			// Request notification permission when setting a recurring pattern with notifyAt
+			if (recurringPattern?.notifyAt && permission === "default") {
+				requestPermission();
+			}
 			onChange({
 				...value,
 				recurringPattern,
 			});
 		},
-		[onChange, value],
+		[onChange, value, permission, requestPermission],
 	);
 
 	const handleClear = useCallback(

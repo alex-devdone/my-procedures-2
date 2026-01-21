@@ -3,6 +3,7 @@
 import { getNextNotificationTime } from "@my-procedures-2/api/lib/recurring";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Todo } from "@/app/api/todo";
+import { isDateMatchingPattern } from "@/lib/recurring-utils";
 import { useNotifications } from "./use-notifications";
 
 // ============================================================================
@@ -210,20 +211,34 @@ export function markReminderAsShown(
 	return newShownIds;
 }
 
+// Re-export from utility file for backwards compatibility
+export { isDateMatchingPattern } from "@/lib/recurring-utils";
+
 /**
  * Get the notification time for today based on a recurring pattern's notifyAt.
- * This calculates when the notification should have fired today, regardless of
- * whether that time has passed.
+ * This calculates when the notification should have fired today, only if today
+ * is a matching day for the pattern.
  *
  * @param pattern - The recurring pattern with notifyAt
  * @param currentTime - The current time to calculate from
- * @returns The notification datetime for today, or null if not applicable
+ * @returns The notification datetime for today, or null if not applicable or today doesn't match
  */
 function getTodayNotificationTime(
-	pattern: { notifyAt?: string; type?: string },
+	pattern: {
+		notifyAt?: string;
+		type?: string;
+		daysOfWeek?: number[];
+		dayOfMonth?: number;
+		monthOfYear?: number;
+	},
 	currentTime: Date,
 ): Date | null {
 	if (!pattern.notifyAt) return null;
+
+	// Check if today matches the pattern
+	if (!isDateMatchingPattern(pattern, currentTime)) {
+		return null;
+	}
 
 	const [hours = 0, minutes = 0] = pattern.notifyAt.split(":").map(Number);
 	const todayNotification = new Date(currentTime);
@@ -528,11 +543,14 @@ export function useReminderChecker(
 			const stillRelevant = prev.filter((r) => {
 				// Keep if not in newly due (already shown) and todo still exists with reminder
 				const todo = todos.find((t) => t.id === r.todoId);
+				// Check for either explicit reminderAt or recurring pattern with notifyAt
+				const hasReminder =
+					todo?.reminderAt || todo?.recurringPattern?.notifyAt;
 				return (
 					!existingIds.has(String(r.todoId)) &&
 					todo &&
 					!todo.completed &&
-					todo.reminderAt
+					hasReminder
 				);
 			});
 			return [...stillRelevant, ...newlyDue];

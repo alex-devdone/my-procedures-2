@@ -1,7 +1,7 @@
 "use client";
 
 import { Clock, X } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,6 +66,7 @@ export function TimePicker({
 	className,
 }: TimePickerProps) {
 	const [inputValue, setInputValue] = useState(value ?? "");
+	const isFocusedRef = useRef(false);
 
 	const handleInputChange = useCallback(
 		(e: React.ChangeEvent<HTMLInputElement>) => {
@@ -82,7 +83,12 @@ export function TimePicker({
 		[onChange],
 	);
 
+	const handleInputFocus = useCallback(() => {
+		isFocusedRef.current = true;
+	}, []);
+
 	const handleInputBlur = useCallback(() => {
+		isFocusedRef.current = false;
 		// On blur, format the input value if valid, otherwise reset to last valid value
 		if (inputValue === "") {
 			return;
@@ -116,18 +122,17 @@ export function TimePicker({
 		return formatTimeDisplay(value);
 	}, [value]);
 
-	// Sync internal state with external value changes
-	const handleValueSync = useCallback(() => {
+	// Sync internal state with external value changes (only when not focused)
+	useEffect(() => {
+		if (isFocusedRef.current) {
+			return;
+		}
 		if (value !== null && value !== inputValue) {
 			setInputValue(value);
 		} else if (value === null && inputValue !== "") {
 			setInputValue("");
 		}
-	}, [value, inputValue]);
-
-	// biome-ignore lint/correctness/useExhaustiveDependencies: intentionally sync on value changes only
-	useMemo(() => {
-		handleValueSync();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [value]);
 
 	return (
@@ -146,6 +151,7 @@ export function TimePicker({
 						type="text"
 						value={inputValue}
 						onChange={handleInputChange}
+						onFocus={handleInputFocus}
 						onBlur={handleInputBlur}
 						placeholder={placeholder}
 						disabled={disabled}

@@ -12,6 +12,7 @@ import { TodoExpandableItem } from "@/components/todos";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { isDateMatchingPattern } from "@/lib/recurring-utils";
 import { cn } from "@/lib/utils";
 
 type FilterType = "all" | "active" | "completed";
@@ -64,11 +65,25 @@ export interface TodayViewProps {
 
 /**
  * Filters todos to return only those due today.
+ * Includes both todos with an explicit dueDate of today and
+ * recurring todos that match today's date.
  */
-export function getTodosDueToday(todos: Todo[]): Todo[] {
+export function getTodosDueToday(
+	todos: Todo[],
+	now: Date = new Date(),
+): Todo[] {
 	return todos.filter((todo) => {
-		if (!todo.dueDate) return false;
-		return isToday(todo.dueDate);
+		// Check explicit dueDate
+		if (todo.dueDate && isToday(todo.dueDate)) {
+			return true;
+		}
+
+		// Check recurring pattern (if today matches the pattern)
+		if (todo.recurringPattern && !todo.completed) {
+			return isDateMatchingPattern(todo.recurringPattern, now);
+		}
+
+		return false;
 	});
 }
 
