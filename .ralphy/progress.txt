@@ -107,3 +107,16 @@
   - All local Zod schemas validation with string IDs
   - SubtaskProgress helper function tests
   - areAllSubtasksCompleted helper function tests
+
+- [✓] 2026-01-21 01:19 - Create subtask.api.ts (apps/web/src/app/api/subtask/subtask.api.ts) with:
+  - getSubtasksQueryOptions(input: ListSubtasksInput) for fetching subtasks by todoId
+  - getSubtasksQueryKey(todoId: number) for cache key generation
+  - getCreateSubtaskMutationOptions() for creating subtasks
+  - getUpdateSubtaskMutationOptions() for updating subtask text
+  - getDeleteSubtaskMutationOptions() for deleting subtasks
+  - getToggleSubtaskMutationOptions() for toggling completion status
+  - getReorderSubtaskMutationOptions() for reordering subtasks
+- [✓] 2026-01-21 01:19 - Add unit tests for subtask API (16 tests) in apps/web/src/app/api/subtask/subtask.api.test.ts covering:
+  - Query options structure and function exports
+  - Mutation options structure for all CRUD operations
+  - Query key generation with todoId parameter
