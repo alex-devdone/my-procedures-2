@@ -244,13 +244,13 @@ Smart views based on scheduling data. Can proceed after Phase 10.
 
 Configure Supabase client and enable Realtime for automatic sync. Can proceed after Phase 1.
 
-- [ ] Install `@supabase/supabase-js` package in apps/web with `bun add @supabase/supabase-js`
-- [ ] Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` to `packages/env/` validation
-- [ ] Create `apps/web/src/lib/supabase.ts` with Supabase client initialization
-- [ ] Add unit tests for Supabase client setup in `apps/web/src/lib/supabase.test.ts`
+- [x] Install `@supabase/supabase-js` package in apps/web with `bun add @supabase/supabase-js`
+- [x] Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` to `packages/env/` validation
+- [x] Create `apps/web/src/lib/supabase.ts` with Supabase client initialization
+- [x] Add unit tests for Supabase client setup in `apps/web/src/lib/supabase.test.ts`
 - [ ] Enable Realtime replication for `todo`, `folder`, and `subtask` tables in Supabase dashboard (document in README)
-- [ ] Create `apps/web/src/hooks/use-supabase-realtime.ts` - generic hook for subscribing to table changes
-- [ ] Add unit tests for useSupabaseRealtime in `apps/web/src/hooks/use-supabase-realtime.test.ts`
+- [x] Create `apps/web/src/hooks/use-supabase-realtime.ts` - generic hook for subscribing to table changes
+- [x] Add unit tests for useSupabaseRealtime in `apps/web/src/hooks/use-supabase-realtime.test.ts`
 
 ---
 

@@ -753,4 +753,34 @@
 - [✓] 2026-01-21 09:01 - Run all unit tests: 1631 tests passed
 - [✓] 2026-01-21 09:01 - Run E2E tests: 109 passed (includes fixed todo.spec.ts tests)
 - [✓] 2026-01-21 09:01 - Run linting check: passed (auto-formatted, 41 warnings pre-existing)
+- [✓] 2026-01-21 09:37 - Install @supabase/supabase-js package in apps/web with bun add
+- [✓] 2026-01-21 09:37 - Add Supabase env variables to packages/env/ validation (already configured)
+- [✓] 2026-01-21 09:37 - Create apps/web/src/lib/supabase.ts with Supabase client initialization:
+  - Created supabase client using createClient from @supabase/supabase-js
+  - Configured with persistSession: false and autoRefreshToken: false for realtime use
+  - Created createSupabaseChannel helper function for channel creation
+  - Created RealtimePayload<T> type for type-safe event payloads
+  - Created isSupabaseConfigured() function to check if Supabase is properly configured
+- [✓] 2026-01-21 09:37 - Add unit tests for Supabase client setup (5 tests) in apps/web/src/lib/supabase.test.ts:
+  - Test supabase client instance creation
+  - Test createSupabaseChannel function
+  - Test isSupabaseConfigured function
+- [✓] 2026-01-21 09:37 - Update vitest.config.ts to resolve @my-procedures-2/env/web and @my-procedures-2/env/server
+- [✓] 2026-01-21 09:37 - Create apps/web/src/hooks/use-supabase-realtime.ts generic hook:
+  - Created useSupabaseRealtime hook for subscribing to table changes
+  - Supports filtering with user_id=eq.X format
+  - Supports configurable event types (INSERT, UPDATE, DELETE)
+  - Calls onChange callback when matching events occur
+  - Calls onSubscribe callback when subscription is established
+  - Calls onError callback when subscription fails
+  - Automatically handles cleanup on unmount
+  - Created useSupabasePresence hook for tracking online/offline status
+- [✓] 2026-01-21 09:37 - Add unit tests for useSupabaseRealtime (10 tests) in apps/web/src/hooks/use-supabase-realtime.test.ts:
+  - Test initial state (isConfigured, isSubscribed)
+  - Test subscription behavior (channel creation, callbacks, configuration check)
+  - Test cleanup (channel removal on unmount)
+  - Test useSupabasePresence hook behavior
+- [✓] 2026-01-21 09:37 - Run all unit tests: 1646 tests passed (15 new tests added)
+- [✓] 2026-01-21 09:37 - Run linting check: passed (auto-formatted, added biome-ignore for reserved key parameter)
+
 
