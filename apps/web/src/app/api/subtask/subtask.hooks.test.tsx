@@ -5,6 +5,14 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+// Mock Supabase env variables
+vi.mock("@my-procedures-2/env/web", () => ({
+	env: {
+		NEXT_PUBLIC_SUPABASE_URL: "https://test-project.supabase.co",
+		NEXT_PUBLIC_SUPABASE_ANON_KEY: "test-anon-key-12345678",
+	},
+}));
+
 // Mock the auth-client module
 const mockUseSession = vi.fn();
 vi.mock("@/lib/auth-client", () => ({

@@ -2,10 +2,10 @@
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { useSubtaskRealtimeWithAuth } from "@/hooks/use-subtask-realtime";
 import { useSession } from "@/lib/auth-client";
 import * as localSubtaskStorage from "@/lib/local-subtask-storage";
 import { queryClient } from "@/utils/trpc";
-
 import {
 	getCreateSubtaskMutationOptions,
 	getDeleteSubtaskMutationOptions,
@@ -99,6 +99,9 @@ export function useSubtaskStorage(
 ): UseSubtaskStorageReturn {
 	const { data: session, isPending: isSessionPending } = useSession();
 	const isAuthenticated = !!session?.user;
+
+	// Integrate realtime sync for authenticated users
+	useSubtaskRealtimeWithAuth();
 
 	// For local storage, we need string todoId
 	const localTodoId = String(todoId);

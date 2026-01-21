@@ -849,4 +849,30 @@
   - No additional configuration needed - works seamlessly with existing tRPC mutations
 - [✓] 2026-01-21 10:21 - Run all unit tests: 1710 tests passed (16 new realtime folder tests added)
 - [✓] 2026-01-21 10:21 - Run linting check: passed (auto-formatted new files, 49 pre-existing warnings)
+- [✓] 2026-01-21 10:39 - Create use-subtask-realtime.ts (apps/web/src/hooks/use-subtask-realtime.ts) with:
+  - useSubtaskRealtime hook for subscribing to subtask table changes by userId
+  - useSubtaskRealtimeWithAuth hook that integrates with useSession
+  - Event handlers for INSERT (add new subtask to cache), UPDATE (update existing subtask), DELETE (remove subtask from cache)
+  - useEffect-based subscription lifecycle management with cleanup
+  - React Query cache integration for automatic updates
+  - Proper ref usage for subscription state tracking
+  - Query key helper function for tRPC TanStack Query pattern ([['subtask', 'list'], { input: { todoId } }])
+- [✓] 2026-01-21 10:39 - Add unit tests for useSubtaskRealtime (17 tests) in apps/web/src/hooks/use-subtask-realtime.test.tsx:
+  - Initial state tests (isConfigured, isSubscribed, unsubscribe function)
+  - Subscription behavior tests (channel creation, no subscription when not configured, no subscription when no userId)
+  - Unsubscribe function tests
+  - INSERT/UPDATE/DELETE event handling tests
+  - React Query cache integration tests (tRPC query key structure validation)
+- [✓] 2026-01-21 10:39 - Update subtask.hooks.ts (apps/web/src/app/api/subtask/subtask.hooks.ts) to integrate realtime:
+  - Added import for useSubtaskRealtimeWithAuth from @/hooks/use-subtask-realtime
+  - Integrated useSubtaskRealtimeWithAuth() call in useSubtaskStorage hook
+  - Realtime sync now enabled automatically for authenticated users
+  - No additional configuration needed - works seamlessly with existing tRPC mutations
+- [✓] 2026-01-21 10:39 - Added env mocks to test files requiring Supabase configuration:
+  - apps/web/src/app/api/subtask/subtask.hooks.test.tsx
+  - apps/web/src/components/subtasks/subtask-list.test.tsx
+  - apps/web/src/components/todos/todo-expandable-item.test.tsx
+- [✓] 2026-01-21 10:39 - Run all unit tests: 1727 tests passed (17 new subtask realtime tests added)
+- [✓] 2026-01-21 10:39 - Run linting check: passed (auto-formatted imports)
+
 

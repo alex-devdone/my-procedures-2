@@ -3,6 +3,14 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// Mock Supabase env variables before any imports
+vi.mock("@my-procedures-2/env/web", () => ({
+	env: {
+		NEXT_PUBLIC_SUPABASE_URL: "https://test-project.supabase.co",
+		NEXT_PUBLIC_SUPABASE_ANON_KEY: "test-anon-key-12345678",
+	},
+}));
+
 import type { Subtask, UseSubtaskStorageReturn } from "@/app/api/subtask";
 
 // Mock the subtask hooks
