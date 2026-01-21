@@ -37,7 +37,10 @@ apps/
     src/app/                   # App Router pages and API routes
       api/:entityName/         # Entity-based API modules (see below)
     src/components/            # React components (shadcn/ui in ui/)
+    src/hooks/                 # Shared React hooks
+    src/lib/                   # Utilities (auth-client, local storage, etc.)
     src/utils/trpc.ts          # tRPC client setup
+    e2e/                       # Playwright E2E tests
 
 packages/
   api/                         # tRPC API layer
@@ -61,6 +64,7 @@ apps/web/src/app/api/todo/     # Example: todo entity
   todo.types.ts                # TypeScript types and Zod schemas
   todo.api.ts                  # tRPC client wrappers (query/mutation options)
   todo.hooks.ts                # React Query hooks with optimistic updates
+  todo.utils.ts                # Entity-specific utility functions
   index.ts                     # Re-exports for clean imports
 ```
 
@@ -72,7 +76,18 @@ apps/web/src/app/api/todo/     # Example: todo entity
 
 - **`:entityName.hooks.ts`** — React hooks that consume the API layer. Implements optimistic updates, loading states, and business logic. Marked with `"use client"`.
 
+- **`:entityName.utils.ts`** — Entity-specific utility functions (e.g., data transformations, local storage helpers). Optional file, create when needed.
+
 - **`index.ts`** — Barrel file that re-exports types, schemas, API functions, and hooks for clean imports.
+
+**Shared Hooks (`apps/web/src/hooks/`):**
+
+Reusable hooks that are not entity-specific live in the hooks directory:
+- `use-auth-state.ts` — Authentication state management
+- `use-form-validation.ts` — Form validation utilities
+- `use-error-handler.ts` — Centralized error handling
+- `use-todo-storage.ts` — Local storage for offline todo support
+- `use-sync-todos.ts` — Syncing local todos with server
 
 **Adding a new entity:**
 
@@ -89,6 +104,7 @@ apps/web/src/app/api/todo/     # Example: todo entity
 - Database schema in TypeScript at `packages/db/src/schema/`
 - Environment variables validated via Zod in `packages/env/`
 - Entity hooks use optimistic updates via React Query's `onMutate`/`onError`/`onSettled`
+- Local storage hooks in `src/hooks/` enable offline-first patterns with server sync
 
 ## Code Style
 
@@ -151,7 +167,7 @@ describe("MyComponent", () => {
 ```
 apps/web/e2e/
   home.spec.ts           # Home page tests
-  auth.spec.ts           # Authentication flow tests
+  todo.spec.ts           # Todo functionality tests
 ```
 
 **Running E2E tests:**

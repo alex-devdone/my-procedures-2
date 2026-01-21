@@ -169,6 +169,10 @@ describe("Todo Normalization", () => {
 				text: "Test",
 				completed: false,
 				userId: "user-123",
+				folderId: null,
+				dueDate: null,
+				reminderAt: null,
+				recurringPattern: null,
 			};
 
 			const result = normalizeRemoteTodo(remoteTodo);
@@ -185,8 +189,26 @@ describe("Todo Normalization", () => {
 	describe("normalizeRemoteTodos", () => {
 		it("normalizes array of remote todos", () => {
 			const remoteTodos: RemoteTodo[] = [
-				{ id: 1, text: "Task 1", completed: false, userId: "user-1" },
-				{ id: 2, text: "Task 2", completed: true, userId: "user-1" },
+				{
+					id: 1,
+					text: "Task 1",
+					completed: false,
+					userId: "user-1",
+					folderId: null,
+					dueDate: null,
+					reminderAt: null,
+					recurringPattern: null,
+				},
+				{
+					id: 2,
+					text: "Task 2",
+					completed: true,
+					userId: "user-1",
+					folderId: null,
+					dueDate: null,
+					reminderAt: null,
+					recurringPattern: null,
+				},
 			];
 
 			const result = normalizeRemoteTodos(remoteTodos);
@@ -266,8 +288,26 @@ describe("Local Storage Sync Logic", () => {
 
 describe("Optimistic Update Helpers", () => {
 	const baseTodos: RemoteTodo[] = [
-		{ id: 1, text: "Task 1", completed: false, userId: "user-1" },
-		{ id: 2, text: "Task 2", completed: true, userId: "user-1" },
+		{
+			id: 1,
+			text: "Task 1",
+			completed: false,
+			userId: "user-1",
+			folderId: null,
+			dueDate: null,
+			reminderAt: null,
+			recurringPattern: null,
+		},
+		{
+			id: 2,
+			text: "Task 2",
+			completed: true,
+			userId: "user-1",
+			folderId: null,
+			dueDate: null,
+			reminderAt: null,
+			recurringPattern: null,
+		},
 	];
 
 	describe("createOptimisticTodo", () => {
@@ -288,6 +328,10 @@ describe("Optimistic Update Helpers", () => {
 				text: "New Task",
 				completed: false,
 				userId: "user-1",
+				folderId: null,
+				dueDate: null,
+				reminderAt: null,
+				recurringPattern: null,
 			};
 
 			const result = applyOptimisticCreate(baseTodos, newTodo);
@@ -302,6 +346,10 @@ describe("Optimistic Update Helpers", () => {
 				text: "New",
 				completed: false,
 				userId: "user-1",
+				folderId: null,
+				dueDate: null,
+				reminderAt: null,
+				recurringPattern: null,
 			};
 
 			applyOptimisticCreate(baseTodos, newTodo);

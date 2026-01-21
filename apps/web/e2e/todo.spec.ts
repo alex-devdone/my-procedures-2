@@ -7,7 +7,7 @@ test.describe("Todo functionality (localStorage mode)", () => {
 		await page.evaluate(() => localStorage.clear());
 		await page.reload();
 		// Wait for the page to be ready (wait for the input field)
-		await page.waitForSelector('input[placeholder="What needs to be done?"]');
+		await page.waitForSelector('input[placeholder^="Add task to"]');
 	});
 
 	test.describe("Create todo", () => {
@@ -17,7 +17,7 @@ test.describe("Todo functionality (localStorage mode)", () => {
 			const todoText = "Buy groceries";
 
 			// Enter todo text
-			await page.fill('input[placeholder="What needs to be done?"]', todoText);
+			await page.fill('input[placeholder^="Add task to"]', todoText);
 
 			// Click Add button
 			await page.click('button[type="submit"]');
@@ -32,8 +32,8 @@ test.describe("Todo functionality (localStorage mode)", () => {
 			const todoText = "Walk the dog";
 
 			// Enter todo text and press Enter
-			await page.fill('input[placeholder="What needs to be done?"]', todoText);
-			await page.press('input[placeholder="What needs to be done?"]', "Enter");
+			await page.fill('input[placeholder^="Add task to"]', todoText);
+			await page.press('input[placeholder^="Add task to"]', "Enter");
 
 			// Verify todo appears in the list
 			await expect(
@@ -44,12 +44,12 @@ test.describe("Todo functionality (localStorage mode)", () => {
 		test("should clear input field after creating todo", async ({ page }) => {
 			const todoText = "Read a book";
 
-			await page.fill('input[placeholder="What needs to be done?"]', todoText);
+			await page.fill('input[placeholder^="Add task to"]', todoText);
 			await page.click('button[type="submit"]');
 
 			// Verify input is cleared
 			await expect(
-				page.locator('input[placeholder="What needs to be done?"]'),
+				page.locator('input[placeholder^="Add task to"]'),
 			).toHaveValue("");
 		});
 
@@ -57,7 +57,7 @@ test.describe("Todo functionality (localStorage mode)", () => {
 			const todoText = "Persistent todo";
 
 			// Create todo
-			await page.fill('input[placeholder="What needs to be done?"]', todoText);
+			await page.fill('input[placeholder^="Add task to"]', todoText);
 			await page.click('button[type="submit"]');
 
 			// Wait for todo to appear
@@ -69,7 +69,7 @@ test.describe("Todo functionality (localStorage mode)", () => {
 			await page.reload();
 
 			// Wait for page to load
-			await page.waitForSelector('input[placeholder="What needs to be done?"]');
+			await page.waitForSelector('input[placeholder^="Add task to"]');
 
 			// Verify todo still exists
 			await expect(
@@ -83,7 +83,7 @@ test.describe("Todo functionality (localStorage mode)", () => {
 			const todoText = "Complete me";
 
 			// Create todo
-			await page.fill('input[placeholder="What needs to be done?"]', todoText);
+			await page.fill('input[placeholder^="Add task to"]', todoText);
 			await page.click('button[type="submit"]');
 
 			// Wait for todo to appear
@@ -110,7 +110,7 @@ test.describe("Todo functionality (localStorage mode)", () => {
 			const todoText = "Persist completion";
 
 			// Create todo
-			await page.fill('input[placeholder="What needs to be done?"]', todoText);
+			await page.fill('input[placeholder^="Add task to"]', todoText);
 			await page.click('button[type="submit"]');
 
 			// Complete the todo
@@ -122,7 +122,7 @@ test.describe("Todo functionality (localStorage mode)", () => {
 
 			// Reload page
 			await page.reload();
-			await page.waitForSelector('input[placeholder="What needs to be done?"]');
+			await page.waitForSelector('input[placeholder^="Add task to"]');
 
 			// Verify completed state persists
 			const reloadedTodoItem = page.locator("li").filter({ hasText: todoText });
@@ -133,7 +133,7 @@ test.describe("Todo functionality (localStorage mode)", () => {
 			const todoText = "Toggle me back";
 
 			// Create and complete todo
-			await page.fill('input[placeholder="What needs to be done?"]', todoText);
+			await page.fill('input[placeholder^="Add task to"]', todoText);
 			await page.click('button[type="submit"]');
 
 			const todoItem = page.locator("li").filter({ hasText: todoText });
@@ -158,7 +158,7 @@ test.describe("Todo functionality (localStorage mode)", () => {
 			const todoText = "Delete me";
 
 			// Create todo
-			await page.fill('input[placeholder="What needs to be done?"]', todoText);
+			await page.fill('input[placeholder^="Add task to"]', todoText);
 			await page.click('button[type="submit"]');
 
 			// Wait for todo to appear
@@ -179,7 +179,7 @@ test.describe("Todo functionality (localStorage mode)", () => {
 			const todoText = "Delete and persist";
 
 			// Create todo
-			await page.fill('input[placeholder="What needs to be done?"]', todoText);
+			await page.fill('input[placeholder^="Add task to"]', todoText);
 			await page.click('button[type="submit"]');
 
 			// Delete the todo
@@ -192,7 +192,7 @@ test.describe("Todo functionality (localStorage mode)", () => {
 
 			// Reload page
 			await page.reload();
-			await page.waitForSelector('input[placeholder="What needs to be done?"]');
+			await page.waitForSelector('input[placeholder^="Add task to"]');
 
 			// Verify todo is still gone
 			await expect(
@@ -212,7 +212,7 @@ test.describe("Todo functionality (localStorage mode)", () => {
 
 		test("should prevent whitespace-only todo submission", async ({ page }) => {
 			// Enter only whitespace
-			await page.fill('input[placeholder="What needs to be done?"]', "   ");
+			await page.fill('input[placeholder^="Add task to"]', "   ");
 
 			// Button should still be disabled (whitespace is trimmed)
 			const addButton = page.locator('button[type="submit"]');
@@ -224,10 +224,7 @@ test.describe("Todo functionality (localStorage mode)", () => {
 
 			// Create multiple todos
 			for (const todoText of todos) {
-				await page.fill(
-					'input[placeholder="What needs to be done?"]',
-					todoText,
-				);
+				await page.fill('input[placeholder^="Add task to"]', todoText);
 				await page.click('button[type="submit"]');
 				await expect(
 					page.locator("li").filter({ hasText: todoText }),
@@ -265,7 +262,7 @@ test.describe("Todo functionality (localStorage mode)", () => {
 
 			// Reload and verify persistence
 			await page.reload();
-			await page.waitForSelector('input[placeholder="What needs to be done?"]');
+			await page.waitForSelector('input[placeholder^="Add task to"]');
 
 			await expect(
 				page.locator("li").filter({ hasText: "First todo" }),
@@ -286,16 +283,10 @@ test.describe("Todo functionality (localStorage mode)", () => {
 	test.describe("Filter functionality", () => {
 		test("should filter todos by active/completed status", async ({ page }) => {
 			// Create todos
-			await page.fill(
-				'input[placeholder="What needs to be done?"]',
-				"Active todo",
-			);
+			await page.fill('input[placeholder^="Add task to"]', "Active todo");
 			await page.click('button[type="submit"]');
 
-			await page.fill(
-				'input[placeholder="What needs to be done?"]',
-				"Completed todo",
-			);
+			await page.fill('input[placeholder^="Add task to"]', "Completed todo");
 			await page.click('button[type="submit"]');
 
 			// Complete one todo

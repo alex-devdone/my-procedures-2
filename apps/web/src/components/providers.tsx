@@ -5,6 +5,8 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 
 import { queryClient } from "@/utils/trpc";
 
+import { ReminderProvider } from "./notifications";
+import { SyncProvider } from "./sync";
 import { ThemeProvider } from "./theme-provider";
 import { Toaster } from "./ui/sonner";
 
@@ -17,7 +19,9 @@ export default function Providers({ children }: { children: React.ReactNode }) {
 			disableTransitionOnChange
 		>
 			<QueryClientProvider client={queryClient}>
-				{children}
+				<SyncProvider>
+					<ReminderProvider>{children}</ReminderProvider>
+				</SyncProvider>
 				<ReactQueryDevtools />
 			</QueryClientProvider>
 			<Toaster richColors />

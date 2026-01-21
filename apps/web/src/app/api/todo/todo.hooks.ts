@@ -9,10 +9,10 @@ import {
 	useState,
 	useSyncExternalStore,
 } from "react";
+import { useTodoRealtimeWithAuth } from "@/hooks/use-todo-realtime";
 import { useSession } from "@/lib/auth-client";
 import * as localTodoStorage from "@/lib/local-todo-storage";
 import { queryClient } from "@/utils/trpc";
-
 import {
 	getAllTodosQueryOptions,
 	getBulkCreateTodosMutationOptions,
@@ -20,10 +20,14 @@ import {
 	getDeleteTodoMutationOptions,
 	getTodosQueryKey,
 	getToggleTodoMutationOptions,
+	getUpdateTodoFolderMutationOptions,
+	getUpdateTodoScheduleMutationOptions,
 } from "./todo.api";
 import type {
 	LocalTodo,
+	RecurringPattern,
 	RemoteTodo,
+	SelectedFolderId,
 	SyncAction,
 	SyncPromptState,
 	Todo,
@@ -52,7 +56,7 @@ function subscribeToLocalTodos(callback: () => void) {
 	};
 }
 
-function notifyLocalTodosListeners() {
+export function notifyLocalTodosListeners() {
 	for (const listener of localTodosListeners) {
 		listener();
 	}
@@ -83,10 +87,14 @@ function getLocalTodosServerSnapshot(): LocalTodo[] {
  * Unified hook for managing todos with dual-mode support:
  * - Authenticated users: todos stored remotely via tRPC
  * - Guest users: todos stored locally in browser localStorage
+ *
+ * Also provides folder filtering capabilities.
  */
 export function useTodoStorage(): UseTodoStorageReturn {
 	const { data: session, isPending: isSessionPending } = useSession();
 	const isAuthenticated = !!session?.user;
+	const [selectedFolderId, setSelectedFolderId] =
+		useState<SelectedFolderId>("inbox");
 
 	const localTodos = useSyncExternalStore(
 		subscribeToLocalTodos,
@@ -108,7 +116,13 @@ export function useTodoStorage(): UseTodoStorageReturn {
 	// Create mutation with optimistic updates
 	const createMutation = useMutation({
 		mutationFn: getCreateTodoMutationOptions().mutationFn,
-		onMutate: async (newTodo: { text: string }) => {
+		onMutate: async (newTodo: {
+			text: string;
+			folderId?: number | null;
+			dueDate?: string | null;
+			reminderAt?: string | null;
+			recurringPattern?: RecurringPattern | null;
+		}) => {
 			await queryClient.cancelQueries({ queryKey });
 
 			const previousTodos = queryClient.getQueryData<RemoteTodo[]>(queryKey);
@@ -120,6 +134,10 @@ export function useTodoStorage(): UseTodoStorageReturn {
 					text: newTodo.text,
 					completed: false,
 					userId: session?.user?.id ?? "",
+					folderId: newTodo.folderId ?? null,
+					dueDate: newTodo.dueDate ?? null,
+					reminderAt: newTodo.reminderAt ?? null,
+					recurringPattern: newTodo.recurringPattern ?? null,
 				},
 			]);
 
@@ -183,12 +201,112 @@ export function useTodoStorage(): UseTodoStorageReturn {
 		},
 	});
 
+	// Update folder mutation with optimistic updates
+	const updateFolderMutation = useMutation({
+		mutationFn: getUpdateTodoFolderMutationOptions().mutationFn,
+		onMutate: async ({
+			id,
+			folderId,
+		}: {
+			id: number;
+			folderId: number | null;
+		}) => {
+			await queryClient.cancelQueries({ queryKey });
+
+			const previousTodos = queryClient.getQueryData<RemoteTodo[]>(queryKey);
+
+			queryClient.setQueryData<RemoteTodo[]>(queryKey, (old) =>
+				old?.map((todo) => (todo.id === id ? { ...todo, folderId } : todo)),
+			);
+
+			return { previousTodos };
+		},
+		onError: (_err, _variables, context) => {
+			if (context?.previousTodos) {
+				queryClient.setQueryData(queryKey, context.previousTodos);
+			}
+		},
+		onSettled: () => {
+			refetchRemoteTodos();
+		},
+	});
+
+	// Update schedule mutation with optimistic updates
+	const updateScheduleMutation = useMutation({
+		mutationFn: getUpdateTodoScheduleMutationOptions().mutationFn,
+		onMutate: async ({
+			id,
+			dueDate,
+			reminderAt,
+			recurringPattern,
+		}: {
+			id: number;
+			dueDate?: string | null;
+			reminderAt?: string | null;
+			recurringPattern?: RecurringPattern | null;
+		}) => {
+			await queryClient.cancelQueries({ queryKey });
+
+			const previousTodos = queryClient.getQueryData<RemoteTodo[]>(queryKey);
+
+			queryClient.setQueryData<RemoteTodo[]>(queryKey, (old) =>
+				old?.map((todo) =>
+					todo.id === id
+						? {
+								...todo,
+								...(dueDate !== undefined && { dueDate }),
+								...(reminderAt !== undefined && { reminderAt }),
+								...(recurringPattern !== undefined && { recurringPattern }),
+							}
+						: todo,
+				),
+			);
+
+			return { previousTodos };
+		},
+		onError: (_err, _variables, context) => {
+			if (context?.previousTodos) {
+				queryClient.setQueryData(queryKey, context.previousTodos);
+			}
+		},
+		onSettled: () => {
+			refetchRemoteTodos();
+		},
+	});
+
 	const create = useCallback(
-		async (text: string) => {
+		async (
+			text: string,
+			folderId?: number | string | null,
+			scheduling?: {
+				dueDate?: string | null;
+				reminderAt?: string | null;
+				recurringPattern?: RecurringPattern | null;
+			},
+		) => {
+			// Convert folderId to appropriate type for storage
+			const numericFolderId =
+				folderId === "inbox" || folderId === null || folderId === undefined
+					? null
+					: typeof folderId === "string"
+						? folderId // Keep as string for local storage
+						: folderId;
+
 			if (isAuthenticated) {
-				await createMutation.mutateAsync({ text });
+				await createMutation.mutateAsync({
+					text,
+					folderId:
+						typeof numericFolderId === "number" ? numericFolderId : null,
+					dueDate: scheduling?.dueDate ?? null,
+					reminderAt: scheduling?.reminderAt ?? null,
+					recurringPattern: scheduling?.recurringPattern ?? null,
+				});
 			} else {
-				localTodoStorage.create(text);
+				localTodoStorage.create(
+					text,
+					typeof numericFolderId === "string" ? numericFolderId : null,
+					scheduling,
+				);
 				notifyLocalTodosListeners();
 			}
 		},
@@ -200,7 +318,17 @@ export function useTodoStorage(): UseTodoStorageReturn {
 			if (isAuthenticated) {
 				await toggleMutation.mutateAsync({ id: id as number, completed });
 			} else {
-				localTodoStorage.toggle(id as string);
+				// For recurring todos being completed, use completeRecurring to create next occurrence
+				const localTodos = localTodoStorage.getAll();
+				const todo = localTodos.find((t) => t.id === id);
+
+				if (todo?.recurringPattern && completed) {
+					// Complete the recurring todo and create next occurrence
+					localTodoStorage.completeRecurring(id as string);
+				} else {
+					// Regular toggle for non-recurring todos or unchecking
+					localTodoStorage.toggle(id as string);
+				}
 				notifyLocalTodosListeners();
 			}
 		},
@@ -219,33 +347,104 @@ export function useTodoStorage(): UseTodoStorageReturn {
 		[isAuthenticated, deleteMutation],
 	);
 
+	const updateFolder = useCallback(
+		async (id: number | string, folderId: number | string | null) => {
+			if (isAuthenticated) {
+				await updateFolderMutation.mutateAsync({
+					id: id as number,
+					folderId: typeof folderId === "number" ? folderId : null,
+				});
+			} else {
+				localTodoStorage.updateFolder(
+					id as string,
+					typeof folderId === "string" ? folderId : null,
+				);
+				notifyLocalTodosListeners();
+			}
+		},
+		[isAuthenticated, updateFolderMutation],
+	);
+
+	const updateSchedule = useCallback(
+		async (
+			id: number | string,
+			scheduling: {
+				dueDate?: string | null;
+				reminderAt?: string | null;
+				recurringPattern?: RecurringPattern | null;
+			},
+		) => {
+			if (isAuthenticated) {
+				await updateScheduleMutation.mutateAsync({
+					id: id as number,
+					...scheduling,
+				});
+			} else {
+				localTodoStorage.updateSchedule(id as string, scheduling);
+				notifyLocalTodosListeners();
+			}
+		},
+		[isAuthenticated, updateScheduleMutation],
+	);
+
 	const todos: Todo[] = useMemo(() => {
 		if (isAuthenticated) {
 			return (remoteTodos ?? []).map((t) => ({
 				id: t.id,
 				text: t.text,
 				completed: t.completed,
+				folderId: t.folderId,
+				dueDate: t.dueDate,
+				reminderAt: t.reminderAt,
+				recurringPattern:
+					(t.recurringPattern as RecurringPattern | null) ?? null,
 			}));
 		}
 		return localTodos.map((t) => ({
 			id: t.id,
 			text: t.text,
 			completed: t.completed,
+			folderId: t.folderId ?? null,
+			dueDate: t.dueDate ?? null,
+			reminderAt: t.reminderAt ?? null,
+			recurringPattern: t.recurringPattern ?? null,
 		}));
 	}, [isAuthenticated, remoteTodos, localTodos]);
+
+	// Filter todos by selected folder
+	const filteredTodos: Todo[] = useMemo(() => {
+		if (selectedFolderId === "inbox") {
+			// Inbox shows todos without a folder
+			return todos.filter(
+				(todo) => todo.folderId === null || todo.folderId === undefined,
+			);
+		}
+		// Filter by specific folder ID
+		return todos.filter((todo) => todo.folderId === selectedFolderId);
+	}, [todos, selectedFolderId]);
 
 	// Initial loading state - only true during first data fetch
 	// Does NOT include mutation pending states to allow optimistic updates to render
 	const isLoading =
 		isSessionPending || (isAuthenticated && isRemoteTodosLoading);
 
+	// Enable realtime sync for authenticated users
+	// This hook automatically subscribes to Supabase Realtime updates
+	// and keeps the React Query cache in sync across multiple devices/tabs
+	useTodoRealtimeWithAuth();
+
 	return {
 		todos,
 		create,
 		toggle,
 		deleteTodo,
+		updateFolder,
+		updateSchedule,
 		isLoading,
 		isAuthenticated,
+		selectedFolderId,
+		setSelectedFolderId,
+		filteredTodos,
 	};
 }
 
@@ -321,12 +520,18 @@ export function useSyncTodos(): UseSyncTodosReturn {
 			try {
 				switch (action) {
 					case "sync": {
-						// Upload local todos to server, then clear local storage
+						// Upload local todos to server with all fields, then clear local storage
 						if (localTodos.length > 0) {
 							await bulkCreateMutation.mutateAsync({
 								todos: localTodos.map((t) => ({
 									text: t.text,
 									completed: t.completed,
+									// Note: folderId is not synced because local folders use string UUIDs
+									// while remote folders use numeric IDs - folder sync is handled separately
+									folderId: null,
+									dueDate: t.dueDate ?? null,
+									reminderAt: t.reminderAt ?? null,
+									recurringPattern: t.recurringPattern ?? null,
 								})),
 							});
 						}
@@ -339,12 +544,18 @@ export function useSyncTodos(): UseSyncTodosReturn {
 						break;
 					}
 					case "keep_both": {
-						// Upload local todos and keep remote ones (they're already there)
+						// Upload local todos with all fields and keep remote ones (they're already there)
 						if (localTodos.length > 0) {
 							await bulkCreateMutation.mutateAsync({
 								todos: localTodos.map((t) => ({
 									text: t.text,
 									completed: t.completed,
+									// Note: folderId is not synced because local folders use string UUIDs
+									// while remote folders use numeric IDs - folder sync is handled separately
+									folderId: null,
+									dueDate: t.dueDate ?? null,
+									reminderAt: t.reminderAt ?? null,
+									recurringPattern: t.recurringPattern ?? null,
 								})),
 							});
 						}

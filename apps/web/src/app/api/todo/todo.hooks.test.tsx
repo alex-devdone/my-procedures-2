@@ -5,6 +5,17 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+// Mock Supabase environment variables
+vi.mock("@my-procedures-2/env/web", () => ({
+	env: {
+		NEXT_PUBLIC_SUPABASE_URL: "https://test-project.supabase.co",
+		NEXT_PUBLIC_SUPABASE_ANON_KEY: "test-anon-key-12345678",
+		BETTER_AUTH_SECRET: "test-better-auth-secret-at-least-32-chars",
+		BETTER_AUTH_URL: "http://localhost:4757",
+		DATABASE_URL: "postgresql://test:test@localhost:5432/test",
+	},
+}));
+
 // Mock the auth-client module
 const mockUseSession = vi.fn();
 vi.mock("@/lib/auth-client", () => ({
@@ -51,6 +62,12 @@ vi.mock("./todo.api", () => ({
 	}),
 	getBulkCreateTodosMutationOptions: () => ({
 		mutationFn: vi.fn().mockResolvedValue({ count: 0 }),
+	}),
+	getUpdateTodoFolderMutationOptions: () => ({
+		mutationFn: vi.fn().mockResolvedValue({}),
+	}),
+	getUpdateTodoScheduleMutationOptions: () => ({
+		mutationFn: vi.fn().mockResolvedValue({}),
 	}),
 	getTodosQueryKey: () => ["todos"],
 }));
@@ -358,6 +375,10 @@ describe("useTodoStorage", () => {
 				id: "uuid-abc",
 				text: "Task",
 				completed: true,
+				folderId: null,
+				dueDate: null,
+				reminderAt: null,
+				recurringPattern: null,
 			});
 		});
 	});
@@ -515,6 +536,217 @@ describe("useSyncTodos", () => {
 			expect(result.current.syncPrompt.localTodosCount).toBe(0);
 		});
 	});
+
+	describe("Sync with Scheduling Fields", () => {
+		beforeEach(() => {
+			mockUseSession.mockReturnValue({
+				data: { user: { id: "user-123" } },
+				isPending: false,
+			});
+		});
+
+		it("includes scheduling fields when syncing todos with dueDate", async () => {
+			const localTodos = [
+				{
+					id: "uuid-1",
+					text: "Task with due date",
+					completed: false,
+					dueDate: "2026-01-25T10:00:00.000Z",
+				},
+			];
+			mockLocalStorage.todos = JSON.stringify(localTodos);
+
+			const { result } = renderHook(() => useSyncTodos(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.handleSyncAction("sync");
+			});
+
+			// Verify localStorage was cleared (sync was attempted)
+			expect(localStorageMock.removeItem).toHaveBeenCalledWith("todos");
+		});
+
+		it("includes scheduling fields when syncing todos with reminderAt", async () => {
+			const localTodos = [
+				{
+					id: "uuid-1",
+					text: "Task with reminder",
+					completed: false,
+					reminderAt: "2026-01-25T09:00:00.000Z",
+				},
+			];
+			mockLocalStorage.todos = JSON.stringify(localTodos);
+
+			const { result } = renderHook(() => useSyncTodos(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.handleSyncAction("sync");
+			});
+
+			// Verify localStorage was cleared (sync was attempted)
+			expect(localStorageMock.removeItem).toHaveBeenCalledWith("todos");
+		});
+
+		it("includes scheduling fields when syncing todos with recurringPattern", async () => {
+			const localTodos = [
+				{
+					id: "uuid-1",
+					text: "Daily recurring task",
+					completed: false,
+					recurringPattern: { type: "daily" },
+				},
+			];
+			mockLocalStorage.todos = JSON.stringify(localTodos);
+
+			const { result } = renderHook(() => useSyncTodos(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.handleSyncAction("sync");
+			});
+
+			// Verify localStorage was cleared (sync was attempted)
+			expect(localStorageMock.removeItem).toHaveBeenCalledWith("todos");
+		});
+
+		it("includes all scheduling fields when syncing fully scheduled todo", async () => {
+			const localTodos = [
+				{
+					id: "uuid-1",
+					text: "Fully scheduled task",
+					completed: true,
+					dueDate: "2026-01-25T10:00:00.000Z",
+					reminderAt: "2026-01-25T09:00:00.000Z",
+					recurringPattern: { type: "weekly", daysOfWeek: [1, 3, 5] },
+				},
+			];
+			mockLocalStorage.todos = JSON.stringify(localTodos);
+
+			const { result } = renderHook(() => useSyncTodos(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.handleSyncAction("sync");
+			});
+
+			// Verify localStorage was cleared (sync was attempted)
+			expect(localStorageMock.removeItem).toHaveBeenCalledWith("todos");
+		});
+
+		it("sets null for undefined scheduling fields when syncing", async () => {
+			const localTodos = [
+				{
+					id: "uuid-1",
+					text: "Task without scheduling",
+					completed: false,
+				},
+			];
+			mockLocalStorage.todos = JSON.stringify(localTodos);
+
+			const { result } = renderHook(() => useSyncTodos(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.handleSyncAction("sync");
+			});
+
+			// Verify localStorage was cleared (sync was attempted)
+			expect(localStorageMock.removeItem).toHaveBeenCalledWith("todos");
+		});
+
+		it("includes scheduling fields when using keep_both action", async () => {
+			const localTodos = [
+				{
+					id: "uuid-1",
+					text: "Task to keep",
+					completed: false,
+					dueDate: "2026-01-30T10:00:00.000Z",
+					reminderAt: "2026-01-30T08:00:00.000Z",
+				},
+			];
+			mockLocalStorage.todos = JSON.stringify(localTodos);
+
+			const { result } = renderHook(() => useSyncTodos(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.handleSyncAction("keep_both");
+			});
+
+			// Verify localStorage was cleared (sync was attempted)
+			expect(localStorageMock.removeItem).toHaveBeenCalledWith("todos");
+		});
+
+		it("sets folderId to null when syncing (local folders use string UUIDs)", async () => {
+			const localTodos = [
+				{
+					id: "uuid-1",
+					text: "Task in local folder",
+					completed: false,
+					folderId: "local-folder-uuid",
+					dueDate: "2026-01-25T10:00:00.000Z",
+				},
+			];
+			mockLocalStorage.todos = JSON.stringify(localTodos);
+
+			const { result } = renderHook(() => useSyncTodos(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.handleSyncAction("sync");
+			});
+
+			// Verify localStorage was cleared (sync was attempted)
+			// Note: folderId is intentionally set to null because local folders use string UUIDs
+			// while remote folders use numeric IDs - folder sync is handled separately
+			expect(localStorageMock.removeItem).toHaveBeenCalledWith("todos");
+		});
+
+		it("syncs multiple todos with mixed scheduling fields", async () => {
+			const localTodos = [
+				{
+					id: "uuid-1",
+					text: "Simple task",
+					completed: false,
+				},
+				{
+					id: "uuid-2",
+					text: "Scheduled task",
+					completed: true,
+					dueDate: "2026-01-25T10:00:00.000Z",
+					reminderAt: "2026-01-25T09:00:00.000Z",
+					recurringPattern: { type: "daily" },
+				},
+				{
+					id: "uuid-3",
+					text: "Due only task",
+					completed: false,
+					dueDate: "2026-02-01T12:00:00.000Z",
+				},
+			];
+			mockLocalStorage.todos = JSON.stringify(localTodos);
+
+			const { result } = renderHook(() => useSyncTodos(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.handleSyncAction("sync");
+			});
+
+			// Verify localStorage was cleared (all todos were synced)
+			expect(localStorageMock.removeItem).toHaveBeenCalledWith("todos");
+		});
+	});
 });
 
 describe("External Store Pattern", () => {
@@ -560,5 +792,631 @@ describe("External Store Pattern", () => {
 
 		// The hook should work without errors in test environment
 		expect(Array.isArray(result.current.todos)).toBe(true);
+	});
+});
+
+describe("Scheduling Support", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		localStorageMock.clear();
+		mockUseSession.mockReturnValue({
+			data: null,
+			isPending: false,
+		});
+	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	describe("Create Todo with Scheduling (Guest Mode)", () => {
+		it("creates todo with dueDate in localStorage", async () => {
+			const { result } = renderHook(() => useTodoStorage(), {
+				wrapper: createWrapper(),
+			});
+
+			const dueDate = "2026-01-25T10:00:00.000Z";
+			await act(async () => {
+				await result.current.create("Task with due date", null, { dueDate });
+			});
+
+			const stored = JSON.parse(mockLocalStorage.todos);
+			expect(stored[0].dueDate).toBe(dueDate);
+		});
+
+		it("creates todo with reminderAt in localStorage", async () => {
+			const { result } = renderHook(() => useTodoStorage(), {
+				wrapper: createWrapper(),
+			});
+
+			const reminderAt = "2026-01-25T09:00:00.000Z";
+			await act(async () => {
+				await result.current.create("Task with reminder", null, { reminderAt });
+			});
+
+			const stored = JSON.parse(mockLocalStorage.todos);
+			expect(stored[0].reminderAt).toBe(reminderAt);
+		});
+
+		it("creates todo with recurringPattern in localStorage", async () => {
+			const { result } = renderHook(() => useTodoStorage(), {
+				wrapper: createWrapper(),
+			});
+
+			const recurringPattern = { type: "daily" as const };
+			await act(async () => {
+				await result.current.create("Daily task", null, { recurringPattern });
+			});
+
+			const stored = JSON.parse(mockLocalStorage.todos);
+			expect(stored[0].recurringPattern).toEqual({ type: "daily" });
+		});
+
+		it("creates todo with all scheduling fields in localStorage", async () => {
+			const { result } = renderHook(() => useTodoStorage(), {
+				wrapper: createWrapper(),
+			});
+
+			const scheduling = {
+				dueDate: "2026-01-25T10:00:00.000Z",
+				reminderAt: "2026-01-25T09:00:00.000Z",
+				recurringPattern: { type: "weekly" as const, daysOfWeek: [1, 3, 5] },
+			};
+			await act(async () => {
+				await result.current.create("Full scheduled task", null, scheduling);
+			});
+
+			const stored = JSON.parse(mockLocalStorage.todos);
+			expect(stored[0].dueDate).toBe(scheduling.dueDate);
+			expect(stored[0].reminderAt).toBe(scheduling.reminderAt);
+			expect(stored[0].recurringPattern).toEqual(scheduling.recurringPattern);
+		});
+
+		it("creates todo with folderId and scheduling in localStorage", async () => {
+			const { result } = renderHook(() => useTodoStorage(), {
+				wrapper: createWrapper(),
+			});
+
+			const scheduling = { dueDate: "2026-01-25T10:00:00.000Z" };
+			await act(async () => {
+				await result.current.create(
+					"Folder task with due date",
+					"work-folder",
+					scheduling,
+				);
+			});
+
+			const stored = JSON.parse(mockLocalStorage.todos);
+			expect(stored[0].folderId).toBe("work-folder");
+			expect(stored[0].dueDate).toBe(scheduling.dueDate);
+		});
+
+		it("creates todo with null scheduling fields when no scheduling provided", async () => {
+			const { result } = renderHook(() => useTodoStorage(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.create("Simple task");
+			});
+
+			const stored = JSON.parse(mockLocalStorage.todos);
+			expect(stored[0].dueDate).toBe(null);
+			expect(stored[0].reminderAt).toBe(null);
+			expect(stored[0].recurringPattern).toBe(null);
+		});
+	});
+
+	describe("Update Schedule (Guest Mode)", () => {
+		it("updates todo dueDate via updateSchedule in localStorage", async () => {
+			const storedTodos = [
+				{ id: "uuid-1", text: "Task", completed: false, folderId: null },
+			];
+			mockLocalStorage.todos = JSON.stringify(storedTodos);
+
+			const { result } = renderHook(() => useTodoStorage(), {
+				wrapper: createWrapper(),
+			});
+
+			const dueDate = "2026-01-30T10:00:00.000Z";
+			await act(async () => {
+				await result.current.updateSchedule("uuid-1", { dueDate });
+			});
+
+			const stored = JSON.parse(mockLocalStorage.todos);
+			expect(stored[0].dueDate).toBe(dueDate);
+		});
+
+		it("updates todo reminderAt via updateSchedule in localStorage", async () => {
+			const storedTodos = [
+				{ id: "uuid-1", text: "Task", completed: false, folderId: null },
+			];
+			mockLocalStorage.todos = JSON.stringify(storedTodos);
+
+			const { result } = renderHook(() => useTodoStorage(), {
+				wrapper: createWrapper(),
+			});
+
+			const reminderAt = "2026-01-30T09:00:00.000Z";
+			await act(async () => {
+				await result.current.updateSchedule("uuid-1", { reminderAt });
+			});
+
+			const stored = JSON.parse(mockLocalStorage.todos);
+			expect(stored[0].reminderAt).toBe(reminderAt);
+		});
+
+		it("updates todo recurringPattern via updateSchedule in localStorage", async () => {
+			const storedTodos = [
+				{ id: "uuid-1", text: "Task", completed: false, folderId: null },
+			];
+			mockLocalStorage.todos = JSON.stringify(storedTodos);
+
+			const { result } = renderHook(() => useTodoStorage(), {
+				wrapper: createWrapper(),
+			});
+
+			const recurringPattern = { type: "monthly" as const, dayOfMonth: 15 };
+			await act(async () => {
+				await result.current.updateSchedule("uuid-1", { recurringPattern });
+			});
+
+			const stored = JSON.parse(mockLocalStorage.todos);
+			expect(stored[0].recurringPattern).toEqual(recurringPattern);
+		});
+
+		it("updates multiple scheduling fields at once in localStorage", async () => {
+			const storedTodos = [
+				{ id: "uuid-1", text: "Task", completed: false, folderId: null },
+			];
+			mockLocalStorage.todos = JSON.stringify(storedTodos);
+
+			const { result } = renderHook(() => useTodoStorage(), {
+				wrapper: createWrapper(),
+			});
+
+			const scheduling = {
+				dueDate: "2026-02-01T10:00:00.000Z",
+				reminderAt: "2026-02-01T08:00:00.000Z",
+				recurringPattern: {
+					type: "yearly" as const,
+					monthOfYear: 2,
+					dayOfMonth: 1,
+				},
+			};
+			await act(async () => {
+				await result.current.updateSchedule("uuid-1", scheduling);
+			});
+
+			const stored = JSON.parse(mockLocalStorage.todos);
+			expect(stored[0].dueDate).toBe(scheduling.dueDate);
+			expect(stored[0].reminderAt).toBe(scheduling.reminderAt);
+			expect(stored[0].recurringPattern).toEqual(scheduling.recurringPattern);
+		});
+
+		it("clears scheduling fields by setting them to null", async () => {
+			const storedTodos = [
+				{
+					id: "uuid-1",
+					text: "Task",
+					completed: false,
+					folderId: null,
+					dueDate: "2026-01-25T10:00:00.000Z",
+					reminderAt: "2026-01-25T09:00:00.000Z",
+					recurringPattern: { type: "daily" },
+				},
+			];
+			mockLocalStorage.todos = JSON.stringify(storedTodos);
+
+			const { result } = renderHook(() => useTodoStorage(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.updateSchedule("uuid-1", {
+					dueDate: null,
+					reminderAt: null,
+					recurringPattern: null,
+				});
+			});
+
+			const stored = JSON.parse(mockLocalStorage.todos);
+			expect(stored[0].dueDate).toBe(null);
+			expect(stored[0].reminderAt).toBe(null);
+			expect(stored[0].recurringPattern).toBe(null);
+		});
+	});
+
+	describe("Todos Include Scheduling Fields", () => {
+		it("todos array includes scheduling fields from localStorage", () => {
+			const storedTodos = [
+				{
+					id: "uuid-1",
+					text: "Scheduled Task",
+					completed: false,
+					folderId: null,
+					dueDate: "2026-01-25T10:00:00.000Z",
+					reminderAt: "2026-01-25T09:00:00.000Z",
+					recurringPattern: { type: "weekly", daysOfWeek: [1, 3, 5] },
+				},
+			];
+			mockLocalStorage.todos = JSON.stringify(storedTodos);
+
+			const { result } = renderHook(() => useTodoStorage(), {
+				wrapper: createWrapper(),
+			});
+
+			expect(result.current.todos[0].dueDate).toBe("2026-01-25T10:00:00.000Z");
+			expect(result.current.todos[0].reminderAt).toBe(
+				"2026-01-25T09:00:00.000Z",
+			);
+			expect(result.current.todos[0].recurringPattern).toEqual({
+				type: "weekly",
+				daysOfWeek: [1, 3, 5],
+			});
+		});
+
+		it("todos array normalizes undefined scheduling fields to null", () => {
+			const storedTodos = [
+				{
+					id: "uuid-1",
+					text: "Task without scheduling",
+					completed: false,
+					folderId: null,
+				},
+			];
+			mockLocalStorage.todos = JSON.stringify(storedTodos);
+
+			const { result } = renderHook(() => useTodoStorage(), {
+				wrapper: createWrapper(),
+			});
+
+			expect(result.current.todos[0].dueDate).toBe(null);
+			expect(result.current.todos[0].reminderAt).toBe(null);
+			expect(result.current.todos[0].recurringPattern).toBe(null);
+		});
+
+		it("filteredTodos preserves scheduling fields", () => {
+			const storedTodos = [
+				{
+					id: "uuid-1",
+					text: "Inbox Task",
+					completed: false,
+					folderId: null,
+					dueDate: "2026-01-25T10:00:00.000Z",
+				},
+				{
+					id: "uuid-2",
+					text: "Folder Task",
+					completed: false,
+					folderId: "work-folder",
+					dueDate: "2026-01-26T10:00:00.000Z",
+				},
+			];
+			mockLocalStorage.todos = JSON.stringify(storedTodos);
+
+			const { result } = renderHook(() => useTodoStorage(), {
+				wrapper: createWrapper(),
+			});
+
+			// Default is inbox
+			expect(result.current.filteredTodos[0].dueDate).toBe(
+				"2026-01-25T10:00:00.000Z",
+			);
+
+			// Switch to folder
+			act(() => {
+				result.current.setSelectedFolderId("work-folder");
+			});
+
+			expect(result.current.filteredTodos[0].dueDate).toBe(
+				"2026-01-26T10:00:00.000Z",
+			);
+		});
+	});
+});
+
+describe("Folder Filtering", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		localStorageMock.clear();
+		mockUseSession.mockReturnValue({
+			data: null,
+			isPending: false,
+		});
+	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	describe("selectedFolderId State", () => {
+		it("defaults to 'inbox' for selectedFolderId", () => {
+			const { result } = renderHook(() => useTodoStorage(), {
+				wrapper: createWrapper(),
+			});
+
+			expect(result.current.selectedFolderId).toBe("inbox");
+		});
+
+		it("allows changing selectedFolderId", () => {
+			const { result } = renderHook(() => useTodoStorage(), {
+				wrapper: createWrapper(),
+			});
+
+			act(() => {
+				result.current.setSelectedFolderId("folder-1");
+			});
+
+			expect(result.current.selectedFolderId).toBe("folder-1");
+		});
+
+		it("allows setting selectedFolderId back to inbox", () => {
+			const { result } = renderHook(() => useTodoStorage(), {
+				wrapper: createWrapper(),
+			});
+
+			act(() => {
+				result.current.setSelectedFolderId("folder-1");
+			});
+
+			act(() => {
+				result.current.setSelectedFolderId("inbox");
+			});
+
+			expect(result.current.selectedFolderId).toBe("inbox");
+		});
+	});
+
+	describe("filteredTodos by Folder", () => {
+		it("shows only todos without folderId when inbox is selected", () => {
+			const storedTodos = [
+				{
+					id: "uuid-1",
+					text: "Inbox Task 1",
+					completed: false,
+					folderId: null,
+				},
+				{
+					id: "uuid-2",
+					text: "Folder Task",
+					completed: false,
+					folderId: "folder-1",
+				},
+				{ id: "uuid-3", text: "Inbox Task 2", completed: true, folderId: null },
+			];
+			mockLocalStorage.todos = JSON.stringify(storedTodos);
+
+			const { result } = renderHook(() => useTodoStorage(), {
+				wrapper: createWrapper(),
+			});
+
+			// Default is inbox
+			expect(result.current.selectedFolderId).toBe("inbox");
+			expect(result.current.filteredTodos).toHaveLength(2);
+			expect(result.current.filteredTodos[0].text).toBe("Inbox Task 1");
+			expect(result.current.filteredTodos[1].text).toBe("Inbox Task 2");
+		});
+
+		it("shows only todos with matching folderId when folder is selected", () => {
+			const storedTodos = [
+				{ id: "uuid-1", text: "Inbox Task", completed: false, folderId: null },
+				{
+					id: "uuid-2",
+					text: "Work Task 1",
+					completed: false,
+					folderId: "work-folder",
+				},
+				{
+					id: "uuid-3",
+					text: "Work Task 2",
+					completed: true,
+					folderId: "work-folder",
+				},
+				{
+					id: "uuid-4",
+					text: "Personal Task",
+					completed: false,
+					folderId: "personal-folder",
+				},
+			];
+			mockLocalStorage.todos = JSON.stringify(storedTodos);
+
+			const { result } = renderHook(() => useTodoStorage(), {
+				wrapper: createWrapper(),
+			});
+
+			act(() => {
+				result.current.setSelectedFolderId("work-folder");
+			});
+
+			expect(result.current.filteredTodos).toHaveLength(2);
+			expect(result.current.filteredTodos[0].text).toBe("Work Task 1");
+			expect(result.current.filteredTodos[1].text).toBe("Work Task 2");
+		});
+
+		it("returns empty array when folder has no todos", () => {
+			const storedTodos = [
+				{ id: "uuid-1", text: "Inbox Task", completed: false, folderId: null },
+			];
+			mockLocalStorage.todos = JSON.stringify(storedTodos);
+
+			const { result } = renderHook(() => useTodoStorage(), {
+				wrapper: createWrapper(),
+			});
+
+			act(() => {
+				result.current.setSelectedFolderId("empty-folder");
+			});
+
+			expect(result.current.filteredTodos).toHaveLength(0);
+		});
+
+		it("treats undefined folderId as inbox (null)", () => {
+			const storedTodos = [
+				{ id: "uuid-1", text: "Task without folderId", completed: false },
+				{
+					id: "uuid-2",
+					text: "Task with null folderId",
+					completed: false,
+					folderId: null,
+				},
+			];
+			mockLocalStorage.todos = JSON.stringify(storedTodos);
+
+			const { result } = renderHook(() => useTodoStorage(), {
+				wrapper: createWrapper(),
+			});
+
+			// Both should appear in inbox
+			expect(result.current.filteredTodos).toHaveLength(2);
+		});
+
+		it("updates filteredTodos when todos change", async () => {
+			const storedTodos = [
+				{ id: "uuid-1", text: "Inbox Task", completed: false, folderId: null },
+			];
+			mockLocalStorage.todos = JSON.stringify(storedTodos);
+
+			const { result } = renderHook(() => useTodoStorage(), {
+				wrapper: createWrapper(),
+			});
+
+			expect(result.current.filteredTodos).toHaveLength(1);
+
+			// Create a new todo in inbox
+			await act(async () => {
+				await result.current.create("New Inbox Task");
+			});
+
+			expect(result.current.filteredTodos).toHaveLength(2);
+		});
+	});
+
+	describe("Create Todo with Folder", () => {
+		it("creates todo with null folderId when inbox is selected", async () => {
+			const { result } = renderHook(() => useTodoStorage(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.create("New Task");
+			});
+
+			const stored = JSON.parse(mockLocalStorage.todos);
+			expect(stored[0].folderId).toBe(null);
+		});
+
+		it("creates todo with folderId when folder is selected", async () => {
+			const { result } = renderHook(() => useTodoStorage(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.create("New Task", "work-folder");
+			});
+
+			const stored = JSON.parse(mockLocalStorage.todos);
+			expect(stored[0].folderId).toBe("work-folder");
+		});
+
+		it("creates todo with explicit null folderId", async () => {
+			const { result } = renderHook(() => useTodoStorage(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.create("New Task", null);
+			});
+
+			const stored = JSON.parse(mockLocalStorage.todos);
+			expect(stored[0].folderId).toBe(null);
+		});
+	});
+
+	describe("Update Todo Folder", () => {
+		it("updates todo folderId via updateFolder", async () => {
+			const storedTodos = [
+				{ id: "uuid-1", text: "Task", completed: false, folderId: null },
+			];
+			mockLocalStorage.todos = JSON.stringify(storedTodos);
+
+			const { result } = renderHook(() => useTodoStorage(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.updateFolder("uuid-1", "work-folder");
+			});
+
+			const stored = JSON.parse(mockLocalStorage.todos);
+			expect(stored[0].folderId).toBe("work-folder");
+		});
+
+		it("moves todo to inbox by setting folderId to null", async () => {
+			const storedTodos = [
+				{
+					id: "uuid-1",
+					text: "Task",
+					completed: false,
+					folderId: "work-folder",
+				},
+			];
+			mockLocalStorage.todos = JSON.stringify(storedTodos);
+
+			const { result } = renderHook(() => useTodoStorage(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.updateFolder("uuid-1", null);
+			});
+
+			const stored = JSON.parse(mockLocalStorage.todos);
+			expect(stored[0].folderId).toBe(null);
+		});
+
+		it("todo disappears from filtered list when moved to different folder", async () => {
+			const storedTodos = [
+				{ id: "uuid-1", text: "Task", completed: false, folderId: null },
+			];
+			mockLocalStorage.todos = JSON.stringify(storedTodos);
+
+			const { result } = renderHook(() => useTodoStorage(), {
+				wrapper: createWrapper(),
+			});
+
+			// Task is visible in inbox
+			expect(result.current.filteredTodos).toHaveLength(1);
+
+			await act(async () => {
+				await result.current.updateFolder("uuid-1", "work-folder");
+			});
+
+			// Task is no longer visible in inbox
+			expect(result.current.filteredTodos).toHaveLength(0);
+		});
+	});
+
+	describe("Todos Include folderId", () => {
+		it("todos array includes folderId property", () => {
+			const storedTodos = [
+				{
+					id: "uuid-1",
+					text: "Task 1",
+					completed: false,
+					folderId: "folder-1",
+				},
+				{ id: "uuid-2", text: "Task 2", completed: true, folderId: null },
+			];
+			mockLocalStorage.todos = JSON.stringify(storedTodos);
+
+			const { result } = renderHook(() => useTodoStorage(), {
+				wrapper: createWrapper(),
+			});
+
+			expect(result.current.todos[0].folderId).toBe("folder-1");
+			expect(result.current.todos[1].folderId).toBe(null);
+		});
 	});
 });

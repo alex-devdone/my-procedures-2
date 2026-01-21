@@ -26,6 +26,14 @@ export default defineConfig({
 	resolve: {
 		alias: {
 			"@": resolve(__dirname, "./src"),
+			"@my-procedures-2/env/web": resolve(
+				__dirname,
+				"../../packages/env/src/web.ts",
+			),
+			"@my-procedures-2/env/server": resolve(
+				__dirname,
+				"../../packages/env/src/server.ts",
+			),
 		},
 	},
 });

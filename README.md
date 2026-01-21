@@ -26,16 +26,37 @@ bun install
 
 ## Database Setup
 
-This project uses PostgreSQL with Drizzle ORM.
+This project uses PostgreSQL with Drizzle ORM and Supabase for realtime synchronization.
 
-1. Make sure you have a PostgreSQL database set up.
-2. Update your `apps/web/.env` file with your PostgreSQL connection details.
+1. Make sure you have a PostgreSQL database set up with Supabase.
+2. Update your `apps/web/.env` file with your PostgreSQL connection details and Supabase credentials:
+
+```env
+DATABASE_URL=postgresql://...
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+```
 
 3. Apply the schema to your database:
 
 ```bash
 bun run db:push
 ```
+
+### Supabase Realtime Setup
+
+To enable cross-device realtime synchronization, you need to enable Realtime replication in your Supabase dashboard:
+
+1. Go to your Supabase project dashboard
+2. Navigate to **Database** → **Replication**
+3. Enable replication for the following tables:
+   - `todo`
+   - `folder`
+   - `subtask`
+4. Select events: **INSERT**, **UPDATE**, **DELETE**
+5. Click **Save**
+
+The app uses Supabase Realtime subscriptions to instantly sync changes across multiple browser tabs and devices. Mutations still go through tRPC for type safety, while Realtime provides automatic cache updates.
 
 Then, run the development server:
 

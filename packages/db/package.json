@@ -13,7 +13,9 @@
 		"db:push": "drizzle-kit push",
 		"db:generate": "drizzle-kit generate",
 		"db:studio": "drizzle-kit studio",
-		"db:migrate": "drizzle-kit migrate"
+		"db:migrate": "drizzle-kit migrate",
+		"test": "vitest",
+		"test:run": "vitest run"
 	},
 	"dependencies": {
 		"@my-procedures-2/env": "workspace:*",
@@ -26,6 +28,7 @@
 		"@my-procedures-2/config": "workspace:*",
 		"@types/pg": "catalog:",
 		"drizzle-kit": "^0.31.8",
-		"typescript": "catalog:"
+		"typescript": "catalog:",
+		"vitest": "^4.0.17"
 	}
 }

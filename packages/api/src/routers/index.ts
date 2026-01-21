@@ -1,4 +1,6 @@
 import { protectedProcedure, publicProcedure, router } from "../index";
+import { folderRouter } from "./folder";
+import { subtaskRouter } from "./subtask";
 import { todoRouter } from "./todo";
 
 export const appRouter = router({
@@ -12,5 +14,7 @@ export const appRouter = router({
 		};
 	}),
 	todo: todoRouter,
+	folder: folderRouter,
+	subtask: subtaskRouter,
 });
 export type AppRouter = typeof appRouter;
