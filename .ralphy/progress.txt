@@ -279,3 +279,15 @@
   - Edge cases: empty text, long text, special characters, unicode
 - [✓] 2026-01-21 03:20 - Create barrel export for todos components (apps/web/src/components/todos/index.ts)
 - [✓] 2026-01-21 03:20 - Update todos page to use TodoExpandableItem for inline subtask management
+
+- [✓] 2026-01-21 03:45 - Create E2E tests for subtask CRUD (26 tests) in apps/web/e2e/subtasks.spec.ts covering:
+  - Add subtasks to a todo (single/multiple/to different todos)
+  - Toggle subtask completion (check/uncheck)
+  - Delete a subtask (single/with confirmation)
+  - Auto-complete parent todo when all subtasks completed
+  - Uncheck parent todo when subtask unchecked
+  - Show subtask progress indicator (e.g., "2/5")
+  - Persist subtasks after page reload
+  - Expand/collapse subtask sections
+  - Keyboard navigation (Enter key submission)
+  - Empty subtask input handling

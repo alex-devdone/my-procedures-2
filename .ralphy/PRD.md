@@ -134,15 +134,15 @@ UI components for subtask management. Can proceed after Phase 6.
 - [x] Update todo item component to show subtask progress indicator (e.g., "2/5 done")
 - [x] Add unit tests for subtask progress display
 - [x] Create expandable todo detail view that shows subtasks inline
-- [ ] Create E2E tests for subtask CRUD in localStorage mode at `apps/web/e2e/subtasks.spec.ts`:
-  - [ ] E2E: Add subtasks to a todo
-  - [ ] E2E: Toggle subtask completion
-  - [ ] E2E: Delete a subtask
-  - [ ] E2E: Reorder subtasks
-  - [ ] E2E: Auto-complete parent todo when all subtasks completed
-  - [ ] E2E: Uncheck parent todo when subtask unchecked
-  - [ ] E2E: Show subtask progress indicator (e.g., "2/5")
-  - [ ] E2E: Persist subtasks after page reload
+- [x] Create E2E tests for subtask CRUD in localStorage mode at `apps/web/e2e/subtasks.spec.ts`:
+  - [x] E2E: Add subtasks to a todo
+  - [x] E2E: Toggle subtask completion
+  - [x] E2E: Delete a subtask
+  - [x] E2E: Reorder subtasks
+  - [x] E2E: Auto-complete parent todo when all subtasks completed
+  - [x] E2E: Uncheck parent todo when subtask unchecked
+  - [x] E2E: Show subtask progress indicator (e.g., "2/5")
+  - [x] E2E: Persist subtasks after page reload
 
 ---
 
