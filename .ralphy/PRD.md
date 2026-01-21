@@ -280,8 +280,8 @@ Extend realtime sync to folders and subtasks. Can proceed after Phase 14.
 - [x] Create `apps/web/src/hooks/use-subtask-realtime.ts` - subscribes to subtask table changes
 - [x] Add unit tests for useSubtaskRealtime in `apps/web/src/hooks/use-subtask-realtime.test.tsx`
 - [x] Update `apps/web/src/app/api/subtask/subtask.hooks.ts` to integrate realtime subscription
-- [ ] Handle subtask changes triggering parent todo auto-complete across devices
-- [ ] Add unit tests for cross-device auto-complete behavior
+- [x] Handle subtask changes triggering parent todo auto-complete across devices
+- [x] Add unit tests for cross-device auto-complete behavior
 
 ---
 

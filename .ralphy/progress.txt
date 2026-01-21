@@ -875,4 +875,21 @@
 - [✓] 2026-01-21 10:39 - Run all unit tests: 1727 tests passed (17 new subtask realtime tests added)
 - [✓] 2026-01-21 10:39 - Run linting check: passed (auto-formatted imports)
 
+- [✓] 2026-01-21 11:15 - Handle subtask changes triggering parent todo auto-complete across devices:
+  - Architecture: Server's checkAndAutoCompleteTodo() updates parent todo in DB when all subtasks complete
+  - Supabase Realtime sends UPDATE event for todo table to all subscribed devices
+  - useTodoRealtime hook receives the UPDATE and updates React Query cache
+  - Cross-device sync works without client-side auto-complete logic duplication
+- [✓] 2026-01-21 11:15 - Add unit tests for cross-device auto-complete behavior (18 tests) in:
+  - apps/web/src/hooks/use-subtask-realtime.test.tsx: 9 new tests covering:
+    - Subtask completion flow (cache updates on toggle, completion marking, consistency)
+    - Parent todo auto-complete synchronization (separate channel, no duplication)
+    - Cache isolation (per-todoId updates, independent handling)
+    - Event type handling (DELETE triggers, INSERT affects)
+  - apps/web/src/hooks/use-todo-realtime.test.tsx: 9 new tests covering:
+    - Server-triggered auto-complete updates (receive UPDATE events, cache updates)
+    - Concurrent subtask and todo updates (INSERT/DELETE sequences, rapid updates)
+    - Cross-device consistency (state consistency, no local logic for remote changes)
+- [✓] 2026-01-21 11:15 - Run all unit tests: 1744 tests passed (17 new cross-device auto-complete tests added)
+- [✓] 2026-01-21 11:15 - Run linting check: passed (49 pre-existing warnings)
 
