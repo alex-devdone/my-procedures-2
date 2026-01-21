@@ -113,8 +113,8 @@ Frontend API wrappers for subtasks. Can proceed after Phase 5.
 - [x] Create `apps/web/src/app/api/subtask/subtask.types.ts` with TypeScript types and Zod schemas
 - [x] Add unit tests for subtask types/schemas in `apps/web/src/app/api/subtask/subtask.types.test.ts`
 - [x] Create `apps/web/src/app/api/subtask/subtask.api.ts` with tRPC query/mutation options
-- [ ] Create `apps/web/src/app/api/subtask/subtask.hooks.ts` with React hooks and optimistic updates
-- [ ] Add unit tests for subtask hooks in `apps/web/src/app/api/subtask/subtask.hooks.test.ts`
+- [x] Create `apps/web/src/app/api/subtask/subtask.hooks.ts` with React hooks and optimistic updates
+- [x] Add unit tests for subtask hooks in `apps/web/src/app/api/subtask/subtask.hooks.test.ts`
 - [ ] Create `apps/web/src/app/api/subtask/index.ts` barrel export
 - [ ] Update `apps/web/src/lib/local-todo-storage.ts` to store subtasks for each todo
 - [ ] Add unit tests for local subtask storage in `apps/web/src/lib/local-todo-storage.test.ts`

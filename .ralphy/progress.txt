@@ -120,3 +120,29 @@
   - Query options structure and function exports
   - Mutation options structure for all CRUD operations
   - Query key generation with todoId parameter
+
+- [✓] 2026-01-21 01:34 - Create subtask.hooks.ts (apps/web/src/app/api/subtask/subtask.hooks.ts) with:
+  - useSubtaskStorage hook for dual-mode subtask management (localStorage for guests, tRPC for authenticated)
+  - useSyncExternalStore pattern for local subtask state with per-todoId caching
+  - Optimistic updates for all CRUD operations (create, update, toggle, delete, reorder)
+  - notifyLocalSubtasksListeners function for cross-module state updates
+- [✓] 2026-01-21 01:34 - Create local-subtask-storage.ts (apps/web/src/lib/local-subtask-storage.ts) with:
+  - getAll(todoId) - get subtasks for a specific todo
+  - create(todoId, text) - create new subtask
+  - update(id, text) - update subtask text
+  - toggle(id, completed) - toggle completion status
+  - deleteSubtask(id) - delete subtask
+  - reorder(id, newOrder) - reorder subtask within todo
+  - deleteByTodoId(todoId) - delete all subtasks for a todo
+  - clearAll() - clear all subtasks
+  - getById(id) - get subtask by ID
+- [✓] 2026-01-21 01:34 - Add unit tests for subtask hooks (24 tests) in apps/web/src/app/api/subtask/subtask.hooks.test.tsx covering:
+  - Authentication state detection
+  - Guest mode localStorage operations (CRUD, reorder)
+  - Authenticated mode behavior
+  - Dual-mode switching on login
+  - Loading state management
+  - Subtask normalization and sorting by order
+  - TodoId filtering
+  - Error handling for non-existent subtasks
+  - External store pattern stability
