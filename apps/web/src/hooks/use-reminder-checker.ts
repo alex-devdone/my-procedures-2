@@ -283,27 +283,46 @@ export function getEffectiveReminderTime(
 }
 
 /**
- * Format a recurring type as a human-readable prefix.
+ * Format a time string from an ISO datetime.
+ *
+ * @param isoDateTime - ISO datetime string
+ * @returns Formatted time string (e.g., "9:00 AM")
+ */
+export function formatTimeFromISO(isoDateTime: string): string {
+	const date = new Date(isoDateTime);
+	return date.toLocaleTimeString("en-US", {
+		hour: "numeric",
+		minute: "2-digit",
+		hour12: true,
+	});
+}
+
+/**
+ * Format a recurring type as a human-readable message with time.
  *
  * @param type - The recurring pattern type
- * @returns Human-readable prefix (e.g., "Daily reminder", "Weekly reminder")
+ * @param reminderAt - ISO datetime string of the reminder time
+ * @returns Human-readable message (e.g., "Daily at 9:00 AM")
  */
-function formatRecurringPrefix(
-	type?: "daily" | "weekly" | "monthly" | "yearly" | "custom",
+function formatRecurringMessage(
+	type: "daily" | "weekly" | "monthly" | "yearly" | "custom" | undefined,
+	reminderAt: string,
 ): string {
+	const time = formatTimeFromISO(reminderAt);
+
 	switch (type) {
 		case "daily":
-			return "Daily reminder";
+			return `Daily at ${time}`;
 		case "weekly":
-			return "Weekly reminder";
+			return `Weekly at ${time}`;
 		case "monthly":
-			return "Monthly reminder";
+			return `Monthly at ${time}`;
 		case "yearly":
-			return "Yearly reminder";
+			return `Yearly at ${time}`;
 		case "custom":
-			return "Recurring reminder";
+			return `Recurring at ${time}`;
 		default:
-			return "Reminder for your task";
+			return `Reminder at ${time}`;
 	}
 }
 
@@ -314,9 +333,9 @@ function formatRecurringPrefix(
  * @returns Formatted notification body string
  */
 export function formatReminderNotificationBody(reminder: DueReminder): string {
-	// For recurring reminders, show the pattern type
+	// For recurring reminders, show the pattern type with time
 	if (reminder.isRecurring) {
-		return formatRecurringPrefix(reminder.recurringType);
+		return formatRecurringMessage(reminder.recurringType, reminder.reminderAt);
 	}
 
 	if (reminder.dueDate) {

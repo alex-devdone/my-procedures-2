@@ -6,6 +6,7 @@ import {
 	DEFAULT_CHECK_INTERVAL,
 	DEFAULT_TOLERANCE,
 	formatReminderNotificationBody,
+	formatTimeFromISO,
 	getDueReminders,
 	getEffectiveReminderTime,
 	getShownRemindersFromStorage,
@@ -923,6 +924,43 @@ describe("Reminder Checker Pure Functions", () => {
 		});
 	});
 
+	describe("formatTimeFromISO", () => {
+		it("formats ISO datetime to time string", () => {
+			// Using a time that should be consistent: 10:00 UTC
+			const result = formatTimeFromISO("2026-01-21T10:00:00.000Z");
+			// Time will be in local timezone, so check the format pattern
+			expect(result).toMatch(/^\d{1,2}:\d{2}\s?(AM|PM)$/i);
+		});
+
+		it("formats morning time correctly", () => {
+			// Create a local time for 9:00 AM
+			const date = new Date(2026, 0, 21, 9, 0, 0);
+			const result = formatTimeFromISO(date.toISOString());
+			expect(result).toBe("9:00 AM");
+		});
+
+		it("formats afternoon time correctly", () => {
+			// Create a local time for 2:30 PM
+			const date = new Date(2026, 0, 21, 14, 30, 0);
+			const result = formatTimeFromISO(date.toISOString());
+			expect(result).toBe("2:30 PM");
+		});
+
+		it("formats noon correctly", () => {
+			// Create a local time for 12:00 PM
+			const date = new Date(2026, 0, 21, 12, 0, 0);
+			const result = formatTimeFromISO(date.toISOString());
+			expect(result).toBe("12:00 PM");
+		});
+
+		it("formats midnight correctly", () => {
+			// Create a local time for 12:00 AM (midnight)
+			const date = new Date(2026, 0, 21, 0, 0, 0);
+			const result = formatTimeFromISO(date.toISOString());
+			expect(result).toBe("12:00 AM");
+		});
+	});
+
 	describe("formatReminderNotificationBody", () => {
 		beforeEach(() => {
 			vi.useFakeTimers();
@@ -1022,7 +1060,7 @@ describe("Reminder Checker Pure Functions", () => {
 			expect(result).toBe("Reminder for your task");
 		});
 
-		it("returns daily reminder message for daily recurring", () => {
+		it("returns daily reminder message with time for daily recurring", () => {
 			const reminder = {
 				todoId: "1",
 				todoText: "Test",
@@ -1032,10 +1070,11 @@ describe("Reminder Checker Pure Functions", () => {
 				recurringType: "daily" as const,
 			};
 			const result = formatReminderNotificationBody(reminder);
-			expect(result).toBe("Daily reminder");
+			// Time formatting depends on locale, so check pattern
+			expect(result).toMatch(/^Daily at \d{1,2}:\d{2}\s?(AM|PM)$/i);
 		});
 
-		it("returns weekly reminder message for weekly recurring", () => {
+		it("returns weekly reminder message with time for weekly recurring", () => {
 			const reminder = {
 				todoId: "1",
 				todoText: "Test",
@@ -1045,10 +1084,10 @@ describe("Reminder Checker Pure Functions", () => {
 				recurringType: "weekly" as const,
 			};
 			const result = formatReminderNotificationBody(reminder);
-			expect(result).toBe("Weekly reminder");
+			expect(result).toMatch(/^Weekly at \d{1,2}:\d{2}\s?(AM|PM)$/i);
 		});
 
-		it("returns monthly reminder message for monthly recurring", () => {
+		it("returns monthly reminder message with time for monthly recurring", () => {
 			const reminder = {
 				todoId: "1",
 				todoText: "Test",
@@ -1058,10 +1097,10 @@ describe("Reminder Checker Pure Functions", () => {
 				recurringType: "monthly" as const,
 			};
 			const result = formatReminderNotificationBody(reminder);
-			expect(result).toBe("Monthly reminder");
+			expect(result).toMatch(/^Monthly at \d{1,2}:\d{2}\s?(AM|PM)$/i);
 		});
 
-		it("returns yearly reminder message for yearly recurring", () => {
+		it("returns yearly reminder message with time for yearly recurring", () => {
 			const reminder = {
 				todoId: "1",
 				todoText: "Test",
@@ -1071,10 +1110,10 @@ describe("Reminder Checker Pure Functions", () => {
 				recurringType: "yearly" as const,
 			};
 			const result = formatReminderNotificationBody(reminder);
-			expect(result).toBe("Yearly reminder");
+			expect(result).toMatch(/^Yearly at \d{1,2}:\d{2}\s?(AM|PM)$/i);
 		});
 
-		it("returns recurring reminder message for custom recurring", () => {
+		it("returns recurring reminder message with time for custom recurring", () => {
 			const reminder = {
 				todoId: "1",
 				todoText: "Test",
@@ -1084,10 +1123,10 @@ describe("Reminder Checker Pure Functions", () => {
 				recurringType: "custom" as const,
 			};
 			const result = formatReminderNotificationBody(reminder);
-			expect(result).toBe("Recurring reminder");
+			expect(result).toMatch(/^Recurring at \d{1,2}:\d{2}\s?(AM|PM)$/i);
 		});
 
-		it("returns generic message for recurring without type", () => {
+		it("returns reminder with time for recurring without type", () => {
 			const reminder = {
 				todoId: "1",
 				todoText: "Test",
@@ -1097,7 +1136,7 @@ describe("Reminder Checker Pure Functions", () => {
 				recurringType: undefined,
 			};
 			const result = formatReminderNotificationBody(reminder);
-			expect(result).toBe("Reminder for your task");
+			expect(result).toMatch(/^Reminder at \d{1,2}:\d{2}\s?(AM|PM)$/i);
 		});
 	});
 

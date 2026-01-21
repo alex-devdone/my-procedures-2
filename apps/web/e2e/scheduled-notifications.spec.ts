@@ -549,7 +549,7 @@ test.describe("Scheduled notifications (localStorage mode)", () => {
 			).toContainText("Monthly");
 		});
 
-		test("should show reminder body text for recurring notifications", async ({
+		test("should show reminder body text with time for recurring notifications", async ({
 			page,
 		}) => {
 			const todoText = "Daily reminder task";
@@ -566,10 +566,10 @@ test.describe("Scheduled notifications (localStorage mode)", () => {
 
 			const toast = await waitForReminderToast(page);
 
-			// Body should show "Daily reminder" text
+			// Body should show "Daily at HH:MM AM/PM" text (e.g., "Daily at 9:00 AM")
 			await expect(
 				toast.locator('[data-testid="reminder-toast-body"]'),
-			).toContainText("Daily reminder");
+			).toContainText("Daily at");
 		});
 
 		test("should show icon in toast", async ({ page }) => {

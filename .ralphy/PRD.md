@@ -37,9 +37,9 @@ Recurring todos have a pattern (e.g., "repeat daily") but no **specific time** f
 
 Extend RecurringPattern to include notification time.
 
-- [ ] Update `RecurringPattern` interface in `packages/db/src/schema/todo.ts` to add `notifyAt?: string` field (HH:mm format)
-- [ ] Update `recurringPatternSchema` in `apps/web/src/app/api/todo/todo.types.ts` to validate `notifyAt` as optional time string
-- [ ] Add unit tests for `notifyAt` validation in `apps/web/src/app/api/todo/todo.types.test.ts`
+- [x] Update `RecurringPattern` interface in `packages/db/src/schema/todo.ts` to add `notifyAt?: string` field (HH:mm format)
+- [x] Update `recurringPatternSchema` in `apps/web/src/app/api/todo/todo.types.ts` to validate `notifyAt` as optional time string
+- [x] Add unit tests for `notifyAt` validation in `apps/web/src/app/api/todo/todo.types.test.ts`
 
 ---
 
@@ -47,8 +47,8 @@ Extend RecurringPattern to include notification time.
 
 Calculate next notification datetime from recurring pattern + notifyAt.
 
-- [ ] Create `getNextNotificationTime(pattern: RecurringPattern, fromDate?: Date): Date | null` function in `packages/api/src/lib/recurring.ts`
-- [ ] Add unit tests for `getNextNotificationTime` in `packages/api/src/lib/recurring.test.ts` covering:
+- [x] Create `getNextNotificationTime(pattern: RecurringPattern, fromDate?: Date): Date | null` function in `packages/api/src/lib/recurring.ts`
+- [x] Add unit tests for `getNextNotificationTime` in `packages/api/src/lib/recurring.test.ts` covering:
   - Daily pattern with notifyAt "09:00" returns today at 9am or tomorrow at 9am
   - Weekly pattern with daysOfWeek and notifyAt returns correct next occurrence
   - Monthly pattern with dayOfMonth and notifyAt returns correct next occurrence
@@ -60,10 +60,10 @@ Calculate next notification datetime from recurring pattern + notifyAt.
 
 UI for setting notification time on recurring todos.
 
-- [ ] Create `apps/web/src/components/scheduling/time-picker.tsx` - simple time input (HH:mm) with presets (Morning 9am, Noon 12pm, Evening 6pm)
-- [ ] Add unit tests for TimePicker in `apps/web/src/components/scheduling/time-picker.test.tsx`
-- [ ] Update `apps/web/src/components/scheduling/recurring-picker.tsx` to show TimePicker when user sets a recurring pattern
-- [ ] Add unit tests for TimePicker integration in `apps/web/src/components/scheduling/recurring-picker.test.tsx`
+- [x] Create `apps/web/src/components/scheduling/time-picker.tsx` - simple time input (HH:mm) with presets (Morning 9am, Noon 12pm, Evening 6pm)
+- [x] Add unit tests for TimePicker in `apps/web/src/components/scheduling/time-picker.test.tsx`
+- [x] Update `apps/web/src/components/scheduling/recurring-picker.tsx` to show TimePicker when user sets a recurring pattern
+- [x] Add unit tests for TimePicker integration in `apps/web/src/components/scheduling/recurring-picker.test.tsx`
 
 ---
 
@@ -71,13 +71,13 @@ UI for setting notification time on recurring todos.
 
 Update reminder checker to calculate and trigger recurring notifications.
 
-- [ ] Update `apps/web/src/hooks/use-reminder-checker.ts`:
+- [x] Update `apps/web/src/hooks/use-reminder-checker.ts`:
   - Add helper `getEffectiveReminderTime(todo: Todo): string | null` that returns:
     - `reminderAt` if set (existing behavior)
     - OR calculated next notification time from `recurringPattern.notifyAt`
   - Update `getDueReminders` to use `getEffectiveReminderTime`
-- [ ] Add unit tests for recurring notification logic in `apps/web/src/hooks/use-reminder-checker.test.ts`
-- [ ] Update notification display to show recurring indicator (e.g., "Daily reminder" instead of just "Reminder")
+- [x] Add unit tests for recurring notification logic in `apps/web/src/hooks/use-reminder-checker.test.ts`
+- [x] Update notification display to show recurring indicator (e.g., "Daily reminder" instead of just "Reminder")
 
 ---
 
@@ -85,9 +85,9 @@ Update reminder checker to calculate and trigger recurring notifications.
 
 Ensure localStorage (guest) todos also support notifyAt.
 
-- [ ] Verify `apps/web/src/hooks/use-todo-storage.ts` passes `notifyAt` through to local storage
-- [ ] Add unit test confirming local todos with recurring patterns and notifyAt work correctly
-- [ ] Ensure sync mechanism in `useSyncTodos` includes `notifyAt` when syncing to server
+- [x] Verify `apps/web/src/hooks/use-todo-storage.ts` passes `notifyAt` through to local storage
+- [x] Add unit test confirming local todos with recurring patterns and notifyAt work correctly
+- [x] Ensure sync mechanism in `useSyncTodos` includes `notifyAt` when syncing to server
 
 ---
 
@@ -95,12 +95,12 @@ Ensure localStorage (guest) todos also support notifyAt.
 
 End-to-end tests for scheduled recurring notifications.
 
-- [ ] Add E2E tests in `apps/web/e2e/scheduled-notifications.spec.ts`:
-  - [ ] E2E: Create daily recurring todo with notification at 9:00 AM
-  - [ ] E2E: Edit notification time on existing recurring todo
-  - [ ] E2E: Clear notification time from recurring todo
-  - [ ] E2E: Verify time picker shows presets (Morning, Noon, Evening)
-  - [ ] E2E: Persist notification time after page reload
+- [x] Add E2E tests in `apps/web/e2e/scheduled-notifications.spec.ts`:
+  - [x] E2E: Create daily recurring todo with notification at 9:00 AM
+  - [x] E2E: Edit notification time on existing recurring todo
+  - [x] E2E: Clear notification time from recurring todo
+  - [x] E2E: Verify time picker shows presets (Morning, Noon, Evening)
+  - [x] E2E: Persist notification time after page reload
 
 ---
 
@@ -108,25 +108,25 @@ End-to-end tests for scheduled recurring notifications.
 
 Final verification and cleanup.
 
-- [ ] Run `bun run check-types` and fix any TypeScript errors
-- [ ] Run `bun run check` and fix any linting issues
-- [ ] Run `bun run test` and ensure all unit tests pass
-- [ ] Run `bun run test:e2e` and ensure all E2E tests pass
-- [ ] Run `bun run build` and ensure build succeeds
+- [x] Run `bun run check-types` and fix any TypeScript errors
+- [x] Run `bun run check` and fix any linting issues
+- [x] Run `bun run test` and ensure all unit tests pass
+- [x] Run `bun run test:e2e` and ensure all E2E tests pass
+- [x] Run `bun run build` and ensure build succeeds
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] All tests pass (`bun run test`)
-- [ ] No type errors (`bun run check-types`)
-- [ ] Linting passes (`bun run check`)
-- [ ] Build succeeds (`bun run build`)
-- [ ] User can set a specific time (e.g., 9:00 AM) for recurring todos
-- [ ] Browser notification fires automatically when scheduled time arrives
-- [ ] Works for all recurring patterns (daily, weekly, monthly, yearly)
-- [ ] Works in both authenticated and guest (localStorage) modes
-- [ ] Notification shows recurring context (e.g., "Daily at 9:00 AM")
+- [x] All tests pass (`bun run test`)
+- [x] No type errors (`bun run check-types`)
+- [x] Linting passes (`bun run check`)
+- [x] Build succeeds (`bun run build`)
+- [x] User can set a specific time (e.g., 9:00 AM) for recurring todos
+- [x] Browser notification fires automatically when scheduled time arrives
+- [x] Works for all recurring patterns (daily, weekly, monthly, yearly)
+- [x] Works in both authenticated and guest (localStorage) modes
+- [x] Notification shows recurring context (e.g., "Daily at 9:00 AM")
 
 ---
 
