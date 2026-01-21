@@ -100,6 +100,7 @@ export default function TodosPage() {
 		create,
 		toggle,
 		deleteTodo,
+		updateSchedule,
 		isLoading,
 		isAuthenticated,
 		selectedFolderId,
@@ -136,6 +137,17 @@ export default function TodosPage() {
 
 	const handleDeleteTodo = (id: number | string) => {
 		deleteTodo(id);
+	};
+
+	const handleScheduleChange = (
+		id: number | string,
+		schedule: {
+			dueDate?: string | null;
+			reminderAt?: string | null;
+			recurringPattern?: unknown;
+		},
+	) => {
+		updateSchedule(id, schedule);
 	};
 
 	const handleSelectFolder = (folderId: SelectedFolderId) => {
@@ -452,6 +464,7 @@ export default function TodosPage() {
 												subtaskProgress={getProgress(todo.id)}
 												onToggle={handleToggleTodo}
 												onDelete={handleDeleteTodo}
+												onScheduleChange={handleScheduleChange}
 												folder={todoFolder}
 												showFolderBadge={selectedFolderId === "inbox"}
 												folderColorBgClasses={folderColorBgClasses}

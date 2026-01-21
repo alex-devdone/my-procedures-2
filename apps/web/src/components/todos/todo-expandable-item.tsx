@@ -9,6 +9,10 @@ import {
 	DueDateBadge,
 	isOverdue,
 } from "@/components/scheduling/due-date-badge";
+import {
+	type ScheduleValue,
+	TodoSchedulePopover,
+} from "@/components/scheduling/todo-schedule-popover";
 import { SubtaskAddInput } from "@/components/subtasks/subtask-add-input";
 import { SubtaskList } from "@/components/subtasks/subtask-list";
 import { SubtaskProgressIndicator } from "@/components/subtasks/subtask-progress-indicator";
@@ -23,6 +27,7 @@ export interface TodoExpandableItemProps {
 		completed: boolean;
 		folderId?: number | string | null;
 		dueDate?: string | null;
+		reminderAt?: string | null;
 		recurringPattern?: RecurringPattern | null;
 	};
 	/** Subtask progress for this todo */
@@ -31,6 +36,15 @@ export interface TodoExpandableItemProps {
 	onToggle: (id: number | string, completed: boolean) => void;
 	/** Callback when delete is clicked */
 	onDelete: (id: number | string) => void;
+	/** Callback when schedule is updated */
+	onScheduleChange?: (
+		id: number | string,
+		schedule: {
+			dueDate?: string | null;
+			reminderAt?: string | null;
+			recurringPattern?: RecurringPattern | null;
+		},
+	) => void;
 	/** Optional folder information for display */
 	folder?: {
 		name: string;
@@ -63,6 +77,7 @@ export function TodoExpandableItem({
 	subtaskProgress,
 	onToggle,
 	onDelete,
+	onScheduleChange,
 	folder,
 	showFolderBadge = false,
 	folderColorBgClasses = {},
@@ -77,6 +92,29 @@ export function TodoExpandableItem({
 		if (!todo.dueDate || todo.completed) return false;
 		return isOverdue(todo.dueDate, todo.completed);
 	}, [todo.dueDate, todo.completed]);
+
+	// Convert todo scheduling fields to ScheduleValue format
+	const scheduleValue: ScheduleValue = useMemo(
+		() => ({
+			dueDate: todo.dueDate ? new Date(todo.dueDate) : null,
+			reminderAt: todo.reminderAt ? new Date(todo.reminderAt) : null,
+			recurringPattern: todo.recurringPattern ?? null,
+		}),
+		[todo.dueDate, todo.reminderAt, todo.recurringPattern],
+	);
+
+	const handleScheduleChange = useCallback(
+		(value: ScheduleValue) => {
+			if (onScheduleChange) {
+				onScheduleChange(todo.id, {
+					dueDate: value.dueDate?.toISOString() ?? null,
+					reminderAt: value.reminderAt?.toISOString() ?? null,
+					recurringPattern: value.recurringPattern,
+				});
+			}
+		},
+		[onScheduleChange, todo.id],
+	);
 
 	const handleToggle = useCallback(() => {
 		onToggle(todo.id, todo.completed);
@@ -207,17 +245,30 @@ export function TodoExpandableItem({
 					</div>
 				</div>
 
-				{/* Delete button */}
-				<Button
-					variant="ghost"
-					size="icon"
-					onClick={handleDelete}
-					className="h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100"
-					aria-label="Delete task"
-					data-testid="todo-delete"
-				>
-					<Trash2 className="h-4 w-4 text-muted-foreground transition-colors hover:text-destructive" />
-				</Button>
+				{/* Action buttons */}
+				<div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+					{/* Schedule button */}
+					{onScheduleChange && (
+						<TodoSchedulePopover
+							value={scheduleValue}
+							onChange={handleScheduleChange}
+							compact
+							data-testid="todo-schedule-popover"
+						/>
+					)}
+
+					{/* Delete button */}
+					<Button
+						variant="ghost"
+						size="icon"
+						onClick={handleDelete}
+						className="h-8 w-8"
+						aria-label="Delete task"
+						data-testid="todo-delete"
+					>
+						<Trash2 className="h-4 w-4 text-muted-foreground transition-colors hover:text-destructive" />
+					</Button>
+				</div>
 			</div>
 
 			{/* Expanded subtasks section */}

@@ -187,17 +187,17 @@ UI for setting due dates, reminders, and recurring patterns. Can proceed after P
 - [x] Add unit tests for TodoSchedulePopover in `apps/web/src/components/scheduling/todo-schedule-popover.test.tsx`
 - [x] Update todo item component to show due date badge and overdue styling
 - [x] Add unit tests for due date display in todo item
-- [ ] Create E2E tests for scheduling in localStorage mode at `apps/web/e2e/scheduling.spec.ts`:
-  - [ ] E2E: Set due date using date picker
-  - [ ] E2E: Set due date using presets (today, tomorrow, next week)
-  - [ ] E2E: Clear due date from todo
-  - [ ] E2E: Set reminder time for todo
-  - [ ] E2E: Create daily recurring todo
-  - [ ] E2E: Create weekly recurring todo with specific days
-  - [ ] E2E: Create monthly recurring todo
+- [x] Create E2E tests for scheduling in localStorage mode at `apps/web/e2e/scheduling.spec.ts`:
+  - [x] E2E: Set due date using date picker
+  - [x] E2E: Set due date using presets (today, tomorrow, next week)
+  - [x] E2E: Clear due date from todo
+  - [x] E2E: Set reminder time for todo
+  - [x] E2E: Create daily recurring todo
+  - [x] E2E: Create weekly recurring todo with specific days
+  - [x] E2E: Create monthly recurring todo
   - [ ] E2E: Complete recurring todo and verify next occurrence created
-  - [ ] E2E: Show overdue styling for past-due todos
-  - [ ] E2E: Persist scheduling data after page reload
+  - [x] E2E: Show overdue styling for past-due todos
+  - [x] E2E: Persist scheduling data after page reload
 
 ---
 

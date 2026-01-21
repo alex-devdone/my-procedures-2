@@ -527,3 +527,25 @@
   - Overdue styling: past due incomplete, past due completed, future dates, today
   - Recurring pattern display: indicator with date, text without date
 - [✓] 2026-01-21 06:20 - Export RecurringPattern and RecurringPatternType from todo index.ts barrel file
+
+- [✓] 2026-01-21 06:45 - Integrate TodoSchedulePopover into TodoExpandableItem component (apps/web/src/components/todos/todo-expandable-item.tsx):
+  - Added onScheduleChange callback prop for updating todo schedule
+  - Added scheduleValue computation to convert ISO strings to Date objects
+  - Added handleScheduleChange to serialize Date objects back to ISO strings
+  - Added TodoSchedulePopover in action buttons section (compact mode, shows on hover)
+  - Added reminderAt field to todo prop interface
+- [✓] 2026-01-21 06:45 - Update todos page to pass onScheduleChange and updateSchedule (apps/web/src/app/todos/page.tsx):
+  - Extract updateSchedule from useTodoStorage hook
+  - Add handleScheduleChange handler function
+  - Pass onScheduleChange to TodoExpandableItem
+- [✓] 2026-01-21 06:45 - Create E2E tests for scheduling (26 tests) in apps/web/e2e/scheduling.spec.ts:
+  - Set due date using date picker: calendar day selection, month navigation
+  - Set due date using presets: Today, Tomorrow, Next week
+  - Clear due date: using clear button, using Clear all button
+  - Set reminder time: hint when no due date, reminder after due date set, clear with due date
+  - Create daily recurring todo: using preset, using custom builder with interval
+  - Create weekly recurring todo: using preset, with specific days (M/W/F), weekdays preset
+  - Create monthly recurring todo: using preset, on specific day (15th)
+  - Show overdue styling: past-due incomplete, not for completed, not for future
+  - Persist scheduling data after reload: due date, recurring pattern, combined schedule
+  - Schedule display in todo list: due date badge, recurring indicator, combined display
