@@ -32,6 +32,7 @@ const mockReminder: DueReminder = {
 	todoText: "Complete the report",
 	reminderAt: new Date().toISOString(),
 	dueDate: new Date(Date.now() + 3600000).toISOString(), // 1 hour from now
+	isRecurring: false,
 };
 
 const mockOverdueReminder: DueReminder = {
@@ -39,6 +40,7 @@ const mockOverdueReminder: DueReminder = {
 	todoText: "Overdue task",
 	reminderAt: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
 	dueDate: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
+	isRecurring: false,
 };
 
 const mockReminderNoDueDate: DueReminder = {
@@ -46,6 +48,7 @@ const mockReminderNoDueDate: DueReminder = {
 	todoText: "Task without due date",
 	reminderAt: new Date().toISOString(),
 	dueDate: null,
+	isRecurring: false,
 };
 
 const mockNumericIdReminder: DueReminder = {
@@ -53,6 +56,7 @@ const mockNumericIdReminder: DueReminder = {
 	todoText: "Numeric ID task",
 	reminderAt: new Date().toISOString(),
 	dueDate: new Date(Date.now() + 86400000).toISOString(), // Tomorrow
+	isRecurring: false,
 };
 
 // ============================================================================
