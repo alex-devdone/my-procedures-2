@@ -316,6 +316,10 @@ export function useTodoStorage(): UseTodoStorageReturn {
 	const toggle = useCallback(
 		async (id: number | string, completed: boolean) => {
 			if (isAuthenticated) {
+				// Skip server call for optimistic (negative) IDs - they haven't been created yet
+				if (typeof id === "number" && id < 0) {
+					return;
+				}
 				await toggleMutation.mutateAsync({ id: id as number, completed });
 			} else {
 				// For recurring todos being completed, use completeRecurring to create next occurrence
@@ -338,6 +342,10 @@ export function useTodoStorage(): UseTodoStorageReturn {
 	const deleteTodo = useCallback(
 		async (id: number | string) => {
 			if (isAuthenticated) {
+				// Skip server call for optimistic (negative) IDs - they haven't been created yet
+				if (typeof id === "number" && id < 0) {
+					return;
+				}
 				await deleteMutation.mutateAsync({ id: id as number });
 			} else {
 				localTodoStorage.deleteTodo(id as string);
@@ -350,6 +358,10 @@ export function useTodoStorage(): UseTodoStorageReturn {
 	const updateFolder = useCallback(
 		async (id: number | string, folderId: number | string | null) => {
 			if (isAuthenticated) {
+				// Skip server call for optimistic (negative) IDs - they haven't been created yet
+				if (typeof id === "number" && id < 0) {
+					return;
+				}
 				await updateFolderMutation.mutateAsync({
 					id: id as number,
 					folderId: typeof folderId === "number" ? folderId : null,
@@ -375,6 +387,10 @@ export function useTodoStorage(): UseTodoStorageReturn {
 			},
 		) => {
 			if (isAuthenticated) {
+				// Skip server call for optimistic (negative) IDs - they haven't been created yet
+				if (typeof id === "number" && id < 0) {
+					return;
+				}
 				await updateScheduleMutation.mutateAsync({
 					id: id as number,
 					...scheduling,

@@ -286,6 +286,10 @@ export function useFolderStorage(): UseFolderStorageReturn {
 				| { id: string; name?: string; color?: FolderColor },
 		) => {
 			if (isAuthenticated) {
+				// Skip server call for optimistic (negative) IDs - they haven't been created yet
+				if (typeof input.id === "number" && input.id < 0) {
+					return;
+				}
 				await updateMutation.mutateAsync(input as UpdateFolderInput);
 			} else {
 				localFolderStorage.update(
@@ -302,6 +306,10 @@ export function useFolderStorage(): UseFolderStorageReturn {
 	const deleteFolder = useCallback(
 		async (id: number | string) => {
 			if (isAuthenticated) {
+				// Skip server call for optimistic (negative) IDs - they haven't been created yet
+				if (typeof id === "number" && id < 0) {
+					return;
+				}
 				await deleteMutation.mutateAsync({ id: id as number });
 			} else {
 				// Move todos from this folder to Inbox (clear their folderId)
@@ -318,6 +326,10 @@ export function useFolderStorage(): UseFolderStorageReturn {
 	const reorder = useCallback(
 		async (id: number | string, newOrder: number) => {
 			if (isAuthenticated) {
+				// Skip server call for optimistic (negative) IDs - they haven't been created yet
+				if (typeof id === "number" && id < 0) {
+					return;
+				}
 				await reorderMutation.mutateAsync({ id: id as number, newOrder });
 			} else {
 				localFolderStorage.reorder(id as string, newOrder);

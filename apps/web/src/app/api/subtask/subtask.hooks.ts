@@ -123,8 +123,10 @@ export function useSubtaskStorage(
 		getLocalSubtasksServerSnapshot,
 	);
 
-	// Only query remote if authenticated and todoId is numeric
-	const numericTodoId = typeof todoId === "number" ? todoId : null;
+	// Only query remote if authenticated and todoId is a positive number
+	// Negative IDs are optimistic/temporary IDs used during create operations
+	const numericTodoId =
+		typeof todoId === "number" && todoId > 0 ? todoId : null;
 	const queryKey = numericTodoId ? getSubtasksQueryKey(numericTodoId) : [];
 
 	const {
@@ -314,6 +316,10 @@ export function useSubtaskStorage(
 	const create = useCallback(
 		async (parentTodoId: number | string, text: string): Promise<Subtask> => {
 			if (isAuthenticated) {
+				// Skip server call for optimistic (negative) todo IDs - they haven't been created yet
+				if (typeof parentTodoId === "number" && parentTodoId < 0) {
+					throw new Error("Cannot create subtask for pending todo");
+				}
 				const result = await createMutation.mutateAsync({
 					todoId: parentTodoId as number,
 					text,
@@ -330,6 +336,10 @@ export function useSubtaskStorage(
 	const update = useCallback(
 		async (id: number | string, text: string): Promise<Subtask> => {
 			if (isAuthenticated) {
+				// Skip server call for optimistic (negative) IDs - they haven't been created yet
+				if (typeof id === "number" && id < 0) {
+					throw new Error("Cannot update pending subtask");
+				}
 				const result = await updateMutation.mutateAsync({
 					id: id as number,
 					text,
@@ -349,6 +359,10 @@ export function useSubtaskStorage(
 	const toggle = useCallback(
 		async (id: number | string, completed: boolean): Promise<Subtask> => {
 			if (isAuthenticated) {
+				// Skip server call for optimistic (negative) IDs - they haven't been created yet
+				if (typeof id === "number" && id < 0) {
+					throw new Error("Cannot toggle pending subtask");
+				}
 				const result = await toggleMutation.mutateAsync({
 					id: id as number,
 					completed,
@@ -368,6 +382,10 @@ export function useSubtaskStorage(
 	const deleteSubtask = useCallback(
 		async (id: number | string): Promise<void> => {
 			if (isAuthenticated) {
+				// Skip server call for optimistic (negative) IDs - they haven't been created yet
+				if (typeof id === "number" && id < 0) {
+					return;
+				}
 				await deleteMutation.mutateAsync({ id: id as number });
 			} else {
 				localSubtaskStorage.deleteSubtask(String(id));
@@ -380,6 +398,10 @@ export function useSubtaskStorage(
 	const reorder = useCallback(
 		async (id: number | string, newOrder: number): Promise<Subtask> => {
 			if (isAuthenticated) {
+				// Skip server call for optimistic (negative) IDs - they haven't been created yet
+				if (typeof id === "number" && id < 0) {
+					throw new Error("Cannot reorder pending subtask");
+				}
 				const result = await reorderMutation.mutateAsync({
 					id: id as number,
 					newOrder,
