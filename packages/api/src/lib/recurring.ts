@@ -383,6 +383,53 @@ export function parseRecurringDescription(
 }
 
 /**
+ * Calculate the next notification time based on a recurring pattern's notifyAt field
+ *
+ * Combines the next occurrence date from the pattern with the time-of-day specified
+ * in notifyAt. For daily patterns, if the notification time has already passed today,
+ * it moves to the next occurrence.
+ *
+ * @param pattern - The recurring pattern definition with optional notifyAt field
+ * @param fromDate - The date to calculate from (defaults to current date/time)
+ * @returns The next notification datetime, or null if no notifyAt is set or pattern is expired
+ */
+export function getNextNotificationTime(
+	pattern: RecurringPattern,
+	fromDate: Date = new Date(),
+): Date | null {
+	// Return null if no notifyAt is specified
+	if (!pattern.notifyAt) {
+		return null;
+	}
+
+	// Parse the time from notifyAt (HH:mm format)
+	const [hours, minutes] = pattern.notifyAt.split(":").map(Number);
+
+	// Get the next occurrence date based on pattern type
+	const nextOccurrence = getNextOccurrence(pattern, fromDate);
+	if (!nextOccurrence) {
+		return null;
+	}
+
+	// Set the specific time on the occurrence date
+	nextOccurrence.setHours(hours, minutes, 0, 0);
+
+	// For daily patterns, if the time has already passed today, we need to check
+	// if the next occurrence with the specified time is still in the past
+	if (nextOccurrence <= fromDate) {
+		// The calculated time is in the past, get the next occurrence after that
+		const nextAfterCurrent = getNextOccurrence(pattern, nextOccurrence);
+		if (!nextAfterCurrent) {
+			return null;
+		}
+		nextAfterCurrent.setHours(hours, minutes, 0, 0);
+		return nextAfterCurrent;
+	}
+
+	return nextOccurrence;
+}
+
+/**
  * Format a RecurringPattern into a human-readable string
  *
  * @param pattern - The recurring pattern to format
