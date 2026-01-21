@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { DueReminder } from "@/hooks/use-reminder-checker";
 import {
+	formatRecurringLabel,
 	formatReminderTime,
 	getReminderToastId,
 	isReminderOverdue,
@@ -57,6 +58,51 @@ const mockNumericIdReminder: DueReminder = {
 	reminderAt: new Date().toISOString(),
 	dueDate: new Date(Date.now() + 86400000).toISOString(), // Tomorrow
 	isRecurring: false,
+};
+
+const mockDailyRecurringReminder: DueReminder = {
+	todoId: "daily-1",
+	todoText: "Daily standup",
+	reminderAt: new Date().toISOString(),
+	dueDate: null,
+	isRecurring: true,
+	recurringType: "daily",
+};
+
+const mockWeeklyRecurringReminder: DueReminder = {
+	todoId: "weekly-1",
+	todoText: "Weekly review",
+	reminderAt: new Date().toISOString(),
+	dueDate: null,
+	isRecurring: true,
+	recurringType: "weekly",
+};
+
+const mockMonthlyRecurringReminder: DueReminder = {
+	todoId: "monthly-1",
+	todoText: "Monthly report",
+	reminderAt: new Date().toISOString(),
+	dueDate: null,
+	isRecurring: true,
+	recurringType: "monthly",
+};
+
+const mockYearlyRecurringReminder: DueReminder = {
+	todoId: "yearly-1",
+	todoText: "Annual review",
+	reminderAt: new Date().toISOString(),
+	dueDate: null,
+	isRecurring: true,
+	recurringType: "yearly",
+};
+
+const mockCustomRecurringReminder: DueReminder = {
+	todoId: "custom-1",
+	todoText: "Custom schedule task",
+	reminderAt: new Date().toISOString(),
+	dueDate: null,
+	isRecurring: true,
+	recurringType: "custom",
 };
 
 // ============================================================================
@@ -141,6 +187,45 @@ describe("Pure Functions", () => {
 			expect(id1).not.toBe(id2);
 		});
 	});
+
+	describe("formatRecurringLabel", () => {
+		it("returns null for non-recurring reminders", () => {
+			expect(formatRecurringLabel(mockReminder)).toBeNull();
+		});
+
+		it("returns 'Daily' for daily recurring reminders", () => {
+			expect(formatRecurringLabel(mockDailyRecurringReminder)).toBe("Daily");
+		});
+
+		it("returns 'Weekly' for weekly recurring reminders", () => {
+			expect(formatRecurringLabel(mockWeeklyRecurringReminder)).toBe("Weekly");
+		});
+
+		it("returns 'Monthly' for monthly recurring reminders", () => {
+			expect(formatRecurringLabel(mockMonthlyRecurringReminder)).toBe(
+				"Monthly",
+			);
+		});
+
+		it("returns 'Yearly' for yearly recurring reminders", () => {
+			expect(formatRecurringLabel(mockYearlyRecurringReminder)).toBe("Yearly");
+		});
+
+		it("returns 'Recurring' for custom recurring reminders", () => {
+			expect(formatRecurringLabel(mockCustomRecurringReminder)).toBe(
+				"Recurring",
+			);
+		});
+
+		it("returns null for recurring reminder with undefined type", () => {
+			const reminder: DueReminder = {
+				...mockReminder,
+				isRecurring: true,
+				recurringType: undefined,
+			};
+			expect(formatRecurringLabel(reminder)).toBeNull();
+		});
+	});
 });
 
 // ============================================================================
@@ -215,6 +300,87 @@ describe("ReminderToastContent", () => {
 			const dueDate = screen.getByTestId("reminder-toast-due-date");
 			// Should contain month and day
 			expect(dueDate.textContent).toMatch(/\w+\s+\d+/);
+		});
+	});
+
+	describe("Recurring Badge Display", () => {
+		it("does not show recurring badge for non-recurring reminders", () => {
+			render(<ReminderToastContent reminder={mockReminder} />);
+
+			expect(
+				screen.queryByTestId("reminder-toast-recurring-badge"),
+			).not.toBeInTheDocument();
+		});
+
+		it("shows recurring badge for daily recurring reminders", () => {
+			render(<ReminderToastContent reminder={mockDailyRecurringReminder} />);
+
+			const badge = screen.getByTestId("reminder-toast-recurring-badge");
+			expect(badge).toBeInTheDocument();
+			expect(badge).toHaveTextContent("Daily");
+		});
+
+		it("shows recurring badge for weekly recurring reminders", () => {
+			render(<ReminderToastContent reminder={mockWeeklyRecurringReminder} />);
+
+			const badge = screen.getByTestId("reminder-toast-recurring-badge");
+			expect(badge).toBeInTheDocument();
+			expect(badge).toHaveTextContent("Weekly");
+		});
+
+		it("shows recurring badge for monthly recurring reminders", () => {
+			render(<ReminderToastContent reminder={mockMonthlyRecurringReminder} />);
+
+			const badge = screen.getByTestId("reminder-toast-recurring-badge");
+			expect(badge).toBeInTheDocument();
+			expect(badge).toHaveTextContent("Monthly");
+		});
+
+		it("shows recurring badge for yearly recurring reminders", () => {
+			render(<ReminderToastContent reminder={mockYearlyRecurringReminder} />);
+
+			const badge = screen.getByTestId("reminder-toast-recurring-badge");
+			expect(badge).toBeInTheDocument();
+			expect(badge).toHaveTextContent("Yearly");
+		});
+
+		it("shows recurring badge for custom recurring reminders", () => {
+			render(<ReminderToastContent reminder={mockCustomRecurringReminder} />);
+
+			const badge = screen.getByTestId("reminder-toast-recurring-badge");
+			expect(badge).toBeInTheDocument();
+			expect(badge).toHaveTextContent("Recurring");
+		});
+
+		it("does not show recurring badge for recurring reminder without type", () => {
+			const reminder: DueReminder = {
+				...mockReminder,
+				isRecurring: true,
+				recurringType: undefined,
+			};
+			render(<ReminderToastContent reminder={reminder} />);
+
+			expect(
+				screen.queryByTestId("reminder-toast-recurring-badge"),
+			).not.toBeInTheDocument();
+		});
+
+		it("has proper styling for recurring badge", () => {
+			render(<ReminderToastContent reminder={mockDailyRecurringReminder} />);
+
+			const badge = screen.getByTestId("reminder-toast-recurring-badge");
+			expect(badge).toHaveClass("rounded-full");
+			expect(badge).toHaveClass("bg-accent/10");
+			expect(badge).toHaveClass("text-accent");
+		});
+
+		it("includes repeat icon in recurring badge", () => {
+			render(<ReminderToastContent reminder={mockDailyRecurringReminder} />);
+
+			const badge = screen.getByTestId("reminder-toast-recurring-badge");
+			const svgIcon = badge.querySelector("svg");
+			expect(svgIcon).toBeInTheDocument();
+			expect(svgIcon).toHaveAttribute("aria-hidden", "true");
 		});
 	});
 
