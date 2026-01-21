@@ -500,3 +500,30 @@
   - Accessibility: trigger labels, clear button label
   - Helper functions: formatScheduleValue, hasSchedule, emptyScheduleValue
   - Edge cases: reminder without due date, complex recurring patterns, weekdays pattern
+
+- [✓] 2026-01-21 06:20 - Create DueDateBadge component (apps/web/src/components/scheduling/due-date-badge.tsx) with:
+  - Due date display with smart formatting ("Today", "Tomorrow", "Yesterday", weekday for next 7 days)
+  - Overdue styling (red background/text) for past due dates on incomplete todos
+  - Today styling (accent color) for todos due today
+  - Recurring pattern indicator with icon
+  - Helper functions: isOverdue, isToday, isTomorrow, formatDueDate
+  - Completed state styling with muted colors
+- [✓] 2026-01-21 06:20 - Add unit tests for DueDateBadge (41 tests) in apps/web/src/components/scheduling/due-date-badge.test.tsx covering:
+  - Rendering: badge, calendar icon, date text, className
+  - Date display: Today, Tomorrow, Yesterday, weekday, month/day
+  - Overdue styling: past due incomplete, past due completed, future dates, today
+  - Today styling: today vs other dates
+  - Completed styling: muted colors for completed todos
+  - Recurring patterns: icon display, indicator with date, text without date
+  - Helper functions: isOverdue, isToday, isTomorrow, formatDueDate
+- [✓] 2026-01-21 06:20 - Update TodoExpandableItem component to show due date badge and overdue styling:
+  - Added dueDate and recurringPattern fields to todo prop interface
+  - Added overdue detection using isOverdue helper
+  - Added red border/background styling for overdue todos (data-overdue attribute)
+  - Integrated DueDateBadge component in badges section
+- [✓] 2026-01-21 06:20 - Add unit tests for due date display in TodoExpandableItem (13 tests) covering:
+  - Due Date Badge: no badge when no date, badge when date provided, badge with recurring only
+  - Date display: Today, Tomorrow formatting
+  - Overdue styling: past due incomplete, past due completed, future dates, today
+  - Recurring pattern display: indicator with date, text without date
+- [✓] 2026-01-21 06:20 - Export RecurringPattern and RecurringPatternType from todo index.ts barrel file

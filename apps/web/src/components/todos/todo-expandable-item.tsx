@@ -1,9 +1,14 @@
 "use client";
 
 import { CheckCircle2, ChevronDown, FolderIcon, Trash2 } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { SubtaskProgress } from "@/app/api/subtask";
 import { useSubtaskStorage } from "@/app/api/subtask";
+import type { RecurringPattern } from "@/app/api/todo/todo.types";
+import {
+	DueDateBadge,
+	isOverdue,
+} from "@/components/scheduling/due-date-badge";
 import { SubtaskAddInput } from "@/components/subtasks/subtask-add-input";
 import { SubtaskList } from "@/components/subtasks/subtask-list";
 import { SubtaskProgressIndicator } from "@/components/subtasks/subtask-progress-indicator";
@@ -17,6 +22,8 @@ export interface TodoExpandableItemProps {
 		text: string;
 		completed: boolean;
 		folderId?: number | string | null;
+		dueDate?: string | null;
+		recurringPattern?: RecurringPattern | null;
 	};
 	/** Subtask progress for this todo */
 	subtaskProgress?: SubtaskProgress | null;
@@ -65,6 +72,12 @@ export function TodoExpandableItem({
 	const [isExpanded, setIsExpanded] = useState(false);
 	const { create: createSubtask } = useSubtaskStorage(todo.id);
 
+	// Check if the todo is overdue (due date in the past and not completed)
+	const overdue = useMemo(() => {
+		if (!todo.dueDate || todo.completed) return false;
+		return isOverdue(todo.dueDate, todo.completed);
+	}, [todo.dueDate, todo.completed]);
+
 	const handleToggle = useCallback(() => {
 		onToggle(todo.id, todo.completed);
 	}, [todo.id, todo.completed, onToggle]);
@@ -102,10 +115,14 @@ export function TodoExpandableItem({
 		<li
 			className={cn(
 				"group rounded-xl border border-border/50 bg-secondary/30 transition-all duration-200 hover:border-accent/30 hover:bg-secondary/50",
+				// Overdue styling: subtle red border and background tint
+				overdue &&
+					"border-red-500/30 bg-red-500/5 hover:border-red-500/50 hover:bg-red-500/10",
 				className,
 			)}
 			style={animationDelay ? { animationDelay } : undefined}
 			data-testid={`todo-item-${todo.id}`}
+			data-overdue={overdue || undefined}
 		>
 			{/* Main todo row */}
 			<div className="flex items-center gap-4 p-4">
@@ -158,8 +175,16 @@ export function TodoExpandableItem({
 						{todo.text}
 					</span>
 
-					{/* Folder badge and subtask progress */}
+					{/* Due date badge, folder badge, and subtask progress */}
 					<div className="flex flex-wrap items-center gap-2">
+						{/* Due date badge */}
+						{(todo.dueDate || todo.recurringPattern) && (
+							<DueDateBadge
+								dueDate={todo.dueDate}
+								recurringPattern={todo.recurringPattern}
+								isCompleted={todo.completed}
+							/>
+						)}
 						{folder && showFolderBadge && (
 							<span
 								className={cn(

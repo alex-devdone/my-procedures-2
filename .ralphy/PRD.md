@@ -185,8 +185,8 @@ UI for setting due dates, reminders, and recurring patterns. Can proceed after P
 - [x] Add unit tests for RecurringPicker in `apps/web/src/components/scheduling/recurring-picker.test.tsx`
 - [x] Create `apps/web/src/components/scheduling/todo-schedule-popover.tsx` - combined popover for all scheduling options
 - [x] Add unit tests for TodoSchedulePopover in `apps/web/src/components/scheduling/todo-schedule-popover.test.tsx`
-- [ ] Update todo item component to show due date badge and overdue styling
-- [ ] Add unit tests for due date display in todo item
+- [x] Update todo item component to show due date badge and overdue styling
+- [x] Add unit tests for due date display in todo item
 - [ ] Create E2E tests for scheduling in localStorage mode at `apps/web/e2e/scheduling.spec.ts`:
   - [ ] E2E: Set due date using date picker
   - [ ] E2E: Set due date using presets (today, tomorrow, next week)

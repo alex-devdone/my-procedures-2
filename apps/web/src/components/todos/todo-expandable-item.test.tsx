@@ -1,9 +1,10 @@
 "use client";
 
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { UseSubtaskStorageReturn } from "@/app/api/subtask";
+import type { RecurringPattern } from "@/app/api/todo/todo.types";
 
 // Mock the subtask hooks
 const mockUseSubtaskStorage = vi.fn<() => UseSubtaskStorageReturn>();
@@ -24,12 +25,16 @@ const createMockTodo = (
 		text: string;
 		completed: boolean;
 		folderId?: number | string | null;
+		dueDate?: string | null;
+		recurringPattern?: RecurringPattern | null;
 	}> = {},
 ) => ({
 	id: "todo-1",
 	text: "Test Todo",
 	completed: false,
 	folderId: null,
+	dueDate: null,
+	recurringPattern: null,
 	...overrides,
 });
 
@@ -651,6 +656,220 @@ describe("TodoExpandableItem", () => {
 			);
 
 			expect(screen.getByTestId("todo-item-test-id").tagName).toBe("LI");
+		});
+	});
+
+	describe("Due Date Badge", () => {
+		beforeEach(() => {
+			vi.useFakeTimers();
+			vi.setSystemTime(new Date("2026-01-21T10:00:00.000Z"));
+		});
+
+		afterEach(() => {
+			vi.useRealTimers();
+		});
+
+		it("does not show due date badge when no dueDate", () => {
+			render(
+				<TodoExpandableItem
+					todo={createMockTodo({ dueDate: null })}
+					onToggle={mockOnToggle}
+					onDelete={mockOnDelete}
+				/>,
+			);
+
+			expect(screen.queryByTestId("due-date-badge")).not.toBeInTheDocument();
+		});
+
+		it("shows due date badge when dueDate is provided", () => {
+			render(
+				<TodoExpandableItem
+					todo={createMockTodo({ dueDate: "2026-01-25T12:00:00.000Z" })}
+					onToggle={mockOnToggle}
+					onDelete={mockOnDelete}
+				/>,
+			);
+
+			expect(screen.getByTestId("due-date-badge")).toBeInTheDocument();
+		});
+
+		it("shows due date badge when only recurringPattern is provided", () => {
+			render(
+				<TodoExpandableItem
+					todo={createMockTodo({ recurringPattern: { type: "daily" } })}
+					onToggle={mockOnToggle}
+					onDelete={mockOnDelete}
+				/>,
+			);
+
+			expect(screen.getByTestId("due-date-badge")).toBeInTheDocument();
+		});
+
+		it("shows 'Today' for todo due today", () => {
+			render(
+				<TodoExpandableItem
+					todo={createMockTodo({ dueDate: "2026-01-21T10:00:00.000Z" })}
+					onToggle={mockOnToggle}
+					onDelete={mockOnDelete}
+				/>,
+			);
+
+			expect(screen.getByTestId("due-date-text")).toHaveTextContent("Today");
+		});
+
+		it("shows 'Tomorrow' for todo due tomorrow", () => {
+			render(
+				<TodoExpandableItem
+					todo={createMockTodo({ dueDate: "2026-01-22T10:00:00.000Z" })}
+					onToggle={mockOnToggle}
+					onDelete={mockOnDelete}
+				/>,
+			);
+
+			expect(screen.getByTestId("due-date-text")).toHaveTextContent("Tomorrow");
+		});
+	});
+
+	describe("Overdue Styling", () => {
+		beforeEach(() => {
+			vi.useFakeTimers();
+			vi.setSystemTime(new Date("2026-01-21T10:00:00.000Z"));
+		});
+
+		afterEach(() => {
+			vi.useRealTimers();
+		});
+
+		it("applies overdue styling for past due date on incomplete todo", () => {
+			render(
+				<TodoExpandableItem
+					todo={createMockTodo({
+						id: "test-id",
+						dueDate: "2026-01-19T12:00:00.000Z",
+						completed: false,
+					})}
+					onToggle={mockOnToggle}
+					onDelete={mockOnDelete}
+				/>,
+			);
+
+			const item = screen.getByTestId("todo-item-test-id");
+			expect(item).toHaveAttribute("data-overdue", "true");
+			expect(item).toHaveClass("border-red-500/30");
+		});
+
+		it("does not apply overdue styling for past due date on completed todo", () => {
+			render(
+				<TodoExpandableItem
+					todo={createMockTodo({
+						id: "test-id",
+						dueDate: "2026-01-19T12:00:00.000Z",
+						completed: true,
+					})}
+					onToggle={mockOnToggle}
+					onDelete={mockOnDelete}
+				/>,
+			);
+
+			const item = screen.getByTestId("todo-item-test-id");
+			expect(item).not.toHaveAttribute("data-overdue");
+			expect(item).not.toHaveClass("border-red-500/30");
+		});
+
+		it("does not apply overdue styling for future due date", () => {
+			render(
+				<TodoExpandableItem
+					todo={createMockTodo({
+						id: "test-id",
+						dueDate: "2026-01-25T12:00:00.000Z",
+						completed: false,
+					})}
+					onToggle={mockOnToggle}
+					onDelete={mockOnDelete}
+				/>,
+			);
+
+			const item = screen.getByTestId("todo-item-test-id");
+			expect(item).not.toHaveAttribute("data-overdue");
+		});
+
+		it("does not apply overdue styling for today's due date", () => {
+			render(
+				<TodoExpandableItem
+					todo={createMockTodo({
+						id: "test-id",
+						dueDate: "2026-01-21T23:59:59.000Z",
+						completed: false,
+					})}
+					onToggle={mockOnToggle}
+					onDelete={mockOnDelete}
+				/>,
+			);
+
+			const item = screen.getByTestId("todo-item-test-id");
+			expect(item).not.toHaveAttribute("data-overdue");
+		});
+
+		it("shows overdue icon in badge for overdue todo", () => {
+			render(
+				<TodoExpandableItem
+					todo={createMockTodo({
+						dueDate: "2026-01-19T12:00:00.000Z",
+						completed: false,
+					})}
+					onToggle={mockOnToggle}
+					onDelete={mockOnDelete}
+				/>,
+			);
+
+			expect(screen.getByTestId("overdue-icon")).toBeInTheDocument();
+		});
+
+		it("does not show overdue icon for future due date", () => {
+			render(
+				<TodoExpandableItem
+					todo={createMockTodo({
+						dueDate: "2026-01-25T12:00:00.000Z",
+						completed: false,
+					})}
+					onToggle={mockOnToggle}
+					onDelete={mockOnDelete}
+				/>,
+			);
+
+			expect(screen.queryByTestId("overdue-icon")).not.toBeInTheDocument();
+		});
+	});
+
+	describe("Recurring Pattern Display", () => {
+		it("shows recurring indicator when both date and pattern are provided", () => {
+			render(
+				<TodoExpandableItem
+					todo={createMockTodo({
+						dueDate: "2026-01-25T12:00:00.000Z",
+						recurringPattern: { type: "daily" },
+					})}
+					onToggle={mockOnToggle}
+					onDelete={mockOnDelete}
+				/>,
+			);
+
+			expect(screen.getByTestId("recurring-indicator")).toBeInTheDocument();
+		});
+
+		it("shows recurring text when only pattern is provided", () => {
+			render(
+				<TodoExpandableItem
+					todo={createMockTodo({
+						dueDate: null,
+						recurringPattern: { type: "weekly", daysOfWeek: [1, 3, 5] },
+					})}
+					onToggle={mockOnToggle}
+					onDelete={mockOnDelete}
+				/>,
+			);
+
+			expect(screen.getByTestId("recurring-text")).toBeInTheDocument();
 		});
 	});
 

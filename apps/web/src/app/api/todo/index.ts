@@ -21,6 +21,8 @@ export type {
 	CreateTodoInput,
 	DeleteTodoInput,
 	LocalTodo,
+	RecurringPattern,
+	RecurringPatternType,
 	RemoteTodo,
 	SelectedFolderId,
 	SyncAction,
