@@ -1,6 +1,4 @@
-// Types and schemas
-
-// API functions
+// API
 export {
 	getAnalyticsQueryKey,
 	getAnalyticsQueryOptions,
@@ -14,15 +12,18 @@ export {
 	useCompletionHistory,
 	useUpdatePastCompletion,
 } from "./analytics.hooks";
+// Types
+export type {
+	AnalyticsData,
+	CompletionHistoryRecord,
+	CompletionRecord,
+	DailyStats,
+	GetAnalyticsInput,
+	GetCompletionHistoryInput,
+	UpdatePastCompletionInput,
+} from "./analytics.types";
 export {
-	type AnalyticsData,
-	type CompletionHistoryRecord,
-	type CompletionRecord,
-	type DailyStats,
-	type GetAnalyticsInput,
-	type GetCompletionHistoryInput,
 	getAnalyticsInputSchema,
 	getCompletionHistoryInputSchema,
-	type UpdatePastCompletionInput,
 	updatePastCompletionInputSchema,
 } from "./analytics.types";
