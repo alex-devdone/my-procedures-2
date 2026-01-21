@@ -910,3 +910,17 @@
 - [✓] 2026-01-21 11:19 - Run all unit tests: 1752 tests passed (8 new sync scheduling tests added)
 - [✓] 2026-01-21 11:19 - Run linting check: passed (50 pre-existing warnings)
 
+- [✓] 2026-01-21 11:35 - Add bulkCreate procedure to subtask router (packages/api/src/routers/subtask.ts) for syncing local subtasks on login:
+  - Added bulkCreateSubtasksInputSchema Zod schema for validating bulk subtask input
+  - Created bulkCreate procedure with todo ownership verification
+  - Filters out subtasks for todos the user doesn't own
+  - Calculates auto-incremented orders for subtasks without explicit order
+  - Preserves explicit order when provided
+  - Defaults completed to false when not provided
+  - Updates parent todos to incomplete when adding incomplete subtasks
+- [✓] 2026-01-21 11:35 - Add unit tests for bulkCreate subtask procedure (27 new tests) in packages/api/src/routers/subtask.test.ts covering:
+  - Input validation: single subtask, multiple subtasks, optional completed/order fields, empty array, missing fields, validation boundaries
+  - Business logic: empty input returns count 0, ownership filtering, auto-incremented orders, explicit order preservation, default completed value, identifying todos with incomplete subtasks, multiple todos handling, unique todo ID extraction
+- [✓] 2026-01-21 11:35 - Run all unit tests: 1779 tests passed (27 new bulkCreate tests added)
+- [✓] 2026-01-21 11:35 - Run linting check: passed (50 pre-existing warnings)
+

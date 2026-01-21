@@ -35,6 +35,17 @@ export const listSubtasksInputSchema = z.object({
 	todoId: z.number(),
 });
 
+export const bulkCreateSubtasksInputSchema = z.object({
+	subtasks: z.array(
+		z.object({
+			todoId: z.number(),
+			text: z.string().min(1).max(500),
+			completed: z.boolean().optional(),
+			order: z.number().min(0).optional(),
+		}),
+	),
+});
+
 // Helper function to verify todo ownership
 async function verifyTodoOwnership(todoId: number, userId: string) {
 	const [existingTodo] = await db
@@ -268,5 +279,113 @@ export const subtaskRouter = router({
 				.returning();
 
 			return updated;
+		}),
+
+	/**
+	 * Bulk create subtasks for syncing local subtasks to server.
+	 * Verifies ownership of all parent todos before creating subtasks.
+	 */
+	bulkCreate: protectedProcedure
+		.input(bulkCreateSubtasksInputSchema)
+		.mutation(async ({ ctx, input }) => {
+			if (input.subtasks.length === 0) {
+				return { count: 0 };
+			}
+
+			// Get unique todoIds from the input
+			const todoIds = [...new Set(input.subtasks.map((s) => s.todoId))];
+
+			// Verify ownership of all todos
+			const ownedTodos = await db
+				.select({ id: todo.id })
+				.from(todo)
+				.where(
+					and(
+						eq(todo.userId, ctx.session.user.id),
+						// Filter to only the todoIds we're creating subtasks for
+						sql`${todo.id} IN (${sql.join(
+							todoIds.map((id) => sql`${id}`),
+							sql`, `,
+						)})`,
+					),
+				);
+
+			const ownedTodoIds = new Set(ownedTodos.map((t) => t.id));
+
+			// Filter out subtasks for todos the user doesn't own
+			const validSubtasks = input.subtasks.filter((s) =>
+				ownedTodoIds.has(s.todoId),
+			);
+
+			if (validSubtasks.length === 0) {
+				return { count: 0 };
+			}
+
+			// Get max orders for each todo to calculate new orders
+			const maxOrdersResult = await db
+				.select({
+					todoId: subtask.todoId,
+					maxOrder: sql<number>`COALESCE(MAX(${subtask.order}), -1)`,
+				})
+				.from(subtask)
+				.where(
+					sql`${subtask.todoId} IN (${sql.join(
+						todoIds.map((id) => sql`${id}`),
+						sql`, `,
+					)})`,
+				)
+				.groupBy(subtask.todoId);
+
+			const maxOrders = new Map<number, number>();
+			for (const row of maxOrdersResult) {
+				maxOrders.set(row.todoId, row.maxOrder);
+			}
+
+			// Track order assignments per todoId
+			const orderCounters = new Map<number, number>();
+
+			const values = validSubtasks.map((s) => {
+				// If order is provided, use it; otherwise calculate new order
+				let order: number;
+				if (s.order !== undefined) {
+					order = s.order;
+				} else {
+					const currentMax = maxOrders.get(s.todoId) ?? -1;
+					const counter = orderCounters.get(s.todoId) ?? 0;
+					order = currentMax + 1 + counter;
+					orderCounters.set(s.todoId, counter + 1);
+				}
+
+				return {
+					text: s.text,
+					todoId: s.todoId,
+					completed: s.completed ?? false,
+					order,
+				};
+			});
+
+			await db.insert(subtask).values(values);
+
+			// Update parent todos' completed status based on subtask completion
+			// If any new subtask is incomplete, the parent todo should be incomplete
+			const todosWithIncompleteSubtasks = new Set(
+				validSubtasks
+					.filter((s) => !(s.completed ?? false))
+					.map((s) => s.todoId),
+			);
+
+			if (todosWithIncompleteSubtasks.size > 0) {
+				await db
+					.update(todo)
+					.set({ completed: false })
+					.where(
+						sql`${todo.id} IN (${sql.join(
+							[...todosWithIncompleteSubtasks].map((id) => sql`${id}`),
+							sql`, `,
+						)})`,
+					);
+			}
+
+			return { count: validSubtasks.length };
 		}),
 });

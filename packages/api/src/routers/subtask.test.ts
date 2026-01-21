@@ -375,6 +375,181 @@ describe("Subtask Input Validation", () => {
 			expect(validateList({ todoId: "1" })).toEqual({ valid: false });
 		});
 	});
+
+	describe("Bulk Create Subtasks Input Schema", () => {
+		interface BulkCreateSubtaskInput {
+			todoId: number;
+			text: string;
+			completed?: boolean;
+			order?: number;
+		}
+
+		const validateBulkCreate = (
+			input: unknown,
+		): { valid: boolean; subtasks?: BulkCreateSubtaskInput[] } => {
+			if (
+				typeof input !== "object" ||
+				input === null ||
+				!("subtasks" in input) ||
+				!Array.isArray((input as { subtasks: unknown }).subtasks)
+			) {
+				return { valid: false };
+			}
+
+			const subtasks = (input as { subtasks: unknown[] }).subtasks;
+			for (const s of subtasks) {
+				if (typeof s !== "object" || s === null) return { valid: false };
+				const item = s as Record<string, unknown>;
+
+				// Required fields
+				if (typeof item.todoId !== "number") return { valid: false };
+				if (typeof item.text !== "string") return { valid: false };
+				if (item.text.length < 1 || item.text.length > 500)
+					return { valid: false };
+
+				// Optional fields
+				if (
+					item.completed !== undefined &&
+					typeof item.completed !== "boolean"
+				) {
+					return { valid: false };
+				}
+				if (item.order !== undefined) {
+					if (typeof item.order !== "number" || item.order < 0) {
+						return { valid: false };
+					}
+				}
+			}
+
+			return {
+				valid: true,
+				subtasks: subtasks as BulkCreateSubtaskInput[],
+			};
+		};
+
+		it("validates correct input with single subtask", () => {
+			const result = validateBulkCreate({
+				subtasks: [{ todoId: 1, text: "Test subtask" }],
+			});
+			expect(result.valid).toBe(true);
+			expect(result.subtasks).toHaveLength(1);
+		});
+
+		it("validates correct input with multiple subtasks", () => {
+			const result = validateBulkCreate({
+				subtasks: [
+					{ todoId: 1, text: "Subtask 1" },
+					{ todoId: 1, text: "Subtask 2" },
+					{ todoId: 2, text: "Subtask 3" },
+				],
+			});
+			expect(result.valid).toBe(true);
+			expect(result.subtasks).toHaveLength(3);
+		});
+
+		it("validates input with optional completed field", () => {
+			const result = validateBulkCreate({
+				subtasks: [{ todoId: 1, text: "Test", completed: true }],
+			});
+			expect(result.valid).toBe(true);
+			expect(result.subtasks?.[0]?.completed).toBe(true);
+		});
+
+		it("validates input with optional order field", () => {
+			const result = validateBulkCreate({
+				subtasks: [{ todoId: 1, text: "Test", order: 5 }],
+			});
+			expect(result.valid).toBe(true);
+			expect(result.subtasks?.[0]?.order).toBe(5);
+		});
+
+		it("validates input with all optional fields", () => {
+			const result = validateBulkCreate({
+				subtasks: [{ todoId: 1, text: "Test", completed: false, order: 0 }],
+			});
+			expect(result.valid).toBe(true);
+		});
+
+		it("validates empty subtasks array", () => {
+			const result = validateBulkCreate({ subtasks: [] });
+			expect(result.valid).toBe(true);
+			expect(result.subtasks).toHaveLength(0);
+		});
+
+		it("rejects missing subtasks field", () => {
+			expect(validateBulkCreate({})).toEqual({ valid: false });
+		});
+
+		it("rejects non-array subtasks", () => {
+			expect(validateBulkCreate({ subtasks: "not an array" })).toEqual({
+				valid: false,
+			});
+		});
+
+		it("rejects subtask with missing todoId", () => {
+			expect(validateBulkCreate({ subtasks: [{ text: "Test" }] })).toEqual({
+				valid: false,
+			});
+		});
+
+		it("rejects subtask with missing text", () => {
+			expect(validateBulkCreate({ subtasks: [{ todoId: 1 }] })).toEqual({
+				valid: false,
+			});
+		});
+
+		it("rejects subtask with empty text", () => {
+			expect(
+				validateBulkCreate({ subtasks: [{ todoId: 1, text: "" }] }),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects subtask with text over 500 characters", () => {
+			expect(
+				validateBulkCreate({
+					subtasks: [{ todoId: 1, text: "a".repeat(501) }],
+				}),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects subtask with non-boolean completed", () => {
+			expect(
+				validateBulkCreate({
+					subtasks: [{ todoId: 1, text: "Test", completed: "true" }],
+				}),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects subtask with negative order", () => {
+			expect(
+				validateBulkCreate({
+					subtasks: [{ todoId: 1, text: "Test", order: -1 }],
+				}),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects subtask with non-number order", () => {
+			expect(
+				validateBulkCreate({
+					subtasks: [{ todoId: 1, text: "Test", order: "0" }],
+				}),
+			).toEqual({ valid: false });
+		});
+
+		it("accepts subtask with order 0", () => {
+			const result = validateBulkCreate({
+				subtasks: [{ todoId: 1, text: "Test", order: 0 }],
+			});
+			expect(result.valid).toBe(true);
+		});
+
+		it("accepts subtask with max length text", () => {
+			const result = validateBulkCreate({
+				subtasks: [{ todoId: 1, text: "a".repeat(500) }],
+			});
+			expect(result.valid).toBe(true);
+		});
+	});
 });
 
 // ============================================================================
@@ -1056,6 +1231,252 @@ describe("Subtask Router Business Logic", () => {
 				expect(error).toBeInstanceOf(TRPCError);
 				expect((error as TRPCError).code).toBe("NOT_FOUND");
 			}
+		});
+	});
+
+	describe("Bulk Create Operation", () => {
+		interface BulkCreateInput {
+			todoId: number;
+			text: string;
+			completed?: boolean;
+			order?: number;
+		}
+
+		it("should return count 0 for empty input", () => {
+			const processBulkCreate = (subtasks: BulkCreateInput[]) => {
+				if (subtasks.length === 0) {
+					return { count: 0 };
+				}
+				return { count: subtasks.length };
+			};
+
+			expect(processBulkCreate([])).toEqual({ count: 0 });
+		});
+
+		it("should filter out subtasks for todos user does not own", () => {
+			const ownedTodoIds = new Set([1, 2]);
+			const subtasks: BulkCreateInput[] = [
+				{ todoId: 1, text: "Owned" },
+				{ todoId: 3, text: "Not owned" },
+				{ todoId: 2, text: "Also owned" },
+			];
+
+			const filterByOwnership = (
+				input: BulkCreateInput[],
+				owned: Set<number>,
+			) => {
+				return input.filter((s) => owned.has(s.todoId));
+			};
+
+			const result = filterByOwnership(subtasks, ownedTodoIds);
+
+			expect(result).toHaveLength(2);
+			expect(result.every((s) => ownedTodoIds.has(s.todoId))).toBe(true);
+		});
+
+		it("should calculate auto-incremented orders for subtasks without explicit order", () => {
+			const maxOrders = new Map<number, number>([
+				[1, 2], // Todo 1 has max order 2
+				[2, -1], // Todo 2 has no subtasks (max -1)
+			]);
+
+			const subtasks: BulkCreateInput[] = [
+				{ todoId: 1, text: "First for todo 1" },
+				{ todoId: 1, text: "Second for todo 1" },
+				{ todoId: 2, text: "First for todo 2" },
+			];
+
+			const calculateOrders = (
+				input: BulkCreateInput[],
+				existingMaxOrders: Map<number, number>,
+			) => {
+				const orderCounters = new Map<number, number>();
+
+				return input.map((s) => {
+					if (s.order !== undefined) {
+						return { ...s, calculatedOrder: s.order };
+					}
+
+					const currentMax = existingMaxOrders.get(s.todoId) ?? -1;
+					const counter = orderCounters.get(s.todoId) ?? 0;
+					const order = currentMax + 1 + counter;
+					orderCounters.set(s.todoId, counter + 1);
+
+					return { ...s, calculatedOrder: order };
+				});
+			};
+
+			const result = calculateOrders(subtasks, maxOrders);
+
+			// Todo 1 had max order 2, so new orders are 3, 4
+			expect(result[0]?.calculatedOrder).toBe(3);
+			expect(result[1]?.calculatedOrder).toBe(4);
+			// Todo 2 had max order -1, so new order is 0
+			expect(result[2]?.calculatedOrder).toBe(0);
+		});
+
+		it("should preserve explicit order when provided", () => {
+			const subtasks: BulkCreateInput[] = [
+				{ todoId: 1, text: "Explicit", order: 10 },
+				{ todoId: 1, text: "Auto" },
+			];
+
+			const maxOrders = new Map<number, number>([[1, 2]]);
+
+			const calculateOrders = (
+				input: BulkCreateInput[],
+				existingMaxOrders: Map<number, number>,
+			) => {
+				const orderCounters = new Map<number, number>();
+
+				return input.map((s) => {
+					if (s.order !== undefined) {
+						return { ...s, calculatedOrder: s.order };
+					}
+
+					const currentMax = existingMaxOrders.get(s.todoId) ?? -1;
+					const counter = orderCounters.get(s.todoId) ?? 0;
+					const order = currentMax + 1 + counter;
+					orderCounters.set(s.todoId, counter + 1);
+
+					return { ...s, calculatedOrder: order };
+				});
+			};
+
+			const result = calculateOrders(subtasks, maxOrders);
+
+			expect(result[0]?.calculatedOrder).toBe(10); // Explicit order preserved
+			expect(result[1]?.calculatedOrder).toBe(3); // Auto-calculated
+		});
+
+		it("should default completed to false when not provided", () => {
+			const subtasks: BulkCreateInput[] = [
+				{ todoId: 1, text: "No completed" },
+				{ todoId: 1, text: "With completed", completed: true },
+			];
+
+			const prepareValues = (input: BulkCreateInput[]) => {
+				return input.map((s) => ({
+					text: s.text,
+					todoId: s.todoId,
+					completed: s.completed ?? false,
+					order: s.order ?? 0,
+				}));
+			};
+
+			const result = prepareValues(subtasks);
+
+			expect(result[0]?.completed).toBe(false);
+			expect(result[1]?.completed).toBe(true);
+		});
+
+		it("should identify todos with incomplete subtasks for auto-complete update", () => {
+			const subtasks: BulkCreateInput[] = [
+				{ todoId: 1, text: "Complete", completed: true },
+				{ todoId: 1, text: "Incomplete" }, // defaults to false
+				{ todoId: 2, text: "Also complete", completed: true },
+			];
+
+			const findTodosWithIncomplete = (input: BulkCreateInput[]) => {
+				return new Set(
+					input.filter((s) => !(s.completed ?? false)).map((s) => s.todoId),
+				);
+			};
+
+			const result = findTodosWithIncomplete(subtasks);
+
+			expect(result.has(1)).toBe(true); // Has incomplete subtask
+			expect(result.has(2)).toBe(false); // All subtasks complete
+		});
+
+		it("should handle subtasks for multiple todos", () => {
+			const subtasks: BulkCreateInput[] = [
+				{ todoId: 1, text: "Todo 1 - A" },
+				{ todoId: 2, text: "Todo 2 - A" },
+				{ todoId: 1, text: "Todo 1 - B" },
+				{ todoId: 3, text: "Todo 3 - A" },
+			];
+
+			const groupByTodo = (input: BulkCreateInput[]) => {
+				const groups = new Map<number, BulkCreateInput[]>();
+				for (const s of input) {
+					const existing = groups.get(s.todoId) ?? [];
+					existing.push(s);
+					groups.set(s.todoId, existing);
+				}
+				return groups;
+			};
+
+			const result = groupByTodo(subtasks);
+
+			expect(result.get(1)?.length).toBe(2);
+			expect(result.get(2)?.length).toBe(1);
+			expect(result.get(3)?.length).toBe(1);
+		});
+
+		it("should extract unique todo IDs from input", () => {
+			const subtasks: BulkCreateInput[] = [
+				{ todoId: 1, text: "A" },
+				{ todoId: 2, text: "B" },
+				{ todoId: 1, text: "C" },
+				{ todoId: 3, text: "D" },
+			];
+
+			const getUniqueTodoIds = (input: BulkCreateInput[]) => {
+				return [...new Set(input.map((s) => s.todoId))];
+			};
+
+			const result = getUniqueTodoIds(subtasks);
+
+			expect(result).toHaveLength(3);
+			expect(result).toContain(1);
+			expect(result).toContain(2);
+			expect(result).toContain(3);
+		});
+
+		it("should return correct count after filtering unauthorized todos", () => {
+			const ownedTodoIds = new Set([1, 2]);
+			const subtasks: BulkCreateInput[] = [
+				{ todoId: 1, text: "A" },
+				{ todoId: 3, text: "B" }, // Not owned
+				{ todoId: 2, text: "C" },
+				{ todoId: 4, text: "D" }, // Not owned
+			];
+
+			const processBulkCreate = (
+				input: BulkCreateInput[],
+				owned: Set<number>,
+			) => {
+				const validSubtasks = input.filter((s) => owned.has(s.todoId));
+				return { count: validSubtasks.length };
+			};
+
+			const result = processBulkCreate(subtasks, ownedTodoIds);
+
+			expect(result.count).toBe(2);
+		});
+
+		it("should handle case where no subtasks are for owned todos", () => {
+			const ownedTodoIds = new Set<number>([]);
+			const subtasks: BulkCreateInput[] = [
+				{ todoId: 1, text: "A" },
+				{ todoId: 2, text: "B" },
+			];
+
+			const processBulkCreate = (
+				input: BulkCreateInput[],
+				owned: Set<number>,
+			) => {
+				const validSubtasks = input.filter((s) => owned.has(s.todoId));
+				if (validSubtasks.length === 0) {
+					return { count: 0 };
+				}
+				return { count: validSubtasks.length };
+			};
+
+			const result = processBulkCreate(subtasks, ownedTodoIds);
+
+			expect(result.count).toBe(0);
 		});
 	});
 });
