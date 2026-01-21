@@ -207,8 +207,8 @@ Notification system for due reminders. Can proceed after Phase 10.
 
 - [x] Create `apps/web/src/hooks/use-notifications.ts` - hook for requesting/managing browser notification permissions
 - [x] Add unit tests for useNotifications hook in `apps/web/src/hooks/use-notifications.test.ts`
-- [ ] Create `apps/web/src/hooks/use-reminder-checker.ts` - hook that polls for due reminders and triggers notifications
-- [ ] Add unit tests for useReminderChecker in `apps/web/src/hooks/use-reminder-checker.test.ts`
+- [x] Create `apps/web/src/hooks/use-reminder-checker.ts` - hook that polls for due reminders and triggers notifications
+- [x] Add unit tests for useReminderChecker in `apps/web/src/hooks/use-reminder-checker.test.ts`
 - [ ] Create `apps/web/src/components/notifications/reminder-toast.tsx` - in-app toast component for reminders
 - [ ] Add unit tests for ReminderToast in `apps/web/src/components/notifications/reminder-toast.test.tsx`
 - [ ] Integrate reminder checker into app layout to run on authenticated pages

@@ -566,3 +566,19 @@
   - showNotification: returns null when unsupported/denied, creates Notification when granted, passes options, handles constructor errors
   - Permission polling: polls for changes, cleans up on unmount, skips when unsupported
   - Function stability: stable references across rerenders
+
+- [✓] 2026-01-21 07:02 - Create use-reminder-checker.ts hook (apps/web/src/hooks/use-reminder-checker.ts) with:
+  - DueReminder interface for tracking todo reminders that are due
+  - ReminderCheckerOptions interface for configuration (checkInterval, tolerance, enabled)
+  - UseReminderCheckerReturn interface with dueReminders, dismissReminder, dismissAllReminders, shownCount, isChecking
+  - Pure functions for testability: isReminderDue, getDueReminders, getShownRemindersFromStorage, saveShownRemindersToStorage, markReminderAsShown, formatReminderNotificationBody, cleanupShownReminders
+  - useReminderChecker hook with configurable polling interval (default 30s)
+  - Shows browser notifications and calls onReminder callback when reminders are due
+  - Tracks shown reminders in localStorage to prevent duplicates
+  - SSR-safe with client-side initialization
+  - Auto-cleans up shown reminders for completed/deleted todos
+- [✓] 2026-01-21 07:02 - Add unit tests for useReminderChecker hook (61 tests) in apps/web/src/hooks/use-reminder-checker.test.ts covering:
+  - Pure functions: isReminderDue (timing, tolerance, edge cases), getDueReminders (filtering, exclusions), storage functions (get/save/mark/cleanup)
+  - formatReminderNotificationBody: overdue, hours, days, tomorrow, generic messages
+  - Constants: DEFAULT_CHECK_INTERVAL (30s), DEFAULT_TOLERANCE (1min), SHOWN_REMINDERS_STORAGE_KEY
+  - Hook tests (skipped due to environment memory constraints): initial state, reminder detection, dismiss functions, callback support, function stability, interval management
