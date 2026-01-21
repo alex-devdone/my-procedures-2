@@ -1,5 +1,8 @@
 // Components
 
+export type { ReminderProviderProps } from "./reminder-provider";
+export { ReminderProvider } from "./reminder-provider";
+
 // Types
 export type {
 	ReminderToastContentProps,

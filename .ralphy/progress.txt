@@ -600,3 +600,24 @@
   - ReminderToastManager: multiple reminders, rerender handling, enabled/disabled state, empty arrays
   - Accessibility: aria-labels on buttons, icons hidden from screen readers
 - [✓] 2026-01-21 07:18 - Create barrel export for notifications components (apps/web/src/components/notifications/index.ts)
+
+- [✓] 2026-01-21 07:25 - Integrate reminder checker into app layout (apps/web/src/components/providers.tsx):
+  - Created ReminderProvider component (apps/web/src/components/notifications/reminder-provider.tsx) with:
+    - Uses useTodoStorage hook to get todos
+    - Uses useReminderChecker hook to poll for due reminders
+    - Uses ReminderToastManager to display in-app toast notifications
+    - Supports enabled prop to disable reminder checking
+    - Supports checkInterval prop for custom polling interval
+    - Disables checking while todos are loading to avoid false positives
+    - Works with both localStorage (guest) and remote (authenticated) todos
+  - Added unit tests for ReminderProvider (23 tests) in apps/web/src/components/notifications/reminder-provider.test.tsx covering:
+    - Rendering: children, ReminderToastManager, multiple children
+    - useTodoStorage integration: hook called, todos passed to useReminderChecker
+    - useReminderChecker integration: enabled/disabled states, checkInterval prop
+    - ReminderToastManager integration: dueReminders, dismissReminder, enabled state
+    - Props: default enabled, custom checkInterval
+    - Edge cases: empty todos, empty reminders, no children
+  - Updated barrel export (apps/web/src/components/notifications/index.ts) to include ReminderProvider
+  - Integrated ReminderProvider into Providers component (apps/web/src/components/providers.tsx):
+    - Wrapped children with ReminderProvider inside QueryClientProvider
+    - Enables automatic reminder checking for all pages in the app
