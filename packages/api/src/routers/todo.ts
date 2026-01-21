@@ -655,4 +655,98 @@ export const todoRouter = router({
 				dailyBreakdown,
 			};
 		}),
+
+	/**
+	 * Insert, update, or delete a completion record for a past recurring todo occurrence.
+	 * Used for "forgotten check-ins" where users need to retroactively mark completions.
+	 *
+	 * Operations:
+	 * - If `completed` is true and no record exists: creates a new completion record
+	 * - If `completed` is true and record exists: updates completedAt timestamp
+	 * - If `completed` is false and record exists: removes the completedAt (marks as missed)
+	 * - If `completed` is false and no record exists: creates a record with null completedAt
+	 *
+	 * @param todoId - The recurring todo ID
+	 * @param scheduledDate - The date of the occurrence to update
+	 * @param completed - Whether the occurrence was completed
+	 * @returns The created/updated completion record or deletion confirmation
+	 */
+	updatePastCompletion: protectedProcedure
+		.input(
+			z.object({
+				todoId: z.number(),
+				scheduledDate: z.string().datetime(),
+				completed: z.boolean(),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			// Verify the todo exists and belongs to the user
+			const [existingTodo] = await db
+				.select()
+				.from(todo)
+				.where(
+					and(eq(todo.id, input.todoId), eq(todo.userId, ctx.session.user.id)),
+				);
+
+			if (!existingTodo) {
+				throw new TRPCError({
+					code: "NOT_FOUND",
+					message: "Todo not found or you do not have permission to modify it",
+				});
+			}
+
+			// Verify the todo has a recurring pattern
+			if (!existingTodo.recurringPattern) {
+				throw new TRPCError({
+					code: "BAD_REQUEST",
+					message: "Todo does not have a recurring pattern",
+				});
+			}
+
+			const scheduledDate = new Date(input.scheduledDate);
+
+			// Check if a completion record already exists for this todo and scheduled date
+			const [existingCompletion] = await db
+				.select()
+				.from(recurringTodoCompletion)
+				.where(
+					and(
+						eq(recurringTodoCompletion.todoId, input.todoId),
+						eq(recurringTodoCompletion.scheduledDate, scheduledDate),
+						eq(recurringTodoCompletion.userId, ctx.session.user.id),
+					),
+				);
+
+			if (existingCompletion) {
+				// Record exists - update it
+				const [updated] = await db
+					.update(recurringTodoCompletion)
+					.set({
+						completedAt: input.completed ? new Date() : null,
+					})
+					.where(eq(recurringTodoCompletion.id, existingCompletion.id))
+					.returning();
+
+				return {
+					action: "updated" as const,
+					completion: updated,
+				};
+			}
+
+			// No existing record - create one
+			const [created] = await db
+				.insert(recurringTodoCompletion)
+				.values({
+					todoId: input.todoId,
+					scheduledDate,
+					completedAt: input.completed ? new Date() : null,
+					userId: ctx.session.user.id,
+				})
+				.returning();
+
+			return {
+				action: "created" as const,
+				completion: created,
+			};
+		}),
 });

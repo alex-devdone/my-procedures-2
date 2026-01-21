@@ -3143,3 +3143,708 @@ describe("GetAnalytics Procedure", () => {
 		});
 	});
 });
+
+describe("UpdatePastCompletion Procedure", () => {
+	describe("Input Validation", () => {
+		interface UpdatePastCompletionInput {
+			todoId: number;
+			scheduledDate: string;
+			completed: boolean;
+		}
+
+		const validateUpdatePastCompletionInput = (
+			input: unknown,
+		): { valid: boolean; data?: UpdatePastCompletionInput } => {
+			if (typeof input !== "object" || input === null) {
+				return { valid: false };
+			}
+
+			const i = input as Record<string, unknown>;
+
+			// todoId is required and must be a number
+			if (typeof i.todoId !== "number") {
+				return { valid: false };
+			}
+
+			// scheduledDate is required and must be valid datetime string
+			if (typeof i.scheduledDate !== "string") {
+				return { valid: false };
+			}
+			const scheduledDate = new Date(i.scheduledDate);
+			if (Number.isNaN(scheduledDate.getTime())) {
+				return { valid: false };
+			}
+
+			// completed is required and must be a boolean
+			if (typeof i.completed !== "boolean") {
+				return { valid: false };
+			}
+
+			return {
+				valid: true,
+				data: input as UpdatePastCompletionInput,
+			};
+		};
+
+		it("validates valid input with completed=true", () => {
+			const result = validateUpdatePastCompletionInput({
+				todoId: 1,
+				scheduledDate: "2026-01-15T10:00:00Z",
+				completed: true,
+			});
+			expect(result.valid).toBe(true);
+			expect(result.data?.todoId).toBe(1);
+			expect(result.data?.scheduledDate).toBe("2026-01-15T10:00:00Z");
+			expect(result.data?.completed).toBe(true);
+		});
+
+		it("validates valid input with completed=false", () => {
+			const result = validateUpdatePastCompletionInput({
+				todoId: 5,
+				scheduledDate: "2026-01-10T09:00:00Z",
+				completed: false,
+			});
+			expect(result.valid).toBe(true);
+			expect(result.data?.completed).toBe(false);
+		});
+
+		it("rejects missing todoId", () => {
+			expect(
+				validateUpdatePastCompletionInput({
+					scheduledDate: "2026-01-15T10:00:00Z",
+					completed: true,
+				}),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects string todoId", () => {
+			expect(
+				validateUpdatePastCompletionInput({
+					todoId: "1",
+					scheduledDate: "2026-01-15T10:00:00Z",
+					completed: true,
+				}),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects missing scheduledDate", () => {
+			expect(
+				validateUpdatePastCompletionInput({
+					todoId: 1,
+					completed: true,
+				}),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects invalid scheduledDate string", () => {
+			expect(
+				validateUpdatePastCompletionInput({
+					todoId: 1,
+					scheduledDate: "not-a-date",
+					completed: true,
+				}),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects missing completed field", () => {
+			expect(
+				validateUpdatePastCompletionInput({
+					todoId: 1,
+					scheduledDate: "2026-01-15T10:00:00Z",
+				}),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects string completed field", () => {
+			expect(
+				validateUpdatePastCompletionInput({
+					todoId: 1,
+					scheduledDate: "2026-01-15T10:00:00Z",
+					completed: "true",
+				}),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects non-object input", () => {
+			expect(validateUpdatePastCompletionInput("invalid")).toEqual({
+				valid: false,
+			});
+		});
+
+		it("rejects null input", () => {
+			expect(validateUpdatePastCompletionInput(null)).toEqual({ valid: false });
+		});
+	});
+
+	describe("Business Logic", () => {
+		interface RecurringPattern {
+			type: "daily" | "weekly" | "monthly" | "yearly" | "custom";
+			interval?: number;
+			daysOfWeek?: number[];
+			dayOfMonth?: number;
+			monthOfYear?: number;
+			endDate?: string;
+			occurrences?: number;
+		}
+
+		interface MockTodo {
+			id: number;
+			text: string;
+			completed: boolean;
+			userId: string;
+			recurringPattern?: RecurringPattern | null;
+		}
+
+		interface CompletionRecord {
+			id: number;
+			todoId: number;
+			scheduledDate: Date;
+			completedAt: Date | null;
+			userId: string;
+			createdAt: Date;
+		}
+
+		describe("Todo Ownership Verification", () => {
+			it("should throw NOT_FOUND for non-existent todo", () => {
+				const verifyTodoExists = (
+					existingTodo: MockTodo | undefined,
+					currentUserId: string,
+				) => {
+					if (!existingTodo || existingTodo.userId !== currentUserId) {
+						throw new TRPCError({
+							code: "NOT_FOUND",
+							message:
+								"Todo not found or you do not have permission to modify it",
+						});
+					}
+					return existingTodo;
+				};
+
+				expect(() => verifyTodoExists(undefined, "user-123")).toThrow(
+					TRPCError,
+				);
+			});
+
+			it("should throw NOT_FOUND for todo owned by different user", () => {
+				const verifyTodoExists = (
+					existingTodo: MockTodo | undefined,
+					currentUserId: string,
+				) => {
+					if (!existingTodo || existingTodo.userId !== currentUserId) {
+						throw new TRPCError({
+							code: "NOT_FOUND",
+							message:
+								"Todo not found or you do not have permission to modify it",
+						});
+					}
+					return existingTodo;
+				};
+
+				const todo: MockTodo = {
+					id: 1,
+					text: "Test",
+					completed: false,
+					userId: "user-456",
+					recurringPattern: { type: "daily" },
+				};
+
+				expect(() => verifyTodoExists(todo, "user-123")).toThrow(TRPCError);
+			});
+
+			it("should pass for todo owned by current user", () => {
+				const verifyTodoExists = (
+					existingTodo: MockTodo | undefined,
+					currentUserId: string,
+				) => {
+					if (!existingTodo || existingTodo.userId !== currentUserId) {
+						throw new TRPCError({
+							code: "NOT_FOUND",
+							message:
+								"Todo not found or you do not have permission to modify it",
+						});
+					}
+					return existingTodo;
+				};
+
+				const todo: MockTodo = {
+					id: 1,
+					text: "Test",
+					completed: false,
+					userId: "user-123",
+					recurringPattern: { type: "daily" },
+				};
+
+				expect(() => verifyTodoExists(todo, "user-123")).not.toThrow();
+			});
+		});
+
+		describe("Recurring Pattern Validation", () => {
+			it("should throw BAD_REQUEST if todo has no recurring pattern", () => {
+				const verifyRecurringPattern = (
+					recurringPattern: RecurringPattern | null | undefined,
+				) => {
+					if (!recurringPattern) {
+						throw new TRPCError({
+							code: "BAD_REQUEST",
+							message: "Todo does not have a recurring pattern",
+						});
+					}
+					return recurringPattern;
+				};
+
+				expect(() => verifyRecurringPattern(null)).toThrow(TRPCError);
+				expect(() => verifyRecurringPattern(undefined)).toThrow(TRPCError);
+			});
+
+			it("should pass if todo has recurring pattern", () => {
+				const verifyRecurringPattern = (
+					recurringPattern: RecurringPattern | null | undefined,
+				) => {
+					if (!recurringPattern) {
+						throw new TRPCError({
+							code: "BAD_REQUEST",
+							message: "Todo does not have a recurring pattern",
+						});
+					}
+					return recurringPattern;
+				};
+
+				const pattern: RecurringPattern = { type: "daily" };
+				expect(() => verifyRecurringPattern(pattern)).not.toThrow();
+			});
+		});
+
+		describe("Completion Record Update Logic", () => {
+			it("should return 'updated' action when record exists and completed=true", () => {
+				const determineAction = (
+					existingRecord: CompletionRecord | undefined,
+					completed: boolean,
+				): { action: "created" | "updated"; completedAt: Date | null } => {
+					if (existingRecord) {
+						return {
+							action: "updated",
+							completedAt: completed ? new Date() : null,
+						};
+					}
+					return {
+						action: "created",
+						completedAt: completed ? new Date() : null,
+					};
+				};
+
+				const existingRecord: CompletionRecord = {
+					id: 1,
+					todoId: 10,
+					scheduledDate: new Date("2026-01-15T10:00:00Z"),
+					completedAt: null,
+					userId: "user-123",
+					createdAt: new Date(),
+				};
+
+				const result = determineAction(existingRecord, true);
+				expect(result.action).toBe("updated");
+				expect(result.completedAt).toBeInstanceOf(Date);
+			});
+
+			it("should return 'updated' action when record exists and completed=false", () => {
+				const determineAction = (
+					existingRecord: CompletionRecord | undefined,
+					completed: boolean,
+				): { action: "created" | "updated"; completedAt: Date | null } => {
+					if (existingRecord) {
+						return {
+							action: "updated",
+							completedAt: completed ? new Date() : null,
+						};
+					}
+					return {
+						action: "created",
+						completedAt: completed ? new Date() : null,
+					};
+				};
+
+				const existingRecord: CompletionRecord = {
+					id: 1,
+					todoId: 10,
+					scheduledDate: new Date("2026-01-15T10:00:00Z"),
+					completedAt: new Date("2026-01-15T11:00:00Z"),
+					userId: "user-123",
+					createdAt: new Date(),
+				};
+
+				const result = determineAction(existingRecord, false);
+				expect(result.action).toBe("updated");
+				expect(result.completedAt).toBeNull();
+			});
+
+			it("should return 'created' action when no record exists and completed=true", () => {
+				const determineAction = (
+					existingRecord: CompletionRecord | undefined,
+					completed: boolean,
+				): { action: "created" | "updated"; completedAt: Date | null } => {
+					if (existingRecord) {
+						return {
+							action: "updated",
+							completedAt: completed ? new Date() : null,
+						};
+					}
+					return {
+						action: "created",
+						completedAt: completed ? new Date() : null,
+					};
+				};
+
+				const result = determineAction(undefined, true);
+				expect(result.action).toBe("created");
+				expect(result.completedAt).toBeInstanceOf(Date);
+			});
+
+			it("should return 'created' action when no record exists and completed=false", () => {
+				const determineAction = (
+					existingRecord: CompletionRecord | undefined,
+					completed: boolean,
+				): { action: "created" | "updated"; completedAt: Date | null } => {
+					if (existingRecord) {
+						return {
+							action: "updated",
+							completedAt: completed ? new Date() : null,
+						};
+					}
+					return {
+						action: "created",
+						completedAt: completed ? new Date() : null,
+					};
+				};
+
+				const result = determineAction(undefined, false);
+				expect(result.action).toBe("created");
+				expect(result.completedAt).toBeNull();
+			});
+		});
+
+		describe("New Completion Record Creation", () => {
+			it("should create record with correct fields when completed=true", () => {
+				interface CreateCompletionInput {
+					todoId: number;
+					scheduledDate: Date;
+					completed: boolean;
+					userId: string;
+				}
+
+				const buildCompletionRecord = (input: CreateCompletionInput) => ({
+					todoId: input.todoId,
+					scheduledDate: input.scheduledDate,
+					completedAt: input.completed ? new Date() : null,
+					userId: input.userId,
+				});
+
+				const result = buildCompletionRecord({
+					todoId: 10,
+					scheduledDate: new Date("2026-01-15T10:00:00Z"),
+					completed: true,
+					userId: "user-123",
+				});
+
+				expect(result.todoId).toBe(10);
+				expect(result.scheduledDate).toEqual(new Date("2026-01-15T10:00:00Z"));
+				expect(result.completedAt).toBeInstanceOf(Date);
+				expect(result.userId).toBe("user-123");
+			});
+
+			it("should create record with null completedAt when completed=false", () => {
+				interface CreateCompletionInput {
+					todoId: number;
+					scheduledDate: Date;
+					completed: boolean;
+					userId: string;
+				}
+
+				const buildCompletionRecord = (input: CreateCompletionInput) => ({
+					todoId: input.todoId,
+					scheduledDate: input.scheduledDate,
+					completedAt: input.completed ? new Date() : null,
+					userId: input.userId,
+				});
+
+				const result = buildCompletionRecord({
+					todoId: 10,
+					scheduledDate: new Date("2026-01-15T10:00:00Z"),
+					completed: false,
+					userId: "user-123",
+				});
+
+				expect(result.completedAt).toBeNull();
+			});
+		});
+
+		describe("Return Value Structure", () => {
+			it("should return correct structure for created action", () => {
+				interface UpdatePastCompletionResult {
+					action: "created" | "updated";
+					completion: CompletionRecord;
+				}
+
+				const createResult = (
+					action: "created" | "updated",
+					completion: CompletionRecord,
+				): UpdatePastCompletionResult => ({
+					action,
+					completion,
+				});
+
+				const completion: CompletionRecord = {
+					id: 1,
+					todoId: 10,
+					scheduledDate: new Date("2026-01-15T10:00:00Z"),
+					completedAt: new Date("2026-01-22T11:00:00Z"),
+					userId: "user-123",
+					createdAt: new Date(),
+				};
+
+				const result = createResult("created", completion);
+
+				expect(result.action).toBe("created");
+				expect(result.completion).toEqual(completion);
+			});
+
+			it("should return correct structure for updated action", () => {
+				interface UpdatePastCompletionResult {
+					action: "created" | "updated";
+					completion: CompletionRecord;
+				}
+
+				const createResult = (
+					action: "created" | "updated",
+					completion: CompletionRecord,
+				): UpdatePastCompletionResult => ({
+					action,
+					completion,
+				});
+
+				const completion: CompletionRecord = {
+					id: 5,
+					todoId: 10,
+					scheduledDate: new Date("2026-01-15T10:00:00Z"),
+					completedAt: null, // Marked as incomplete
+					userId: "user-123",
+					createdAt: new Date("2026-01-10T00:00:00Z"),
+				};
+
+				const result = createResult("updated", completion);
+
+				expect(result.action).toBe("updated");
+				expect(result.completion.completedAt).toBeNull();
+			});
+		});
+
+		describe("Scheduled Date Lookup", () => {
+			it("should find existing record by todoId and scheduledDate", () => {
+				const existingRecords: CompletionRecord[] = [
+					{
+						id: 1,
+						todoId: 10,
+						scheduledDate: new Date("2026-01-15T10:00:00Z"),
+						completedAt: new Date("2026-01-15T11:00:00Z"),
+						userId: "user-123",
+						createdAt: new Date(),
+					},
+					{
+						id: 2,
+						todoId: 10,
+						scheduledDate: new Date("2026-01-16T10:00:00Z"),
+						completedAt: null,
+						userId: "user-123",
+						createdAt: new Date(),
+					},
+					{
+						id: 3,
+						todoId: 20,
+						scheduledDate: new Date("2026-01-15T10:00:00Z"),
+						completedAt: null,
+						userId: "user-123",
+						createdAt: new Date(),
+					},
+				];
+
+				const findRecord = (
+					records: CompletionRecord[],
+					todoId: number,
+					scheduledDate: Date,
+					userId: string,
+				): CompletionRecord | undefined => {
+					return records.find(
+						(r) =>
+							r.todoId === todoId &&
+							r.scheduledDate.getTime() === scheduledDate.getTime() &&
+							r.userId === userId,
+					);
+				};
+
+				// Should find exact match
+				const result1 = findRecord(
+					existingRecords,
+					10,
+					new Date("2026-01-15T10:00:00Z"),
+					"user-123",
+				);
+				expect(result1?.id).toBe(1);
+
+				// Should find different date for same todo
+				const result2 = findRecord(
+					existingRecords,
+					10,
+					new Date("2026-01-16T10:00:00Z"),
+					"user-123",
+				);
+				expect(result2?.id).toBe(2);
+
+				// Should not find non-existent combination
+				const result3 = findRecord(
+					existingRecords,
+					10,
+					new Date("2026-01-17T10:00:00Z"),
+					"user-123",
+				);
+				expect(result3).toBeUndefined();
+
+				// Should not find record for different user
+				const result4 = findRecord(
+					existingRecords,
+					10,
+					new Date("2026-01-15T10:00:00Z"),
+					"user-456",
+				);
+				expect(result4).toBeUndefined();
+			});
+		});
+
+		describe("Use Cases", () => {
+			it("should support marking a missed occurrence as completed retroactively", () => {
+				// Simulating: User forgot to check in on Jan 15, now marking it completed on Jan 22
+				interface MarkCompletedInput {
+					todoId: number;
+					scheduledDate: Date;
+					completed: boolean;
+					userId: string;
+				}
+
+				const processUpdate = (
+					input: MarkCompletedInput,
+					existingRecord: CompletionRecord | undefined,
+				): { action: "created" | "updated"; completedAt: Date | null } => {
+					if (existingRecord) {
+						return {
+							action: "updated",
+							completedAt: input.completed ? new Date() : null,
+						};
+					}
+					return {
+						action: "created",
+						completedAt: input.completed ? new Date() : null,
+					};
+				};
+
+				// No existing record - creating new one
+				const result = processUpdate(
+					{
+						todoId: 10,
+						scheduledDate: new Date("2026-01-15T10:00:00Z"),
+						completed: true,
+						userId: "user-123",
+					},
+					undefined,
+				);
+
+				expect(result.action).toBe("created");
+				expect(result.completedAt).toBeInstanceOf(Date);
+			});
+
+			it("should support unmarking an accidentally completed occurrence", () => {
+				// Simulating: User accidentally marked completed, now reverting
+				interface MarkCompletedInput {
+					todoId: number;
+					scheduledDate: Date;
+					completed: boolean;
+					userId: string;
+				}
+
+				const processUpdate = (
+					input: MarkCompletedInput,
+					existingRecord: CompletionRecord | undefined,
+				): { action: "created" | "updated"; completedAt: Date | null } => {
+					if (existingRecord) {
+						return {
+							action: "updated",
+							completedAt: input.completed ? new Date() : null,
+						};
+					}
+					return {
+						action: "created",
+						completedAt: input.completed ? new Date() : null,
+					};
+				};
+
+				const existingRecord: CompletionRecord = {
+					id: 1,
+					todoId: 10,
+					scheduledDate: new Date("2026-01-15T10:00:00Z"),
+					completedAt: new Date("2026-01-15T11:00:00Z"),
+					userId: "user-123",
+					createdAt: new Date(),
+				};
+
+				const result = processUpdate(
+					{
+						todoId: 10,
+						scheduledDate: new Date("2026-01-15T10:00:00Z"),
+						completed: false,
+						userId: "user-123",
+					},
+					existingRecord,
+				);
+
+				expect(result.action).toBe("updated");
+				expect(result.completedAt).toBeNull();
+			});
+
+			it("should support pre-creating a record as missed (completed=false)", () => {
+				// Simulating: Creating a record for a missed occurrence explicitly
+				interface MarkCompletedInput {
+					todoId: number;
+					scheduledDate: Date;
+					completed: boolean;
+					userId: string;
+				}
+
+				const processUpdate = (
+					input: MarkCompletedInput,
+					existingRecord: CompletionRecord | undefined,
+				): { action: "created" | "updated"; completedAt: Date | null } => {
+					if (existingRecord) {
+						return {
+							action: "updated",
+							completedAt: input.completed ? new Date() : null,
+						};
+					}
+					return {
+						action: "created",
+						completedAt: input.completed ? new Date() : null,
+					};
+				};
+
+				const result = processUpdate(
+					{
+						todoId: 10,
+						scheduledDate: new Date("2026-01-15T10:00:00Z"),
+						completed: false,
+						userId: "user-123",
+					},
+					undefined,
+				);
+
+				expect(result.action).toBe("created");
+				expect(result.completedAt).toBeNull();
+			});
+		});
+	});
+});
