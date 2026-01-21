@@ -384,3 +384,18 @@
   - Query key generation with date range parameters
   - Module exports verification
 - [✓] 2026-01-21 04:58 - Fix todo.hooks.test.tsx mock to include getUpdateTodoScheduleMutationOptions
+
+- [✓] 2026-01-21 05:03 - Update todo.hooks.ts to handle scheduling in optimistic updates:
+  - Updated create callback to accept optional scheduling parameter (dueDate, reminderAt, recurringPattern)
+  - Pass scheduling fields to remote createMutation.mutateAsync for authenticated mode
+  - Pass scheduling fields to localTodoStorage.create for guest mode
+  - Updated todos mapping to include scheduling fields (dueDate, reminderAt, recurringPattern)
+  - Cast recurringPattern from unknown to RecurringPattern type for remote todos
+- [✓] 2026-01-21 05:03 - Update local-todo-storage.ts create function to accept scheduling parameter:
+  - Extended create function signature with optional scheduling object parameter
+  - Store dueDate, reminderAt, recurringPattern fields when creating new local todos
+- [✓] 2026-01-21 05:03 - Add unit tests for scheduling hooks (17 new tests) in todo.hooks.test.tsx covering:
+  - Create Todo with Scheduling (Guest Mode): dueDate, reminderAt, recurringPattern, all fields, folderId+scheduling, null defaults
+  - Update Schedule (Guest Mode): dueDate, reminderAt, recurringPattern, multiple fields, clearing to null
+  - Todos Include Scheduling Fields: from localStorage, normalize undefined to null, filteredTodos preserves fields
+- [✓] 2026-01-21 05:03 - Fix existing test "normalizes local todos to unified format" to include scheduling fields in expected output

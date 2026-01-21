@@ -63,13 +63,24 @@ export function getAll(): LocalTodo[] {
 	}
 }
 
-export function create(text: string, folderId?: string | null): LocalTodo {
+export function create(
+	text: string,
+	folderId?: string | null,
+	scheduling?: {
+		dueDate?: string | null;
+		reminderAt?: string | null;
+		recurringPattern?: RecurringPattern | null;
+	},
+): LocalTodo {
 	const todos = getAll();
 	const newTodo: LocalTodo = {
 		id: crypto.randomUUID(),
 		text,
 		completed: false,
 		folderId: folderId ?? null,
+		dueDate: scheduling?.dueDate ?? null,
+		reminderAt: scheduling?.reminderAt ?? null,
+		recurringPattern: scheduling?.recurringPattern ?? null,
 	};
 	todos.push(newTodo);
 	localStorage.setItem(STORAGE_KEY, JSON.stringify(todos));

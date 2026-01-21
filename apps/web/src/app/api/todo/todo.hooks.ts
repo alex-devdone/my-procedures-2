@@ -275,7 +275,15 @@ export function useTodoStorage(): UseTodoStorageReturn {
 	});
 
 	const create = useCallback(
-		async (text: string, folderId?: number | string | null) => {
+		async (
+			text: string,
+			folderId?: number | string | null,
+			scheduling?: {
+				dueDate?: string | null;
+				reminderAt?: string | null;
+				recurringPattern?: RecurringPattern | null;
+			},
+		) => {
 			// Convert folderId to appropriate type for storage
 			const numericFolderId =
 				folderId === "inbox" || folderId === null || folderId === undefined
@@ -289,11 +297,15 @@ export function useTodoStorage(): UseTodoStorageReturn {
 					text,
 					folderId:
 						typeof numericFolderId === "number" ? numericFolderId : null,
+					dueDate: scheduling?.dueDate ?? null,
+					reminderAt: scheduling?.reminderAt ?? null,
+					recurringPattern: scheduling?.recurringPattern ?? null,
 				});
 			} else {
 				localTodoStorage.create(
 					text,
 					typeof numericFolderId === "string" ? numericFolderId : null,
+					scheduling,
 				);
 				notifyLocalTodosListeners();
 			}
@@ -372,6 +384,10 @@ export function useTodoStorage(): UseTodoStorageReturn {
 				text: t.text,
 				completed: t.completed,
 				folderId: t.folderId,
+				dueDate: t.dueDate,
+				reminderAt: t.reminderAt,
+				recurringPattern:
+					(t.recurringPattern as RecurringPattern | null) ?? null,
 			}));
 		}
 		return localTodos.map((t) => ({
@@ -379,6 +395,9 @@ export function useTodoStorage(): UseTodoStorageReturn {
 			text: t.text,
 			completed: t.completed,
 			folderId: t.folderId ?? null,
+			dueDate: t.dueDate ?? null,
+			reminderAt: t.reminderAt ?? null,
+			recurringPattern: t.recurringPattern ?? null,
 		}));
 	}, [isAuthenticated, remoteTodos, localTodos]);
 
