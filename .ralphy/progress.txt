@@ -630,3 +630,28 @@
   - Reminder toast displays correct information: due date info, icon display
   - Helper functions for creating todos with due reminders directly in localStorage
   - Tests use localStorage key "todos" (not "flowdo_todos") matching local-todo-storage.ts
+
+- [✓] 2026-01-21 07:52 - Create TodayView component (apps/web/src/components/views/today-view.tsx) with:
+  - getTodosDueToday() pure function for filtering todos due today using isToday helper
+  - TodayView component showing todos due today with Sun icon and header
+  - Status filter tabs (All/Active/Completed) with counts
+  - Search input with clear button for filtering by text
+  - Stats computation (total, active, completed) for today's todos only
+  - Footer showing remaining tasks and completed count
+  - Loading skeleton state while data is loading
+  - Empty state messages for no todos, all done, no completed, no matches
+  - Folder badge display on todo items (always shown since viewing across all folders)
+  - Integration with useFolderStorage for folder info and useAllSubtasksProgress for subtask progress
+  - Passes onScheduleChange to TodoExpandableItem for schedule editing
+- [✓] 2026-01-21 07:52 - Add unit tests for TodayView (39 tests) in apps/web/src/components/views/today-view.test.tsx covering:
+  - getTodosDueToday: empty arrays, filtering by date, includes completed todos
+  - Rendering: header, sun icon, className, filter tabs, search input
+  - Loading state: skeleton display and hiding
+  - Empty state: no todos, all done, no completed, no matches
+  - Todo list: renders today todos, filters out other dates, active/completed filters, search filters
+  - Todo interactions: onToggle, onDelete callbacks
+  - Statistics: counts in filter tabs, footer counts, singular/plural
+  - Folder integration: shows folder badge, no badge for null folderId
+  - Schedule change: passes callback to items, renders without callback
+  - Accessibility: button types, search input placeholder, list structure
+- [✓] 2026-01-21 07:52 - Create barrel export for views (apps/web/src/components/views/index.ts)

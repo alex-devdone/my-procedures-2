@@ -224,8 +224,8 @@ Notification system for due reminders. Can proceed after Phase 10.
 
 Smart views based on scheduling data. Can proceed after Phase 10.
 
-- [ ] Create `apps/web/src/components/views/today-view.tsx` - shows todos due today
-- [ ] Add unit tests for TodayView in `apps/web/src/components/views/today-view.test.tsx`
+- [x] Create `apps/web/src/components/views/today-view.tsx` - shows todos due today
+- [x] Add unit tests for TodayView in `apps/web/src/components/views/today-view.test.tsx`
 - [ ] Create `apps/web/src/components/views/upcoming-view.tsx` - shows todos due in next 7 days grouped by date
 - [ ] Add unit tests for UpcomingView in `apps/web/src/components/views/upcoming-view.test.tsx`
 - [ ] Create `apps/web/src/components/views/overdue-view.tsx` - shows overdue todos
