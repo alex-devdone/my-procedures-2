@@ -323,6 +323,18 @@ export const todoRouter = router({
 				})
 				.returning();
 
+			// Record the completion in recurring_todo_completion table
+			// Use the new todo's ID since it represents the continuing recurring series
+			// The scheduledDate is the due date of the completed occurrence
+			if (newTodo && existing.dueDate) {
+				await db.insert(recurringTodoCompletion).values({
+					todoId: newTodo.id,
+					scheduledDate: existing.dueDate,
+					completedAt: new Date(),
+					userId: ctx.session.user.id,
+				});
+			}
+
 			return {
 				completed: true,
 				nextTodo: newTodo,

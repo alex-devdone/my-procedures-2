@@ -2152,6 +2152,103 @@ describe("CompleteRecurring Procedure", () => {
 				expect(result.getTime()).toBeLessThanOrEqual(afterCall.getTime());
 			});
 		});
+
+		describe("Completion Record Creation", () => {
+			interface CompletionRecordInput {
+				todoId: number;
+				scheduledDate: Date;
+				completedAt: Date;
+				userId: string;
+			}
+
+			const shouldCreateCompletionRecord = (
+				existingDueDate: Date | null | undefined,
+			): boolean => {
+				// Only create a completion record if the todo had a due date
+				return existingDueDate !== null && existingDueDate !== undefined;
+			};
+
+			const buildCompletionRecordData = (
+				newTodoId: number,
+				scheduledDate: Date,
+				userId: string,
+			): CompletionRecordInput => ({
+				todoId: newTodoId,
+				scheduledDate,
+				completedAt: new Date(),
+				userId,
+			});
+
+			it("should create completion record when todo has due date", () => {
+				const existingDueDate = new Date("2026-01-21T10:00:00Z");
+
+				expect(shouldCreateCompletionRecord(existingDueDate)).toBe(true);
+			});
+
+			it("should not create completion record when todo has no due date", () => {
+				expect(shouldCreateCompletionRecord(null)).toBe(false);
+				expect(shouldCreateCompletionRecord(undefined)).toBe(false);
+			});
+
+			it("should build correct completion record data structure", () => {
+				const newTodoId = 2;
+				const scheduledDate = new Date("2026-01-21T10:00:00Z");
+				const userId = "user-123";
+
+				const beforeCall = new Date();
+				const result = buildCompletionRecordData(
+					newTodoId,
+					scheduledDate,
+					userId,
+				);
+				const afterCall = new Date();
+
+				expect(result.todoId).toBe(newTodoId);
+				expect(result.scheduledDate).toEqual(scheduledDate);
+				expect(result.userId).toBe(userId);
+				// completedAt should be around the current time
+				expect(result.completedAt.getTime()).toBeGreaterThanOrEqual(
+					beforeCall.getTime(),
+				);
+				expect(result.completedAt.getTime()).toBeLessThanOrEqual(
+					afterCall.getTime(),
+				);
+			});
+
+			it("should use new todo ID for completion record (not completed todo ID)", () => {
+				// This test documents the design decision that the completion record
+				// references the new todo (the continuing series), not the completed one
+				const completedTodoId = 1;
+				const newTodoId = 2;
+				const scheduledDate = new Date("2026-01-21T10:00:00Z");
+				const userId = "user-123";
+
+				const result = buildCompletionRecordData(
+					newTodoId,
+					scheduledDate,
+					userId,
+				);
+
+				expect(result.todoId).toBe(newTodoId);
+				expect(result.todoId).not.toBe(completedTodoId);
+			});
+
+			it("should use completed todo's due date as scheduled date", () => {
+				// The scheduled date should be when the occurrence was originally scheduled,
+				// not when it was completed
+				const completedTodoDueDate = new Date("2026-01-21T10:00:00Z");
+				const newTodoId = 2;
+				const userId = "user-123";
+
+				const result = buildCompletionRecordData(
+					newTodoId,
+					completedTodoDueDate,
+					userId,
+				);
+
+				expect(result.scheduledDate).toEqual(completedTodoDueDate);
+			});
+		});
 	});
 });
 
