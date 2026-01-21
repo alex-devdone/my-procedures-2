@@ -1,12 +1,20 @@
 "use client";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useCallback, useMemo, useSyncExternalStore } from "react";
+import {
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+	useSyncExternalStore,
+} from "react";
 import { useSubtaskRealtimeWithAuth } from "@/hooks/use-subtask-realtime";
 import { useSession } from "@/lib/auth-client";
 import * as localSubtaskStorage from "@/lib/local-subtask-storage";
 import { queryClient } from "@/utils/trpc";
 import {
+	getBulkCreateSubtasksMutationOptions,
 	getCreateSubtaskMutationOptions,
 	getDeleteSubtaskMutationOptions,
 	getReorderSubtaskMutationOptions,
@@ -19,7 +27,10 @@ import type {
 	LocalSubtask,
 	RemoteSubtask,
 	Subtask,
+	SubtaskSyncAction,
+	SubtaskSyncPromptState,
 	UseSubtaskStorageReturn,
+	UseSyncSubtasksReturn,
 } from "./subtask.types";
 import { notifyAllSubtasksListeners } from "./subtask-progress.hooks";
 
@@ -425,5 +436,167 @@ export function useSubtaskStorage(
 		reorder,
 		isLoading,
 		isAuthenticated,
+	};
+}
+
+// ============================================================================
+// useSyncSubtasks Hook
+// ============================================================================
+
+/**
+ * Hook for syncing local subtasks to server when user logs in.
+ * Detects login transition and prompts user to sync, discard, or keep both.
+ *
+ * Note: Subtask sync requires a todoId mapping from local (string UUIDs) to
+ * remote (numeric IDs). Without this mapping, subtasks can only be discarded.
+ * The mapping should be provided by the todo sync process.
+ */
+export function useSyncSubtasks(): UseSyncSubtasksReturn {
+	const { data: session, isPending: isSessionPending } = useSession();
+	const isAuthenticated = !!session?.user;
+	const previousAuthState = useRef<boolean | null>(null);
+
+	const [syncPrompt, setSyncPrompt] = useState<SubtaskSyncPromptState>({
+		isOpen: false,
+		localSubtasksCount: 0,
+		canSync: false,
+	});
+
+	const bulkCreateMutation = useMutation({
+		mutationFn: getBulkCreateSubtasksMutationOptions().mutationFn,
+	});
+
+	const checkForLocalSubtasks = useCallback(() => {
+		const allSubtasks = localSubtaskStorage.getAllGroupedByTodoId();
+		let totalCount = 0;
+		for (const subtasks of allSubtasks.values()) {
+			totalCount += subtasks.length;
+		}
+
+		if (totalCount > 0) {
+			setSyncPrompt({
+				isOpen: true,
+				localSubtasksCount: totalCount,
+				// By default, we don't have a todoId mapping
+				// The caller needs to provide it if they want to sync
+				canSync: false,
+			});
+		}
+	}, []);
+
+	// Detect login transition (unauthenticated -> authenticated)
+	useEffect(() => {
+		if (isSessionPending) return;
+
+		const wasAuthenticated = previousAuthState.current;
+		const isNowAuthenticated = isAuthenticated;
+
+		// Store current state for next comparison
+		previousAuthState.current = isNowAuthenticated;
+
+		// Only trigger on login transition (was not authenticated, now is)
+		if (wasAuthenticated === false && isNowAuthenticated === true) {
+			checkForLocalSubtasks();
+		}
+	}, [isAuthenticated, isSessionPending, checkForLocalSubtasks]);
+
+	const handleSyncAction = useCallback(
+		async (action: SubtaskSyncAction, todoIdMapping?: Map<string, number>) => {
+			try {
+				switch (action) {
+					case "sync": {
+						// Upload local subtasks to server with order preserved, then clear local storage
+						if (todoIdMapping && todoIdMapping.size > 0) {
+							const allSubtasks = localSubtaskStorage.getAllGroupedByTodoId();
+							const subtasksToSync: Array<{
+								todoId: number;
+								text: string;
+								completed: boolean;
+								order: number;
+							}> = [];
+
+							for (const [localTodoId, subtasks] of allSubtasks) {
+								const remoteTodoId = todoIdMapping.get(localTodoId);
+								if (remoteTodoId !== undefined) {
+									for (const subtask of subtasks) {
+										subtasksToSync.push({
+											todoId: remoteTodoId,
+											text: subtask.text,
+											completed: subtask.completed,
+											order: subtask.order,
+										});
+									}
+								}
+							}
+
+							if (subtasksToSync.length > 0) {
+								await bulkCreateMutation.mutateAsync({
+									subtasks: subtasksToSync,
+								});
+							}
+						}
+						// Clear all local subtasks regardless of whether we synced them
+						localSubtaskStorage.clearAll();
+						notifyAllSubtasksListeners();
+						break;
+					}
+					case "discard": {
+						// Just clear local storage without syncing
+						localSubtaskStorage.clearAll();
+						notifyAllSubtasksListeners();
+						break;
+					}
+					case "keep_both": {
+						// Upload local subtasks (server assigns order) and keep remote ones
+						if (todoIdMapping && todoIdMapping.size > 0) {
+							const allSubtasks = localSubtaskStorage.getAllGroupedByTodoId();
+							const subtasksToSync: Array<{
+								todoId: number;
+								text: string;
+								completed: boolean;
+								// Don't pass order to let server assign new orders
+								// This avoids order conflicts with existing remote subtasks
+							}> = [];
+
+							for (const [localTodoId, subtasks] of allSubtasks) {
+								const remoteTodoId = todoIdMapping.get(localTodoId);
+								if (remoteTodoId !== undefined) {
+									for (const subtask of subtasks) {
+										subtasksToSync.push({
+											todoId: remoteTodoId,
+											text: subtask.text,
+											completed: subtask.completed,
+										});
+									}
+								}
+							}
+
+							if (subtasksToSync.length > 0) {
+								await bulkCreateMutation.mutateAsync({
+									subtasks: subtasksToSync,
+								});
+							}
+						}
+						// Clear all local subtasks regardless of whether we synced them
+						localSubtaskStorage.clearAll();
+						notifyAllSubtasksListeners();
+						break;
+					}
+				}
+			} finally {
+				setSyncPrompt({
+					isOpen: false,
+					localSubtasksCount: 0,
+					canSync: false,
+				});
+			}
+		},
+		[bulkCreateMutation],
+	);
+
+	return {
+		syncPrompt,
+		handleSyncAction,
+		isSyncing: bulkCreateMutation.isPending,
 	};
 }

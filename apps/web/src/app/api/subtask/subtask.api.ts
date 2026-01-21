@@ -58,3 +58,11 @@ export function getToggleSubtaskMutationOptions() {
 export function getReorderSubtaskMutationOptions() {
 	return trpc.subtask.reorder.mutationOptions();
 }
+
+/**
+ * Get mutation options for bulk creating subtasks.
+ * Used during subtask sync when user logs in.
+ */
+export function getBulkCreateSubtasksMutationOptions() {
+	return trpc.subtask.bulkCreate.mutationOptions();
+}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	areAllSubtasksCompleted,
+	bulkCreateSubtasksInputSchema,
 	calculateSubtaskProgress,
 	createSubtaskInputSchema,
 	deleteSubtaskInputSchema,
@@ -638,6 +639,231 @@ describe("Subtask Progress Helper Functions", () => {
 				},
 			];
 			expect(areAllSubtasksCompleted(subtasks)).toBe(true);
+		});
+	});
+});
+
+describe("Bulk Create Subtasks Input Schema", () => {
+	describe("bulkCreateSubtasksInputSchema", () => {
+		it("accepts valid input with single subtask", () => {
+			const result = bulkCreateSubtasksInputSchema.safeParse({
+				subtasks: [
+					{
+						todoId: 1,
+						text: "Buy groceries",
+					},
+				],
+			});
+			expect(result.success).toBe(true);
+			if (result.success) {
+				expect(result.data.subtasks).toHaveLength(1);
+				expect(result.data.subtasks[0].todoId).toBe(1);
+				expect(result.data.subtasks[0].text).toBe("Buy groceries");
+			}
+		});
+
+		it("accepts valid input with multiple subtasks", () => {
+			const result = bulkCreateSubtasksInputSchema.safeParse({
+				subtasks: [
+					{ todoId: 1, text: "Task 1" },
+					{ todoId: 1, text: "Task 2" },
+					{ todoId: 2, text: "Task 3" },
+				],
+			});
+			expect(result.success).toBe(true);
+			if (result.success) {
+				expect(result.data.subtasks).toHaveLength(3);
+			}
+		});
+
+		it("accepts empty subtasks array", () => {
+			const result = bulkCreateSubtasksInputSchema.safeParse({
+				subtasks: [],
+			});
+			expect(result.success).toBe(true);
+			if (result.success) {
+				expect(result.data.subtasks).toHaveLength(0);
+			}
+		});
+
+		it("accepts subtask with optional completed field", () => {
+			const result = bulkCreateSubtasksInputSchema.safeParse({
+				subtasks: [
+					{
+						todoId: 1,
+						text: "Completed task",
+						completed: true,
+					},
+				],
+			});
+			expect(result.success).toBe(true);
+			if (result.success) {
+				expect(result.data.subtasks[0].completed).toBe(true);
+			}
+		});
+
+		it("accepts subtask with optional order field", () => {
+			const result = bulkCreateSubtasksInputSchema.safeParse({
+				subtasks: [
+					{
+						todoId: 1,
+						text: "Ordered task",
+						order: 5,
+					},
+				],
+			});
+			expect(result.success).toBe(true);
+			if (result.success) {
+				expect(result.data.subtasks[0].order).toBe(5);
+			}
+		});
+
+		it("accepts subtask with all optional fields", () => {
+			const result = bulkCreateSubtasksInputSchema.safeParse({
+				subtasks: [
+					{
+						todoId: 1,
+						text: "Full task",
+						completed: true,
+						order: 3,
+					},
+				],
+			});
+			expect(result.success).toBe(true);
+			if (result.success) {
+				expect(result.data.subtasks[0]).toMatchObject({
+					todoId: 1,
+					text: "Full task",
+					completed: true,
+					order: 3,
+				});
+			}
+		});
+
+		it("rejects empty text", () => {
+			const result = bulkCreateSubtasksInputSchema.safeParse({
+				subtasks: [
+					{
+						todoId: 1,
+						text: "",
+					},
+				],
+			});
+			expect(result.success).toBe(false);
+		});
+
+		it("rejects text exceeding 500 characters", () => {
+			const longText = "a".repeat(501);
+			const result = bulkCreateSubtasksInputSchema.safeParse({
+				subtasks: [
+					{
+						todoId: 1,
+						text: longText,
+					},
+				],
+			});
+			expect(result.success).toBe(false);
+		});
+
+		it("accepts text with exactly 500 characters", () => {
+			const maxText = "a".repeat(500);
+			const result = bulkCreateSubtasksInputSchema.safeParse({
+				subtasks: [
+					{
+						todoId: 1,
+						text: maxText,
+					},
+				],
+			});
+			expect(result.success).toBe(true);
+		});
+
+		it("rejects missing todoId", () => {
+			const result = bulkCreateSubtasksInputSchema.safeParse({
+				subtasks: [
+					{
+						text: "Task without todoId",
+					},
+				],
+			});
+			expect(result.success).toBe(false);
+		});
+
+		it("rejects missing text", () => {
+			const result = bulkCreateSubtasksInputSchema.safeParse({
+				subtasks: [
+					{
+						todoId: 1,
+					},
+				],
+			});
+			expect(result.success).toBe(false);
+		});
+
+		it("rejects non-numeric todoId", () => {
+			const result = bulkCreateSubtasksInputSchema.safeParse({
+				subtasks: [
+					{
+						todoId: "uuid-123",
+						text: "Task",
+					},
+				],
+			});
+			expect(result.success).toBe(false);
+		});
+
+		it("rejects negative order", () => {
+			const result = bulkCreateSubtasksInputSchema.safeParse({
+				subtasks: [
+					{
+						todoId: 1,
+						text: "Task",
+						order: -1,
+					},
+				],
+			});
+			expect(result.success).toBe(false);
+		});
+
+		it("accepts order of 0", () => {
+			const result = bulkCreateSubtasksInputSchema.safeParse({
+				subtasks: [
+					{
+						todoId: 1,
+						text: "Task",
+						order: 0,
+					},
+				],
+			});
+			expect(result.success).toBe(true);
+		});
+
+		it("rejects non-boolean completed", () => {
+			const result = bulkCreateSubtasksInputSchema.safeParse({
+				subtasks: [
+					{
+						todoId: 1,
+						text: "Task",
+						completed: "yes",
+					},
+				],
+			});
+			expect(result.success).toBe(false);
+		});
+
+		it("rejects missing subtasks array", () => {
+			const result = bulkCreateSubtasksInputSchema.safeParse({});
+			expect(result.success).toBe(false);
+		});
+
+		it("validates all subtasks in array", () => {
+			const result = bulkCreateSubtasksInputSchema.safeParse({
+				subtasks: [
+					{ todoId: 1, text: "Valid task" },
+					{ todoId: 2, text: "" }, // Invalid: empty text
+				],
+			});
+			expect(result.success).toBe(false);
 		});
 	});
 });

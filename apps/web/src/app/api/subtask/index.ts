@@ -1,5 +1,6 @@
 // API
 export {
+	getBulkCreateSubtasksMutationOptions,
 	getCreateSubtaskMutationOptions,
 	getDeleteSubtaskMutationOptions,
 	getReorderSubtaskMutationOptions,
@@ -12,9 +13,12 @@ export {
 export {
 	notifyLocalSubtasksListeners,
 	useSubtaskStorage,
+	useSyncSubtasks,
 } from "./subtask.hooks";
 // Types
 export type {
+	BulkCreateSubtasksInput,
+	BulkCreateSubtasksOutput,
 	CreateSubtaskInput,
 	DeleteSubtaskInput,
 	DeleteSubtaskOutput,
@@ -30,12 +34,16 @@ export type {
 	ReorderSubtaskInput,
 	Subtask,
 	SubtaskProgress,
+	SubtaskSyncAction,
+	SubtaskSyncPromptState,
 	ToggleSubtaskInput,
 	UpdateSubtaskInput,
 	UseSubtaskStorageReturn,
+	UseSyncSubtasksReturn,
 } from "./subtask.types";
 export {
 	areAllSubtasksCompleted,
+	bulkCreateSubtasksInputSchema,
 	calculateSubtaskProgress,
 	createSubtaskInputSchema,
 	deleteSubtaskInputSchema,

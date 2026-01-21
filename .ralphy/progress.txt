@@ -957,3 +957,39 @@
 - [✓] 2026-01-21 11:32 - Run all unit tests: 1781 tests passed (51 new folder sync tests added)
 - [✓] 2026-01-21 11:32 - Run linting check: passed (50 pre-existing warnings)
 
+- [✓] 2026-01-21 11:45 - Create subtask sync mechanism (Phase 16) with:
+  - Added bulkCreateSubtasksInputSchema to subtask.types.ts (apps/web/src/app/api/subtask/subtask.types.ts):
+    - Zod schema for bulk subtask creation with todoId, text, completed, order fields
+    - BulkCreateSubtasksInput and BulkCreateSubtasksOutput types
+    - SubtaskSyncAction type ("sync" | "discard" | "keep_both")
+    - SubtaskSyncPromptState and UseSyncSubtasksReturn interfaces
+    - Note: Subtask sync requires todoId mapping (local string UUIDs to remote numeric IDs)
+  - Added getBulkCreateSubtasksMutationOptions to subtask.api.ts
+  - Created useSyncSubtasks hook in subtask.hooks.ts (apps/web/src/app/api/subtask/subtask.hooks.ts):
+    - Detects login transition (unauthenticated -> authenticated)
+    - Prompts user with sync dialog showing local subtask count
+    - handleSyncAction accepts optional todoId mapping for syncing
+    - "sync" action preserves subtask order when syncing with mapping
+    - "keep_both" action omits order to let server assign new orders
+    - "discard" action clears local subtasks without syncing
+    - Clears localStorage after any action and notifies listeners
+    - Only syncs subtasks for todos that have a mapping (unmapped subtasks are cleared)
+  - Updated subtask barrel export (apps/web/src/app/api/subtask/index.ts):
+    - Exports useSyncSubtasks, getBulkCreateSubtasksMutationOptions
+    - Exports new types and schemas (BulkCreateSubtasksInput, SubtaskSyncAction, etc.)
+- [✓] 2026-01-21 11:45 - Add unit tests for subtask sync mechanism:
+  - apps/web/src/app/api/subtask/subtask.types.test.ts: 18 new tests for bulkCreateSubtasksInputSchema covering:
+    - Input validation (single/multiple subtasks, optional completed/order fields)
+    - Text validation (empty, max length), todoId validation (numeric required)
+    - Order validation (non-negative), completed validation (boolean)
+  - apps/web/src/app/api/subtask/subtask.hooks.test.tsx: 21 new tests for useSyncSubtasks covering:
+    - Initial state (isOpen, localSubtasksCount, canSync, isSyncing)
+    - Login transition detection (with/without local subtasks)
+    - handleSyncAction "discard" (clears local, no bulkCreate call)
+    - handleSyncAction "sync" (uploads with mapping, preserves order, clears local)
+    - handleSyncAction "keep_both" (uploads without order, clears local)
+    - TodoId mapping behavior (only syncs mapped subtasks)
+    - Multiple todos with subtasks (syncs from multiple todos correctly)
+- [✓] 2026-01-21 11:45 - Run all unit tests: 1820 tests passed (39 new subtask sync tests added)
+- [✓] 2026-01-21 11:45 - Run linting check: passed (50 pre-existing warnings)
+

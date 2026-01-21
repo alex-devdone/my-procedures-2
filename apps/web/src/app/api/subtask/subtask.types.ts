@@ -177,3 +177,67 @@ export function calculateSubtaskProgress(subtasks: Subtask[]): SubtaskProgress {
 export function areAllSubtasksCompleted(subtasks: Subtask[]): boolean {
 	return subtasks.length > 0 && subtasks.every((s) => s.completed);
 }
+
+// ============================================================================
+// Bulk Create Types (for sync)
+// ============================================================================
+
+/**
+ * Zod schema for bulk creating subtasks during sync.
+ * Used when syncing local subtasks to server after login.
+ */
+export const bulkCreateSubtasksInputSchema = z.object({
+	subtasks: z.array(
+		z.object({
+			todoId: z.number(),
+			text: z.string().min(1, "Subtask text is required").max(500),
+			completed: z.boolean().optional(),
+			order: z.number().min(0).optional(),
+		}),
+	),
+});
+
+export type BulkCreateSubtasksInput = z.infer<
+	typeof bulkCreateSubtasksInputSchema
+>;
+
+export interface BulkCreateSubtasksOutput {
+	count: number;
+}
+
+// ============================================================================
+// Sync Types
+// ============================================================================
+
+/**
+ * Action type for subtask sync operations.
+ * - "sync": Upload local subtasks to server with order preserved, then clear local storage
+ * - "discard": Clear local subtasks without uploading
+ * - "keep_both": Upload local subtasks (server assigns order), then clear local storage
+ *
+ * Note: Subtask sync requires a todoId mapping from local (string UUIDs) to remote (numeric IDs).
+ * If no mapping is available, subtasks will be cleared without syncing.
+ */
+export type SubtaskSyncAction = "sync" | "discard" | "keep_both";
+
+/**
+ * State for the subtask sync prompt dialog.
+ */
+export interface SubtaskSyncPromptState {
+	isOpen: boolean;
+	localSubtasksCount: number;
+	/** Whether a todoId mapping is available for syncing */
+	canSync: boolean;
+}
+
+/**
+ * Return type for useSyncSubtasks hook.
+ */
+export interface UseSyncSubtasksReturn {
+	syncPrompt: SubtaskSyncPromptState;
+	handleSyncAction: (
+		action: SubtaskSyncAction,
+		todoIdMapping?: Map<string, number>,
+	) => Promise<void>;
+	isSyncing: boolean;
+}

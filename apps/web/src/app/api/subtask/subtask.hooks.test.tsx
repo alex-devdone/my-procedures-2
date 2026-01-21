@@ -42,6 +42,9 @@ vi.stubGlobal("crypto", {
 	randomUUID: () => `uuid-${Date.now()}-${Math.random()}`,
 });
 
+// Mock bulk create mutation function that we can spy on
+const mockBulkCreateMutationFn = vi.fn().mockResolvedValue({ count: 0 });
+
 // Mock the subtask.api module
 vi.mock("./subtask.api", () => ({
 	getSubtasksQueryOptions: (input: { todoId: number }) => ({
@@ -88,6 +91,9 @@ vi.mock("./subtask.api", () => ({
 			order: 1,
 		}),
 	}),
+	getBulkCreateSubtasksMutationOptions: () => ({
+		mutationFn: mockBulkCreateMutationFn,
+	}),
 }));
 
 // Mock queryClient
@@ -101,7 +107,7 @@ vi.mock("@/utils/trpc", () => ({
 }));
 
 // Import after mocks are set up
-import { useSubtaskStorage } from "./subtask.hooks";
+import { useSubtaskStorage, useSyncSubtasks } from "./subtask.hooks";
 
 // Test wrapper with QueryClientProvider
 function createWrapper() {
@@ -755,5 +761,678 @@ describe("External Store Pattern", () => {
 
 		// The hook should work without errors in test environment
 		expect(Array.isArray(result.current.subtasks)).toBe(true);
+	});
+});
+
+// ============================================================================
+// useSyncSubtasks Tests
+// ============================================================================
+
+describe("useSyncSubtasks", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		localStorageMock.clear();
+		mockBulkCreateMutationFn.mockResolvedValue({ count: 0 });
+
+		// Default: unauthenticated user
+		mockUseSession.mockReturnValue({
+			data: null,
+			isPending: false,
+		});
+	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	describe("Initial State", () => {
+		it("returns syncPrompt.isOpen: false initially", () => {
+			const { result } = renderHook(() => useSyncSubtasks(), {
+				wrapper: createWrapper(),
+			});
+
+			expect(result.current.syncPrompt.isOpen).toBe(false);
+		});
+
+		it("returns syncPrompt.localSubtasksCount: 0 initially", () => {
+			const { result } = renderHook(() => useSyncSubtasks(), {
+				wrapper: createWrapper(),
+			});
+
+			expect(result.current.syncPrompt.localSubtasksCount).toBe(0);
+		});
+
+		it("returns syncPrompt.canSync: false initially", () => {
+			const { result } = renderHook(() => useSyncSubtasks(), {
+				wrapper: createWrapper(),
+			});
+
+			expect(result.current.syncPrompt.canSync).toBe(false);
+		});
+
+		it("returns isSyncing: false initially", () => {
+			const { result } = renderHook(() => useSyncSubtasks(), {
+				wrapper: createWrapper(),
+			});
+
+			expect(result.current.isSyncing).toBe(false);
+		});
+
+		it("provides handleSyncAction function", () => {
+			const { result } = renderHook(() => useSyncSubtasks(), {
+				wrapper: createWrapper(),
+			});
+
+			expect(typeof result.current.handleSyncAction).toBe("function");
+		});
+	});
+
+	describe("Login Transition Detection", () => {
+		it("detects login transition and opens sync prompt when local subtasks exist", async () => {
+			// Start with local subtasks
+			const localSubtasks = [
+				{
+					id: "subtask-1",
+					text: "Local subtask",
+					completed: false,
+					todoId: "todo-1",
+					order: 0,
+				},
+			];
+			mockLocalStorage.subtasks = JSON.stringify(localSubtasks);
+
+			// Start unauthenticated
+			mockUseSession.mockReturnValue({
+				data: null,
+				isPending: false,
+			});
+
+			const { result, rerender } = renderHook(() => useSyncSubtasks(), {
+				wrapper: createWrapper(),
+			});
+
+			expect(result.current.syncPrompt.isOpen).toBe(false);
+
+			// Simulate login
+			mockUseSession.mockReturnValue({
+				data: { user: { id: "user-123", email: "test@test.com" } },
+				isPending: false,
+			});
+
+			rerender();
+
+			await waitFor(() => {
+				expect(result.current.syncPrompt.isOpen).toBe(true);
+				expect(result.current.syncPrompt.localSubtasksCount).toBe(1);
+			});
+		});
+
+		it("does not open sync prompt when no local subtasks exist", async () => {
+			// No local subtasks
+			mockLocalStorage.subtasks = JSON.stringify([]);
+
+			// Start unauthenticated
+			mockUseSession.mockReturnValue({
+				data: null,
+				isPending: false,
+			});
+
+			const { result, rerender } = renderHook(() => useSyncSubtasks(), {
+				wrapper: createWrapper(),
+			});
+
+			// Simulate login
+			mockUseSession.mockReturnValue({
+				data: { user: { id: "user-123", email: "test@test.com" } },
+				isPending: false,
+			});
+
+			rerender();
+
+			await waitFor(() => {
+				// Small delay to allow effect to run
+			});
+
+			expect(result.current.syncPrompt.isOpen).toBe(false);
+		});
+
+		it("counts subtasks from multiple todos", async () => {
+			const localSubtasks = [
+				{
+					id: "subtask-1",
+					text: "Todo 1 subtask 1",
+					completed: false,
+					todoId: "todo-1",
+					order: 0,
+				},
+				{
+					id: "subtask-2",
+					text: "Todo 1 subtask 2",
+					completed: true,
+					todoId: "todo-1",
+					order: 1,
+				},
+				{
+					id: "subtask-3",
+					text: "Todo 2 subtask 1",
+					completed: false,
+					todoId: "todo-2",
+					order: 0,
+				},
+			];
+			mockLocalStorage.subtasks = JSON.stringify(localSubtasks);
+
+			mockUseSession.mockReturnValue({
+				data: null,
+				isPending: false,
+			});
+
+			const { result, rerender } = renderHook(() => useSyncSubtasks(), {
+				wrapper: createWrapper(),
+			});
+
+			// Simulate login
+			mockUseSession.mockReturnValue({
+				data: { user: { id: "user-123", email: "test@test.com" } },
+				isPending: false,
+			});
+
+			rerender();
+
+			await waitFor(() => {
+				expect(result.current.syncPrompt.isOpen).toBe(true);
+				expect(result.current.syncPrompt.localSubtasksCount).toBe(3);
+			});
+		});
+
+		it("does not trigger on session pending", async () => {
+			const localSubtasks = [
+				{
+					id: "subtask-1",
+					text: "Subtask",
+					completed: false,
+					todoId: "todo-1",
+					order: 0,
+				},
+			];
+			mockLocalStorage.subtasks = JSON.stringify(localSubtasks);
+
+			// Start with session pending
+			mockUseSession.mockReturnValue({
+				data: null,
+				isPending: true,
+			});
+
+			const { result, rerender } = renderHook(() => useSyncSubtasks(), {
+				wrapper: createWrapper(),
+			});
+
+			// Session still pending but now authenticated
+			mockUseSession.mockReturnValue({
+				data: { user: { id: "user-123", email: "test@test.com" } },
+				isPending: true,
+			});
+
+			rerender();
+
+			// Should not open prompt while session is pending
+			expect(result.current.syncPrompt.isOpen).toBe(false);
+		});
+	});
+
+	describe("handleSyncAction - discard", () => {
+		it("clears local subtasks when action is discard", async () => {
+			const localSubtasks = [
+				{
+					id: "subtask-1",
+					text: "Subtask",
+					completed: false,
+					todoId: "todo-1",
+					order: 0,
+				},
+			];
+			mockLocalStorage.subtasks = JSON.stringify(localSubtasks);
+
+			mockUseSession.mockReturnValue({
+				data: { user: { id: "user-123", email: "test@test.com" } },
+				isPending: false,
+			});
+
+			const { result } = renderHook(() => useSyncSubtasks(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.handleSyncAction("discard");
+			});
+
+			expect(localStorageMock.removeItem).toHaveBeenCalledWith("subtasks");
+		});
+
+		it("does not call bulkCreate when action is discard", async () => {
+			const localSubtasks = [
+				{
+					id: "subtask-1",
+					text: "Subtask",
+					completed: false,
+					todoId: "todo-1",
+					order: 0,
+				},
+			];
+			mockLocalStorage.subtasks = JSON.stringify(localSubtasks);
+
+			mockUseSession.mockReturnValue({
+				data: { user: { id: "user-123", email: "test@test.com" } },
+				isPending: false,
+			});
+
+			const { result } = renderHook(() => useSyncSubtasks(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.handleSyncAction("discard");
+			});
+
+			expect(mockBulkCreateMutationFn).not.toHaveBeenCalled();
+		});
+
+		it("closes sync prompt after discard", async () => {
+			mockUseSession.mockReturnValue({
+				data: { user: { id: "user-123", email: "test@test.com" } },
+				isPending: false,
+			});
+
+			const { result } = renderHook(() => useSyncSubtasks(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.handleSyncAction("discard");
+			});
+
+			expect(result.current.syncPrompt.isOpen).toBe(false);
+			expect(result.current.syncPrompt.localSubtasksCount).toBe(0);
+		});
+	});
+
+	describe("handleSyncAction - sync", () => {
+		it("uploads subtasks with todoId mapping when sync action is called", async () => {
+			const localSubtasks = [
+				{
+					id: "subtask-1",
+					text: "Task 1",
+					completed: false,
+					todoId: "todo-local-1",
+					order: 0,
+				},
+				{
+					id: "subtask-2",
+					text: "Task 2",
+					completed: true,
+					todoId: "todo-local-1",
+					order: 1,
+				},
+			];
+			mockLocalStorage.subtasks = JSON.stringify(localSubtasks);
+
+			mockUseSession.mockReturnValue({
+				data: { user: { id: "user-123", email: "test@test.com" } },
+				isPending: false,
+			});
+
+			const { result } = renderHook(() => useSyncSubtasks(), {
+				wrapper: createWrapper(),
+			});
+
+			// Create todoId mapping (local string UUID -> remote numeric ID)
+			const todoIdMapping = new Map<string, number>();
+			todoIdMapping.set("todo-local-1", 123);
+
+			await act(async () => {
+				await result.current.handleSyncAction("sync", todoIdMapping);
+			});
+
+			expect(mockBulkCreateMutationFn).toHaveBeenCalled();
+			const call = mockBulkCreateMutationFn.mock.calls[0][0];
+			expect(call.subtasks).toHaveLength(2);
+			expect(call.subtasks[0]).toMatchObject({
+				todoId: 123,
+				text: "Task 1",
+				completed: false,
+				order: 0,
+			});
+			expect(call.subtasks[1]).toMatchObject({
+				todoId: 123,
+				text: "Task 2",
+				completed: true,
+				order: 1,
+			});
+		});
+
+		it("preserves order when sync action is called", async () => {
+			const localSubtasks = [
+				{
+					id: "subtask-1",
+					text: "First",
+					completed: false,
+					todoId: "todo-local-1",
+					order: 0,
+				},
+				{
+					id: "subtask-2",
+					text: "Second",
+					completed: false,
+					todoId: "todo-local-1",
+					order: 1,
+				},
+				{
+					id: "subtask-3",
+					text: "Third",
+					completed: false,
+					todoId: "todo-local-1",
+					order: 2,
+				},
+			];
+			mockLocalStorage.subtasks = JSON.stringify(localSubtasks);
+
+			mockUseSession.mockReturnValue({
+				data: { user: { id: "user-123", email: "test@test.com" } },
+				isPending: false,
+			});
+
+			const { result } = renderHook(() => useSyncSubtasks(), {
+				wrapper: createWrapper(),
+			});
+
+			const todoIdMapping = new Map<string, number>();
+			todoIdMapping.set("todo-local-1", 123);
+
+			await act(async () => {
+				await result.current.handleSyncAction("sync", todoIdMapping);
+			});
+
+			const call = mockBulkCreateMutationFn.mock.calls[0][0];
+			expect(call.subtasks[0].order).toBe(0);
+			expect(call.subtasks[1].order).toBe(1);
+			expect(call.subtasks[2].order).toBe(2);
+		});
+
+		it("clears local storage after sync", async () => {
+			const localSubtasks = [
+				{
+					id: "subtask-1",
+					text: "Task 1",
+					completed: false,
+					todoId: "todo-local-1",
+					order: 0,
+				},
+			];
+			mockLocalStorage.subtasks = JSON.stringify(localSubtasks);
+
+			mockUseSession.mockReturnValue({
+				data: { user: { id: "user-123", email: "test@test.com" } },
+				isPending: false,
+			});
+
+			const { result } = renderHook(() => useSyncSubtasks(), {
+				wrapper: createWrapper(),
+			});
+
+			const todoIdMapping = new Map<string, number>();
+			todoIdMapping.set("todo-local-1", 123);
+
+			await act(async () => {
+				await result.current.handleSyncAction("sync", todoIdMapping);
+			});
+
+			expect(localStorageMock.removeItem).toHaveBeenCalledWith("subtasks");
+		});
+
+		it("only syncs subtasks for todos with mapping", async () => {
+			const localSubtasks = [
+				{
+					id: "subtask-1",
+					text: "Mapped todo subtask",
+					completed: false,
+					todoId: "todo-local-1",
+					order: 0,
+				},
+				{
+					id: "subtask-2",
+					text: "Unmapped todo subtask",
+					completed: false,
+					todoId: "todo-local-2",
+					order: 0,
+				},
+			];
+			mockLocalStorage.subtasks = JSON.stringify(localSubtasks);
+
+			mockUseSession.mockReturnValue({
+				data: { user: { id: "user-123", email: "test@test.com" } },
+				isPending: false,
+			});
+
+			const { result } = renderHook(() => useSyncSubtasks(), {
+				wrapper: createWrapper(),
+			});
+
+			// Only map one todo
+			const todoIdMapping = new Map<string, number>();
+			todoIdMapping.set("todo-local-1", 123);
+
+			await act(async () => {
+				await result.current.handleSyncAction("sync", todoIdMapping);
+			});
+
+			const call = mockBulkCreateMutationFn.mock.calls[0][0];
+			expect(call.subtasks).toHaveLength(1);
+			expect(call.subtasks[0].text).toBe("Mapped todo subtask");
+		});
+
+		it("does not call bulkCreate when no todoId mapping provided", async () => {
+			const localSubtasks = [
+				{
+					id: "subtask-1",
+					text: "Task 1",
+					completed: false,
+					todoId: "todo-local-1",
+					order: 0,
+				},
+			];
+			mockLocalStorage.subtasks = JSON.stringify(localSubtasks);
+
+			mockUseSession.mockReturnValue({
+				data: { user: { id: "user-123", email: "test@test.com" } },
+				isPending: false,
+			});
+
+			const { result } = renderHook(() => useSyncSubtasks(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.handleSyncAction("sync");
+			});
+
+			expect(mockBulkCreateMutationFn).not.toHaveBeenCalled();
+		});
+
+		it("clears local storage even when no mapping provided", async () => {
+			const localSubtasks = [
+				{
+					id: "subtask-1",
+					text: "Task 1",
+					completed: false,
+					todoId: "todo-local-1",
+					order: 0,
+				},
+			];
+			mockLocalStorage.subtasks = JSON.stringify(localSubtasks);
+
+			mockUseSession.mockReturnValue({
+				data: { user: { id: "user-123", email: "test@test.com" } },
+				isPending: false,
+			});
+
+			const { result } = renderHook(() => useSyncSubtasks(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.handleSyncAction("sync");
+			});
+
+			expect(localStorageMock.removeItem).toHaveBeenCalledWith("subtasks");
+		});
+	});
+
+	describe("handleSyncAction - keep_both", () => {
+		it("uploads subtasks without order (server assigns) when keep_both action is called", async () => {
+			const localSubtasks = [
+				{
+					id: "subtask-1",
+					text: "Task 1",
+					completed: false,
+					todoId: "todo-local-1",
+					order: 5,
+				},
+			];
+			mockLocalStorage.subtasks = JSON.stringify(localSubtasks);
+
+			mockUseSession.mockReturnValue({
+				data: { user: { id: "user-123", email: "test@test.com" } },
+				isPending: false,
+			});
+
+			const { result } = renderHook(() => useSyncSubtasks(), {
+				wrapper: createWrapper(),
+			});
+
+			const todoIdMapping = new Map<string, number>();
+			todoIdMapping.set("todo-local-1", 123);
+
+			await act(async () => {
+				await result.current.handleSyncAction("keep_both", todoIdMapping);
+			});
+
+			const call = mockBulkCreateMutationFn.mock.calls[0][0];
+			expect(call.subtasks[0]).toMatchObject({
+				todoId: 123,
+				text: "Task 1",
+				completed: false,
+			});
+			// Order should NOT be included in keep_both
+			expect(call.subtasks[0].order).toBeUndefined();
+		});
+
+		it("clears local storage after keep_both", async () => {
+			const localSubtasks = [
+				{
+					id: "subtask-1",
+					text: "Task 1",
+					completed: false,
+					todoId: "todo-local-1",
+					order: 0,
+				},
+			];
+			mockLocalStorage.subtasks = JSON.stringify(localSubtasks);
+
+			mockUseSession.mockReturnValue({
+				data: { user: { id: "user-123", email: "test@test.com" } },
+				isPending: false,
+			});
+
+			const { result } = renderHook(() => useSyncSubtasks(), {
+				wrapper: createWrapper(),
+			});
+
+			const todoIdMapping = new Map<string, number>();
+			todoIdMapping.set("todo-local-1", 123);
+
+			await act(async () => {
+				await result.current.handleSyncAction("keep_both", todoIdMapping);
+			});
+
+			expect(localStorageMock.removeItem).toHaveBeenCalledWith("subtasks");
+		});
+	});
+
+	describe("Function Stability", () => {
+		it("provides stable handleSyncAction function", () => {
+			mockUseSession.mockReturnValue({
+				data: { user: { id: "user-123", email: "test@test.com" } },
+				isPending: false,
+			});
+
+			const { result, rerender } = renderHook(() => useSyncSubtasks(), {
+				wrapper: createWrapper(),
+			});
+
+			expect(typeof result.current.handleSyncAction).toBe("function");
+
+			rerender();
+
+			expect(typeof result.current.handleSyncAction).toBe("function");
+		});
+	});
+
+	describe("Multiple Todos with Subtasks", () => {
+		it("syncs subtasks from multiple todos correctly", async () => {
+			const localSubtasks = [
+				{
+					id: "subtask-1",
+					text: "Todo 1 Task 1",
+					completed: false,
+					todoId: "todo-local-1",
+					order: 0,
+				},
+				{
+					id: "subtask-2",
+					text: "Todo 1 Task 2",
+					completed: true,
+					todoId: "todo-local-1",
+					order: 1,
+				},
+				{
+					id: "subtask-3",
+					text: "Todo 2 Task 1",
+					completed: false,
+					todoId: "todo-local-2",
+					order: 0,
+				},
+			];
+			mockLocalStorage.subtasks = JSON.stringify(localSubtasks);
+
+			mockUseSession.mockReturnValue({
+				data: { user: { id: "user-123", email: "test@test.com" } },
+				isPending: false,
+			});
+
+			const { result } = renderHook(() => useSyncSubtasks(), {
+				wrapper: createWrapper(),
+			});
+
+			const todoIdMapping = new Map<string, number>();
+			todoIdMapping.set("todo-local-1", 100);
+			todoIdMapping.set("todo-local-2", 200);
+
+			await act(async () => {
+				await result.current.handleSyncAction("sync", todoIdMapping);
+			});
+
+			const call = mockBulkCreateMutationFn.mock.calls[0][0];
+			expect(call.subtasks).toHaveLength(3);
+
+			const todo1Subtasks = call.subtasks.filter(
+				(s: { todoId: number }) => s.todoId === 100,
+			);
+			const todo2Subtasks = call.subtasks.filter(
+				(s: { todoId: number }) => s.todoId === 200,
+			);
+
+			expect(todo1Subtasks).toHaveLength(2);
+			expect(todo2Subtasks).toHaveLength(1);
+		});
 	});
 });
