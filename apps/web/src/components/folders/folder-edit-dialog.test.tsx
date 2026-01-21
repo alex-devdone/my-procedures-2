@@ -4,6 +4,17 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// Mock Supabase environment variables
+vi.mock("@my-procedures-2/env/web", () => ({
+	env: {
+		NEXT_PUBLIC_SUPABASE_URL: "https://test-project.supabase.co",
+		NEXT_PUBLIC_SUPABASE_ANON_KEY: "test-anon-key-12345678",
+		BETTER_AUTH_SECRET: "test-better-auth-secret-at-least-32-chars",
+		BETTER_AUTH_URL: "http://localhost:4757",
+		DATABASE_URL: "postgresql://test:test@localhost:5432/test",
+	},
+}));
+
 import { FOLDER_COLORS, type Folder } from "@/app/api/folder";
 
 import { FolderEditDialog } from "./folder-edit-dialog";

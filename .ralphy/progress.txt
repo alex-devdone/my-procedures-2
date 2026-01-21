@@ -783,4 +783,30 @@
 - [✓] 2026-01-21 09:37 - Run all unit tests: 1646 tests passed (15 new tests added)
 - [✓] 2026-01-21 09:37 - Run linting check: passed (auto-formatted, added biome-ignore for reserved key parameter)
 
+- [✓] 2026-01-21 09:58 - Create use-todo-realtime.ts hook (apps/web/src/hooks/use-todo-realtime.ts) with:
+  - useTodoRealtime hook for subscribing to todo table changes by userId
+  - useTodoRealtimeWithAuth hook that integrates with useSession
+  - Event handlers for INSERT (add new todo to cache), UPDATE (update existing todo), DELETE (remove todo from cache)
+  - useEffect-based subscription lifecycle management with cleanup
+  - React Query cache integration for automatic updates
+  - Proper ref usage for subscription state tracking
+- [✓] 2026-01-21 09:58 - Add unit tests for useTodoRealtime (16 tests) in apps/web/src/hooks/use-todo-realtime.test.tsx:
+  - Initial state tests (isConfigured, isSubscribed, unsubscribe function)
+  - Subscription behavior tests (channel creation, no subscription when not configured, no subscription when no userId)
+  - Unsubscribe function tests
+  - INSERT/UPDATE/DELETE event handling tests
+  - React Query cache integration tests
+- [✓] 2026-01-21 09:58 - Update todo.hooks.ts (apps/web/src/app/api/todo/todo.hooks.ts) to integrate realtime:
+  - Added import for useTodoRealtimeWithAuth from @/hooks/use-todo-realtime
+  - Integrated useTodoRealtimeWithAuth() call in useTodoStorage hook
+  - Realtime sync now enabled automatically for authenticated users
+  - No additional configuration needed - works seamlessly with existing tRPC mutations
+- [✓] 2026-01-21 09:58 - Add Supabase environment variable mocks to failing test files:
+  - Updated apps/web/src/app/api/folder/folder.hooks.test.tsx with @my-procedures-2/env/web mock
+  - Updated apps/web/src/app/api/todo/todo.hooks.test.tsx with @my-procedures-2/env/web mock
+  - Updated apps/web/src/components/folders/folder-create-dialog.test.tsx with env mock
+  - Updated apps/web/src/components/folders/folder-edit-dialog.test.tsx with env mock
+- [✓] 2026-01-21 09:58 - Run all unit tests: 1662 tests passed (16 new realtime tests added)
+- [✓] 2026-01-21 09:58 - Run linting check: passed (auto-formatted imports and code)
+
 

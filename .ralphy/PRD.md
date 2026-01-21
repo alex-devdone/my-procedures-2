@@ -258,13 +258,13 @@ Configure Supabase client and enable Realtime for automatic sync. Can proceed af
 
 Integrate Supabase Realtime with todo React Query cache. Can proceed after Phase 13.
 
-- [ ] Create `apps/web/src/hooks/use-todo-realtime.ts` - subscribes to todo table changes and updates React Query cache
-- [ ] Add unit tests for useTodoRealtime in `apps/web/src/hooks/use-todo-realtime.test.ts`
-- [ ] Update `apps/web/src/app/api/todo/todo.hooks.ts` useTodoStorage to integrate realtime subscription
-- [ ] Add unit tests for realtime integration in todo hooks
-- [ ] Handle INSERT events - add new todo to cache when created on another device/tab
-- [ ] Handle UPDATE events - update todo in cache when modified elsewhere
-- [ ] Handle DELETE events - remove todo from cache when deleted elsewhere
+- [x] Create `apps/web/src/hooks/use-todo-realtime.ts` - subscribes to todo table changes and updates React Query cache
+- [x] Add unit tests for useTodoRealtime in `apps/web/src/hooks/use-todo-realtime.test.tsx`
+- [x] Update `apps/web/src/app/api/todo/todo.hooks.ts` useTodoStorage to integrate realtime subscription
+- [x] Add unit tests for realtime integration in todo hooks
+- [x] Handle INSERT events - add new todo to cache when created on another device/tab
+- [x] Handle UPDATE events - update todo in cache when modified elsewhere
+- [x] Handle DELETE events - remove todo from cache when deleted elsewhere
 - [ ] Add connection status indicator component at `apps/web/src/components/realtime/connection-status.tsx`
 - [ ] Add unit tests for ConnectionStatus in `apps/web/src/components/realtime/connection-status.test.tsx`
 

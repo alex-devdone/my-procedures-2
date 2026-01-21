@@ -9,10 +9,10 @@ import {
 	useState,
 	useSyncExternalStore,
 } from "react";
+import { useTodoRealtimeWithAuth } from "@/hooks/use-todo-realtime";
 import { useSession } from "@/lib/auth-client";
 import * as localTodoStorage from "@/lib/local-todo-storage";
 import { queryClient } from "@/utils/trpc";
-
 import {
 	getAllTodosQueryOptions,
 	getBulkCreateTodosMutationOptions,
@@ -417,6 +417,11 @@ export function useTodoStorage(): UseTodoStorageReturn {
 	// Does NOT include mutation pending states to allow optimistic updates to render
 	const isLoading =
 		isSessionPending || (isAuthenticated && isRemoteTodosLoading);
+
+	// Enable realtime sync for authenticated users
+	// This hook automatically subscribes to Supabase Realtime updates
+	// and keeps the React Query cache in sync across multiple devices/tabs
+	useTodoRealtimeWithAuth();
 
 	return {
 		todos,
