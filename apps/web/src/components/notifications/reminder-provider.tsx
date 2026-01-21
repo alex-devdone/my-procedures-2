@@ -1,8 +1,42 @@
 "use client";
 
+import { createContext, useContext, useMemo } from "react";
 import { useTodoStorage } from "@/app/api/todo";
+import type { DueReminder } from "@/hooks/use-reminder-checker";
 import { useReminderChecker } from "@/hooks/use-reminder-checker";
 import { ReminderToastManager } from "./reminder-toast";
+
+// ============================================================================
+// Context
+// ============================================================================
+
+interface ReminderContextValue {
+	/** Set of todo IDs (as strings) that currently have due reminders */
+	dueReminderIds: Set<string>;
+	/** Full list of due reminders */
+	dueReminders: DueReminder[];
+	/** Dismiss a reminder by todo ID */
+	dismissReminder: (todoId: number | string) => void;
+}
+
+const ReminderContext = createContext<ReminderContextValue | null>(null);
+
+/**
+ * Hook to access due reminder information.
+ * Returns the set of todo IDs with due reminders.
+ */
+export function useDueReminders(): ReminderContextValue {
+	const context = useContext(ReminderContext);
+	if (!context) {
+		// Return empty defaults if used outside provider
+		return {
+			dueReminderIds: new Set<string>(),
+			dueReminders: [],
+			dismissReminder: () => {},
+		};
+	}
+	return context;
+}
 
 // ============================================================================
 // Types
@@ -56,14 +90,28 @@ export function ReminderProvider({
 		checkInterval,
 	});
 
+	// Create a Set of due reminder IDs for quick lookup (normalized to strings)
+	const dueReminderIds = useMemo(() => {
+		return new Set(dueReminders.map((r) => String(r.todoId)));
+	}, [dueReminders]);
+
+	const contextValue = useMemo(
+		(): ReminderContextValue => ({
+			dueReminderIds,
+			dueReminders,
+			dismissReminder,
+		}),
+		[dueReminderIds, dueReminders, dismissReminder],
+	);
+
 	return (
-		<>
+		<ReminderContext.Provider value={contextValue}>
 			{children}
 			<ReminderToastManager
 				reminders={dueReminders}
 				onDismiss={dismissReminder}
 				enabled={enabled && !isLoading}
 			/>
-		</>
+		</ReminderContext.Provider>
 	);
 }

@@ -1,7 +1,7 @@
 // Components
 
 export type { ReminderProviderProps } from "./reminder-provider";
-export { ReminderProvider } from "./reminder-provider";
+export { ReminderProvider, useDueReminders } from "./reminder-provider";
 
 // Types
 export type {

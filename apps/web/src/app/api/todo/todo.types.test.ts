@@ -238,6 +238,125 @@ describe("Recurring Pattern Schema", () => {
 			});
 			expect(result.success).toBe(true);
 		});
+
+		// notifyAt field tests
+		it("accepts pattern with valid notifyAt time (09:00)", () => {
+			const result = recurringPatternSchema.safeParse({
+				type: "daily",
+				notifyAt: "09:00",
+			});
+			expect(result.success).toBe(true);
+			if (result.success) {
+				expect(result.data.notifyAt).toBe("09:00");
+			}
+		});
+
+		it("accepts pattern with notifyAt at midnight (00:00)", () => {
+			const result = recurringPatternSchema.safeParse({
+				type: "daily",
+				notifyAt: "00:00",
+			});
+			expect(result.success).toBe(true);
+			if (result.success) {
+				expect(result.data.notifyAt).toBe("00:00");
+			}
+		});
+
+		it("accepts pattern with notifyAt at end of day (23:59)", () => {
+			const result = recurringPatternSchema.safeParse({
+				type: "daily",
+				notifyAt: "23:59",
+			});
+			expect(result.success).toBe(true);
+			if (result.success) {
+				expect(result.data.notifyAt).toBe("23:59");
+			}
+		});
+
+		it("accepts pattern with notifyAt afternoon time (14:30)", () => {
+			const result = recurringPatternSchema.safeParse({
+				type: "weekly",
+				daysOfWeek: [1, 3, 5],
+				notifyAt: "14:30",
+			});
+			expect(result.success).toBe(true);
+			if (result.success) {
+				expect(result.data.notifyAt).toBe("14:30");
+			}
+		});
+
+		it("accepts pattern without notifyAt (undefined)", () => {
+			const result = recurringPatternSchema.safeParse({
+				type: "daily",
+			});
+			expect(result.success).toBe(true);
+			if (result.success) {
+				expect(result.data.notifyAt).toBeUndefined();
+			}
+		});
+
+		it("rejects notifyAt with invalid hour (24:00)", () => {
+			const result = recurringPatternSchema.safeParse({
+				type: "daily",
+				notifyAt: "24:00",
+			});
+			expect(result.success).toBe(false);
+		});
+
+		it("rejects notifyAt with invalid minute (12:60)", () => {
+			const result = recurringPatternSchema.safeParse({
+				type: "daily",
+				notifyAt: "12:60",
+			});
+			expect(result.success).toBe(false);
+		});
+
+		it("rejects notifyAt with incorrect format (9:00 instead of 09:00)", () => {
+			const result = recurringPatternSchema.safeParse({
+				type: "daily",
+				notifyAt: "9:00",
+			});
+			expect(result.success).toBe(false);
+		});
+
+		it("rejects notifyAt with seconds (09:00:00)", () => {
+			const result = recurringPatternSchema.safeParse({
+				type: "daily",
+				notifyAt: "09:00:00",
+			});
+			expect(result.success).toBe(false);
+		});
+
+		it("rejects notifyAt with invalid string format", () => {
+			const result = recurringPatternSchema.safeParse({
+				type: "daily",
+				notifyAt: "morning",
+			});
+			expect(result.success).toBe(false);
+		});
+
+		it("rejects notifyAt with AM/PM format", () => {
+			const result = recurringPatternSchema.safeParse({
+				type: "daily",
+				notifyAt: "9:00 AM",
+			});
+			expect(result.success).toBe(false);
+		});
+
+		it("accepts complete pattern with all fields including notifyAt", () => {
+			const result = recurringPatternSchema.safeParse({
+				type: "weekly",
+				interval: 2,
+				daysOfWeek: [1, 3, 5],
+				endDate: "2030-12-31",
+				occurrences: 10,
+				notifyAt: "09:00",
+			});
+			expect(result.success).toBe(true);
+			if (result.success) {
+				expect(result.data.notifyAt).toBe("09:00");
+			}
+		});
 	});
 
 	describe("RECURRING_PATTERN_TYPES constant", () => {

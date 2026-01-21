@@ -1,10 +1,17 @@
 "use client";
 
-import { CheckCircle2, ChevronDown, FolderIcon, Trash2 } from "lucide-react";
+import {
+	Bell,
+	CheckCircle2,
+	ChevronDown,
+	FolderIcon,
+	Trash2,
+} from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import type { SubtaskProgress } from "@/app/api/subtask";
 import { useSubtaskStorage } from "@/app/api/subtask";
 import type { RecurringPattern } from "@/app/api/todo/todo.types";
+import { useDueReminders } from "@/components/notifications/reminder-provider";
 import {
 	DueDateBadge,
 	isOverdue,
@@ -86,6 +93,10 @@ export function TodoExpandableItem({
 }: TodoExpandableItemProps) {
 	const [isExpanded, setIsExpanded] = useState(false);
 	const { create: createSubtask } = useSubtaskStorage(todo.id);
+	const { dueReminderIds } = useDueReminders();
+
+	// Check if this todo has a due reminder (notification fired but not dismissed)
+	const hasDueReminder = dueReminderIds.has(String(todo.id));
 
 	// Check if the todo is overdue (due date in the past and not completed)
 	const overdue = useMemo(() => {
@@ -201,17 +212,27 @@ export function TodoExpandableItem({
 
 				{/* Todo content */}
 				<div className="flex flex-1 flex-col gap-1">
-					<span
-						className={cn(
-							"text-sm transition-all duration-200",
-							todo.completed
-								? "text-muted-foreground line-through"
-								: "text-foreground",
+					<div className="flex items-center gap-2">
+						{/* Bouncing bell for due reminders */}
+						{hasDueReminder && (
+							<Bell
+								className="h-4 w-4 shrink-0 animate-bounce text-amber-500"
+								data-testid="todo-reminder-bell"
+								aria-label="Reminder is due"
+							/>
 						)}
-						data-testid="todo-text"
-					>
-						{todo.text}
-					</span>
+						<span
+							className={cn(
+								"text-sm transition-all duration-200",
+								todo.completed
+									? "text-muted-foreground line-through"
+									: "text-foreground",
+							)}
+							data-testid="todo-text"
+						>
+							{todo.text}
+						</span>
+					</div>
 
 					{/* Due date badge, folder badge, and subtask progress */}
 					<div className="flex flex-wrap items-center gap-2">

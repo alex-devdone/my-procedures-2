@@ -533,4 +533,693 @@ describe("local-todo-storage", () => {
 			);
 		});
 	});
+
+	describe("notifyAt field persistence", () => {
+		it("creates a todo with notifyAt in recurringPattern", () => {
+			const result = localTodoStorage.create("Daily reminder", null, {
+				dueDate: "2024-01-15T09:00:00.000Z",
+				recurringPattern: {
+					type: "daily",
+					interval: 1,
+					notifyAt: "09:00",
+				},
+			});
+
+			expect(result.recurringPattern).toBeDefined();
+			expect(result.recurringPattern?.notifyAt).toBe("09:00");
+		});
+
+		it("persists notifyAt to localStorage when creating a todo", () => {
+			localTodoStorage.create("Daily reminder", null, {
+				dueDate: "2024-01-15T09:00:00.000Z",
+				recurringPattern: {
+					type: "daily",
+					interval: 1,
+					notifyAt: "14:30",
+				},
+			});
+
+			const stored = JSON.parse(localStorageMock._store[STORAGE_KEY]);
+			expect(stored).toHaveLength(1);
+			expect(stored[0].recurringPattern.notifyAt).toBe("14:30");
+		});
+
+		it("retrieves notifyAt from localStorage via getAll", () => {
+			const todos = [
+				{
+					id: "todo-1",
+					text: "Daily task",
+					completed: false,
+					folderId: null,
+					dueDate: "2024-01-15T09:00:00.000Z",
+					recurringPattern: {
+						type: "daily",
+						interval: 1,
+						notifyAt: "08:00",
+					},
+				},
+			];
+			localStorageMock.setItem(STORAGE_KEY, JSON.stringify(todos));
+
+			const result = localTodoStorage.getAll();
+
+			expect(result).toHaveLength(1);
+			expect(result[0].recurringPattern?.notifyAt).toBe("08:00");
+		});
+
+		it("preserves notifyAt when updating schedule", () => {
+			const todos = [
+				{
+					id: "todo-1",
+					text: "Daily task",
+					completed: false,
+					folderId: null,
+					dueDate: "2024-01-15T09:00:00.000Z",
+					recurringPattern: {
+						type: "daily",
+						interval: 1,
+						notifyAt: "09:00",
+					},
+				},
+			];
+			localStorageMock.setItem(STORAGE_KEY, JSON.stringify(todos));
+
+			// Update dueDate but keep the same recurringPattern
+			localTodoStorage.updateSchedule("todo-1", {
+				dueDate: "2024-01-16T09:00:00.000Z",
+			});
+
+			const stored = JSON.parse(localStorageMock._store[STORAGE_KEY]);
+			expect(stored[0].recurringPattern.notifyAt).toBe("09:00");
+		});
+
+		it("updates notifyAt when updating recurringPattern", () => {
+			const todos = [
+				{
+					id: "todo-1",
+					text: "Daily task",
+					completed: false,
+					folderId: null,
+					dueDate: "2024-01-15T09:00:00.000Z",
+					recurringPattern: {
+						type: "daily",
+						interval: 1,
+						notifyAt: "09:00",
+					},
+				},
+			];
+			localStorageMock.setItem(STORAGE_KEY, JSON.stringify(todos));
+
+			localTodoStorage.updateSchedule("todo-1", {
+				recurringPattern: {
+					type: "weekly",
+					interval: 1,
+					daysOfWeek: [1, 3, 5],
+					notifyAt: "10:30",
+				},
+			});
+
+			const stored = JSON.parse(localStorageMock._store[STORAGE_KEY]);
+			expect(stored[0].recurringPattern.type).toBe("weekly");
+			expect(stored[0].recurringPattern.notifyAt).toBe("10:30");
+		});
+
+		it("preserves notifyAt through completeRecurring", () => {
+			const todos = [
+				{
+					id: "todo-1",
+					text: "Daily task",
+					completed: false,
+					folderId: null,
+					dueDate: "2024-01-15T09:00:00.000Z",
+					recurringPattern: {
+						type: "daily",
+						interval: 1,
+						notifyAt: "09:00",
+					},
+				},
+			];
+			localStorageMock.setItem(STORAGE_KEY, JSON.stringify(todos));
+
+			const result = localTodoStorage.completeRecurring("todo-1");
+
+			expect(result.completed).toBe(true);
+			expect(result.nextTodo).not.toBeNull();
+			expect(result.nextTodo?.recurringPattern?.notifyAt).toBe("09:00");
+		});
+	});
+
+	describe("recurring patterns with notifyAt integration", () => {
+		describe("daily patterns with notifyAt", () => {
+			it("creates daily recurring todo with notifyAt", () => {
+				const result = localTodoStorage.create("Morning standup", null, {
+					dueDate: "2024-01-15T09:00:00.000Z",
+					recurringPattern: {
+						type: "daily",
+						interval: 1,
+						notifyAt: "08:45",
+					},
+				});
+
+				expect(result.recurringPattern?.type).toBe("daily");
+				expect(result.recurringPattern?.interval).toBe(1);
+				expect(result.recurringPattern?.notifyAt).toBe("08:45");
+			});
+
+			it("creates daily recurring todo with custom interval and notifyAt", () => {
+				const result = localTodoStorage.create("Every 3 days task", null, {
+					dueDate: "2024-01-15T14:00:00.000Z",
+					recurringPattern: {
+						type: "daily",
+						interval: 3,
+						notifyAt: "14:00",
+					},
+				});
+
+				expect(result.recurringPattern?.type).toBe("daily");
+				expect(result.recurringPattern?.interval).toBe(3);
+				expect(result.recurringPattern?.notifyAt).toBe("14:00");
+			});
+
+			it("completes daily recurring todo and creates next occurrence with notifyAt preserved", () => {
+				const todos = [
+					{
+						id: "daily-1",
+						text: "Daily reminder",
+						completed: false,
+						folderId: null,
+						dueDate: "2024-01-15T10:00:00.000Z",
+						recurringPattern: {
+							type: "daily",
+							interval: 1,
+							notifyAt: "10:00",
+						},
+					},
+				];
+				localStorageMock.setItem(STORAGE_KEY, JSON.stringify(todos));
+
+				const result = localTodoStorage.completeRecurring("daily-1");
+
+				expect(result.completed).toBe(true);
+				expect(result.nextTodo).not.toBeNull();
+				expect(result.nextTodo?.recurringPattern?.type).toBe("daily");
+				expect(result.nextTodo?.recurringPattern?.notifyAt).toBe("10:00");
+				// Next occurrence should be 1 day later
+				expect(result.nextTodo?.dueDate).toBeDefined();
+				const nextDate = new Date(result.nextTodo?.dueDate ?? "");
+				expect(nextDate.getUTCDate()).toBe(16);
+			});
+		});
+
+		describe("weekly patterns with notifyAt", () => {
+			it("creates weekly recurring todo with specific days and notifyAt", () => {
+				const result = localTodoStorage.create("Team meeting", null, {
+					dueDate: "2024-01-15T15:00:00.000Z",
+					recurringPattern: {
+						type: "weekly",
+						interval: 1,
+						daysOfWeek: [1, 3, 5], // Mon, Wed, Fri
+						notifyAt: "14:45",
+					},
+				});
+
+				expect(result.recurringPattern?.type).toBe("weekly");
+				expect(result.recurringPattern?.daysOfWeek).toEqual([1, 3, 5]);
+				expect(result.recurringPattern?.notifyAt).toBe("14:45");
+			});
+
+			it("completes weekly recurring todo and preserves notifyAt", () => {
+				const todos = [
+					{
+						id: "weekly-1",
+						text: "Weekly review",
+						completed: false,
+						folderId: "work",
+						dueDate: "2024-01-15T09:00:00.000Z", // Monday
+						recurringPattern: {
+							type: "weekly",
+							interval: 1,
+							daysOfWeek: [1], // Monday
+							notifyAt: "08:30",
+						},
+					},
+				];
+				localStorageMock.setItem(STORAGE_KEY, JSON.stringify(todos));
+
+				const result = localTodoStorage.completeRecurring("weekly-1");
+
+				expect(result.completed).toBe(true);
+				expect(result.nextTodo?.recurringPattern?.notifyAt).toBe("08:30");
+				expect(result.nextTodo?.recurringPattern?.daysOfWeek).toEqual([1]);
+			});
+
+			it("creates bi-weekly recurring todo with notifyAt", () => {
+				const result = localTodoStorage.create("Bi-weekly sync", null, {
+					dueDate: "2024-01-15T11:00:00.000Z",
+					recurringPattern: {
+						type: "weekly",
+						interval: 2,
+						daysOfWeek: [2], // Tuesday
+						notifyAt: "10:30",
+					},
+				});
+
+				expect(result.recurringPattern?.interval).toBe(2);
+				expect(result.recurringPattern?.notifyAt).toBe("10:30");
+			});
+		});
+
+		describe("monthly patterns with notifyAt", () => {
+			it("creates monthly recurring todo with day of month and notifyAt", () => {
+				const result = localTodoStorage.create("Monthly report", null, {
+					dueDate: "2024-01-15T17:00:00.000Z",
+					recurringPattern: {
+						type: "monthly",
+						interval: 1,
+						dayOfMonth: 15,
+						notifyAt: "16:00",
+					},
+				});
+
+				expect(result.recurringPattern?.type).toBe("monthly");
+				expect(result.recurringPattern?.dayOfMonth).toBe(15);
+				expect(result.recurringPattern?.notifyAt).toBe("16:00");
+			});
+
+			it("completes monthly recurring todo and preserves notifyAt", () => {
+				const todos = [
+					{
+						id: "monthly-1",
+						text: "Monthly bills",
+						completed: false,
+						folderId: null,
+						dueDate: "2024-01-31T12:00:00.000Z",
+						recurringPattern: {
+							type: "monthly",
+							interval: 1,
+							dayOfMonth: 31,
+							notifyAt: "11:00",
+						},
+					},
+				];
+				localStorageMock.setItem(STORAGE_KEY, JSON.stringify(todos));
+
+				const result = localTodoStorage.completeRecurring("monthly-1");
+
+				expect(result.completed).toBe(true);
+				expect(result.nextTodo?.recurringPattern?.notifyAt).toBe("11:00");
+				expect(result.nextTodo?.recurringPattern?.dayOfMonth).toBe(31);
+			});
+
+			it("handles end of month edge case with notifyAt", () => {
+				const todos = [
+					{
+						id: "monthly-eom",
+						text: "End of month task",
+						completed: false,
+						folderId: null,
+						dueDate: "2024-01-31T09:00:00.000Z",
+						recurringPattern: {
+							type: "monthly",
+							interval: 1,
+							dayOfMonth: 31,
+							notifyAt: "09:00",
+						},
+					},
+				];
+				localStorageMock.setItem(STORAGE_KEY, JSON.stringify(todos));
+
+				const result = localTodoStorage.completeRecurring("monthly-eom");
+
+				expect(result.completed).toBe(true);
+				expect(result.nextTodo?.recurringPattern?.notifyAt).toBe("09:00");
+				// February has 29 days in 2024 (leap year), so should be Feb 29
+				expect(result.nextTodo?.dueDate).toBeDefined();
+				const nextDate = new Date(result.nextTodo?.dueDate ?? "");
+				expect(nextDate.getUTCMonth()).toBe(1); // February
+				expect(nextDate.getUTCDate()).toBe(29); // Feb 29 in leap year
+			});
+		});
+
+		describe("yearly patterns with notifyAt", () => {
+			it("creates yearly recurring todo with notifyAt", () => {
+				const result = localTodoStorage.create("Annual review", null, {
+					dueDate: "2024-03-15T10:00:00.000Z",
+					recurringPattern: {
+						type: "yearly",
+						interval: 1,
+						monthOfYear: 3,
+						dayOfMonth: 15,
+						notifyAt: "09:00",
+					},
+				});
+
+				expect(result.recurringPattern?.type).toBe("yearly");
+				expect(result.recurringPattern?.monthOfYear).toBe(3);
+				expect(result.recurringPattern?.dayOfMonth).toBe(15);
+				expect(result.recurringPattern?.notifyAt).toBe("09:00");
+			});
+
+			it("completes yearly recurring todo and preserves notifyAt", () => {
+				const todos = [
+					{
+						id: "yearly-1",
+						text: "Birthday reminder",
+						completed: false,
+						folderId: "personal",
+						dueDate: "2024-06-15T08:00:00.000Z",
+						recurringPattern: {
+							type: "yearly",
+							interval: 1,
+							monthOfYear: 6,
+							dayOfMonth: 15,
+							notifyAt: "08:00",
+						},
+					},
+				];
+				localStorageMock.setItem(STORAGE_KEY, JSON.stringify(todos));
+
+				const result = localTodoStorage.completeRecurring("yearly-1");
+
+				expect(result.completed).toBe(true);
+				expect(result.nextTodo?.recurringPattern?.notifyAt).toBe("08:00");
+				expect(result.nextTodo?.dueDate).toBeDefined();
+				const nextDate = new Date(result.nextTodo?.dueDate ?? "");
+				expect(nextDate.getUTCFullYear()).toBe(2025);
+				expect(nextDate.getUTCMonth()).toBe(5); // June
+			});
+		});
+
+		describe("custom patterns with notifyAt", () => {
+			it("creates custom recurring todo with specific days and notifyAt", () => {
+				const result = localTodoStorage.create("Custom schedule", null, {
+					dueDate: "2024-01-15T13:00:00.000Z",
+					recurringPattern: {
+						type: "custom",
+						interval: 1,
+						daysOfWeek: [0, 6], // Weekends only
+						notifyAt: "12:00",
+					},
+				});
+
+				expect(result.recurringPattern?.type).toBe("custom");
+				expect(result.recurringPattern?.daysOfWeek).toEqual([0, 6]);
+				expect(result.recurringPattern?.notifyAt).toBe("12:00");
+			});
+
+			it("completes custom recurring todo and preserves notifyAt", () => {
+				const todos = [
+					{
+						id: "custom-1",
+						text: "Weekend activity",
+						completed: false,
+						folderId: null,
+						dueDate: "2024-01-13T10:00:00.000Z", // Saturday
+						recurringPattern: {
+							type: "custom",
+							interval: 1,
+							daysOfWeek: [0, 6], // Sun, Sat
+							notifyAt: "09:30",
+						},
+					},
+				];
+				localStorageMock.setItem(STORAGE_KEY, JSON.stringify(todos));
+
+				const result = localTodoStorage.completeRecurring("custom-1");
+
+				expect(result.completed).toBe(true);
+				expect(result.nextTodo?.recurringPattern?.notifyAt).toBe("09:30");
+				expect(result.nextTodo?.recurringPattern?.daysOfWeek).toEqual([0, 6]);
+			});
+		});
+
+		describe("pattern expiration with notifyAt", () => {
+			it("handles pattern with endDate and notifyAt", () => {
+				const result = localTodoStorage.create("Limited recurrence", null, {
+					dueDate: "2024-01-15T09:00:00.000Z",
+					recurringPattern: {
+						type: "daily",
+						interval: 1,
+						endDate: "2024-01-31",
+						notifyAt: "09:00",
+					},
+				});
+
+				expect(result.recurringPattern?.endDate).toBe("2024-01-31");
+				expect(result.recurringPattern?.notifyAt).toBe("09:00");
+			});
+
+			it("handles pattern with max occurrences and notifyAt", () => {
+				const result = localTodoStorage.create("Limited occurrences", null, {
+					dueDate: "2024-01-15T10:00:00.000Z",
+					recurringPattern: {
+						type: "daily",
+						interval: 1,
+						occurrences: 5,
+						notifyAt: "10:00",
+					},
+				});
+
+				expect(result.recurringPattern?.occurrences).toBe(5);
+				expect(result.recurringPattern?.notifyAt).toBe("10:00");
+			});
+
+			it("stops creating next occurrence when pattern expires by date", () => {
+				const todos = [
+					{
+						id: "expiring-date",
+						text: "Expiring by date",
+						completed: false,
+						folderId: null,
+						dueDate: "2024-01-30T09:00:00.000Z",
+						recurringPattern: {
+							type: "daily",
+							interval: 1,
+							endDate: "2024-01-30",
+							notifyAt: "09:00",
+						},
+					},
+				];
+				localStorageMock.setItem(STORAGE_KEY, JSON.stringify(todos));
+
+				const result = localTodoStorage.completeRecurring("expiring-date");
+
+				expect(result.completed).toBe(true);
+				expect(result.nextTodo).toBeNull();
+				expect(result.message).toBe("Recurring pattern has expired");
+			});
+
+			it("stops creating next occurrence when max occurrences reached", () => {
+				const todos = [
+					{
+						id: "expiring-occ",
+						text: "Expiring by occurrences",
+						completed: false,
+						folderId: null,
+						dueDate: "2024-01-15T09:00:00.000Z",
+						recurringPattern: {
+							type: "daily",
+							interval: 1,
+							occurrences: 1,
+							notifyAt: "09:00",
+						},
+					},
+				];
+				localStorageMock.setItem(STORAGE_KEY, JSON.stringify(todos));
+
+				// Complete with 0 prior completions, so this is the 1st (and last)
+				const result = localTodoStorage.completeRecurring("expiring-occ", 0);
+
+				expect(result.completed).toBe(true);
+				expect(result.nextTodo).toBeNull();
+				expect(result.message).toBe("Recurring pattern has expired");
+			});
+		});
+
+		describe("notifyAt time format variations", () => {
+			it("accepts morning time format", () => {
+				const result = localTodoStorage.create("Morning task", null, {
+					dueDate: "2024-01-15T06:00:00.000Z",
+					recurringPattern: {
+						type: "daily",
+						interval: 1,
+						notifyAt: "06:00",
+					},
+				});
+
+				expect(result.recurringPattern?.notifyAt).toBe("06:00");
+			});
+
+			it("accepts afternoon time format", () => {
+				const result = localTodoStorage.create("Afternoon task", null, {
+					dueDate: "2024-01-15T15:30:00.000Z",
+					recurringPattern: {
+						type: "daily",
+						interval: 1,
+						notifyAt: "15:30",
+					},
+				});
+
+				expect(result.recurringPattern?.notifyAt).toBe("15:30");
+			});
+
+			it("accepts evening time format", () => {
+				const result = localTodoStorage.create("Evening task", null, {
+					dueDate: "2024-01-15T21:45:00.000Z",
+					recurringPattern: {
+						type: "daily",
+						interval: 1,
+						notifyAt: "21:45",
+					},
+				});
+
+				expect(result.recurringPattern?.notifyAt).toBe("21:45");
+			});
+
+			it("accepts midnight time format", () => {
+				const result = localTodoStorage.create("Midnight task", null, {
+					dueDate: "2024-01-15T00:00:00.000Z",
+					recurringPattern: {
+						type: "daily",
+						interval: 1,
+						notifyAt: "00:00",
+					},
+				});
+
+				expect(result.recurringPattern?.notifyAt).toBe("00:00");
+			});
+
+			it("accepts end of day time format", () => {
+				const result = localTodoStorage.create("End of day task", null, {
+					dueDate: "2024-01-15T23:59:00.000Z",
+					recurringPattern: {
+						type: "daily",
+						interval: 1,
+						notifyAt: "23:59",
+					},
+				});
+
+				expect(result.recurringPattern?.notifyAt).toBe("23:59");
+			});
+		});
+
+		describe("recurring pattern without notifyAt", () => {
+			it("creates recurring todo without notifyAt", () => {
+				const result = localTodoStorage.create("No notification", null, {
+					dueDate: "2024-01-15T09:00:00.000Z",
+					recurringPattern: {
+						type: "daily",
+						interval: 1,
+					},
+				});
+
+				expect(result.recurringPattern?.type).toBe("daily");
+				expect(result.recurringPattern?.notifyAt).toBeUndefined();
+			});
+
+			it("completes recurring todo without notifyAt", () => {
+				const todos = [
+					{
+						id: "no-notify",
+						text: "Silent recurrence",
+						completed: false,
+						folderId: null,
+						dueDate: "2024-01-15T09:00:00.000Z",
+						recurringPattern: {
+							type: "daily",
+							interval: 1,
+						},
+					},
+				];
+				localStorageMock.setItem(STORAGE_KEY, JSON.stringify(todos));
+
+				const result = localTodoStorage.completeRecurring("no-notify");
+
+				expect(result.completed).toBe(true);
+				expect(result.nextTodo?.recurringPattern?.notifyAt).toBeUndefined();
+			});
+		});
+
+		describe("folder assignment with recurring and notifyAt", () => {
+			it("preserves folderId when completing recurring todo with notifyAt", () => {
+				const todos = [
+					{
+						id: "folder-recurring",
+						text: "Work task",
+						completed: false,
+						folderId: "work-folder",
+						dueDate: "2024-01-15T09:00:00.000Z",
+						recurringPattern: {
+							type: "daily",
+							interval: 1,
+							notifyAt: "08:45",
+						},
+					},
+				];
+				localStorageMock.setItem(STORAGE_KEY, JSON.stringify(todos));
+
+				const result = localTodoStorage.completeRecurring("folder-recurring");
+
+				expect(result.nextTodo?.folderId).toBe("work-folder");
+				expect(result.nextTodo?.recurringPattern?.notifyAt).toBe("08:45");
+			});
+
+			it("handles null folderId with recurring and notifyAt", () => {
+				const todos = [
+					{
+						id: "inbox-recurring",
+						text: "Inbox task",
+						completed: false,
+						folderId: null,
+						dueDate: "2024-01-15T09:00:00.000Z",
+						recurringPattern: {
+							type: "weekly",
+							interval: 1,
+							daysOfWeek: [1, 3, 5],
+							notifyAt: "09:00",
+						},
+					},
+				];
+				localStorageMock.setItem(STORAGE_KEY, JSON.stringify(todos));
+
+				const result = localTodoStorage.completeRecurring("inbox-recurring");
+
+				expect(result.nextTodo?.folderId).toBeNull();
+				expect(result.nextTodo?.recurringPattern?.notifyAt).toBe("09:00");
+			});
+		});
+
+		describe("reminderAt combined with recurring and notifyAt", () => {
+			it("preserves reminderAt offset when completing recurring todo with notifyAt", () => {
+				const todos = [
+					{
+						id: "reminder-recurring",
+						text: "Reminder task",
+						completed: false,
+						folderId: null,
+						dueDate: "2024-01-15T14:00:00.000Z",
+						reminderAt: "2024-01-15T13:30:00.000Z", // 30 min before
+						recurringPattern: {
+							type: "daily",
+							interval: 1,
+							notifyAt: "14:00",
+						},
+					},
+				];
+				localStorageMock.setItem(STORAGE_KEY, JSON.stringify(todos));
+
+				const result = localTodoStorage.completeRecurring("reminder-recurring");
+
+				expect(result.completed).toBe(true);
+				expect(result.nextTodo?.recurringPattern?.notifyAt).toBe("14:00");
+				// Reminder should maintain 30 min offset
+				expect(result.nextTodo?.dueDate).toBeDefined();
+				expect(result.nextTodo?.reminderAt).toBeDefined();
+				const nextDue = new Date(result.nextTodo?.dueDate ?? "");
+				const nextReminder = new Date(result.nextTodo?.reminderAt ?? "");
+				const offset = nextDue.getTime() - nextReminder.getTime();
+				expect(offset).toBe(30 * 60 * 1000); // 30 minutes in ms
+			});
+		});
+	});
 });

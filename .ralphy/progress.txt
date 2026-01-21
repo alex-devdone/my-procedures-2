@@ -1134,3 +1134,4 @@
     - Test realtime sync across multiple browser tabs
     - Test realtime sync across multiple devices
   - All automated development work for Scheduled Todos, Folders & Subtasks feature is complete
+- [✓] 2026-01-21 21:31 - Browser notification fires automatically when scheduled time arrives

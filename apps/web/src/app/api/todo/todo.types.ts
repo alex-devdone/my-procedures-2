@@ -28,6 +28,14 @@ export const recurringPatternSchema = z.object({
 	monthOfYear: z.number().int().min(1).max(12).optional(),
 	endDate: z.string().optional(),
 	occurrences: z.number().int().positive().optional(),
+	/** Time of day to send notification in HH:mm format (e.g., "09:00") */
+	notifyAt: z
+		.string()
+		.regex(
+			/^([01]\d|2[0-3]):([0-5]\d)$/,
+			"Must be in HH:mm format (00:00-23:59)",
+		)
+		.optional(),
 });
 
 export type RecurringPattern = z.infer<typeof recurringPatternSchema>;

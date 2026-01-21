@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Calendar, CheckCircle2, Clock, X } from "lucide-react";
+import { Bell, Calendar, CheckCircle2, Clock, Repeat, X } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
 
@@ -79,6 +79,29 @@ export function getReminderToastId(todoId: number | string): string {
 	return `reminder-toast-${todoId}`;
 }
 
+/**
+ * Formats the recurring type as a short label for display.
+ * Returns null for non-recurring reminders.
+ */
+export function formatRecurringLabel(reminder: DueReminder): string | null {
+	if (!reminder.isRecurring) return null;
+
+	switch (reminder.recurringType) {
+		case "daily":
+			return "Daily";
+		case "weekly":
+			return "Weekly";
+		case "monthly":
+			return "Monthly";
+		case "yearly":
+			return "Yearly";
+		case "custom":
+			return "Recurring";
+		default:
+			return null;
+	}
+}
+
 // ============================================================================
 // Components
 // ============================================================================
@@ -95,6 +118,7 @@ export function ReminderToastContent({
 }: ReminderToastContentProps) {
 	const isOverdue = isReminderOverdue(reminder);
 	const timeInfo = formatReminderTime(reminder);
+	const recurringLabel = formatRecurringLabel(reminder);
 
 	return (
 		<div
@@ -120,6 +144,17 @@ export function ReminderToastContent({
 
 			{/* Content */}
 			<div className="min-w-0 flex-1">
+				{/* Recurring indicator badge */}
+				{recurringLabel && (
+					<div
+						className="mb-1 inline-flex items-center gap-1 rounded-full bg-accent/10 px-2 py-0.5 text-accent text-xs"
+						data-testid="reminder-toast-recurring-badge"
+					>
+						<Repeat className="h-3 w-3" aria-hidden="true" />
+						<span>{recurringLabel}</span>
+					</div>
+				)}
+
 				{/* Todo text */}
 				<p
 					className="truncate font-medium text-foreground text-sm"

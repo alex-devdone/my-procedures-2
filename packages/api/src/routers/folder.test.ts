@@ -1177,9 +1177,9 @@ describe("Bulk Create Folders Business Logic", () => {
 				order: nextOrder++,
 			}));
 
-			expect(foldersToCreate[0].order).toBe(3);
-			expect(foldersToCreate[1].order).toBe(4);
-			expect(foldersToCreate[2].order).toBe(5);
+			expect(foldersToCreate[0]?.order).toBe(3);
+			expect(foldersToCreate[1]?.order).toBe(4);
+			expect(foldersToCreate[2]?.order).toBe(5);
 		});
 
 		it("should use explicit order when provided", () => {
@@ -1199,9 +1199,9 @@ describe("Bulk Create Folders Business Logic", () => {
 				order: f.order !== undefined ? f.order : nextOrder++,
 			}));
 
-			expect(foldersToCreate[0].order).toBe(10);
-			expect(foldersToCreate[1].order).toBe(3);
-			expect(foldersToCreate[2].order).toBe(20);
+			expect(foldersToCreate[0]?.order).toBe(10);
+			expect(foldersToCreate[1]?.order).toBe(3);
+			expect(foldersToCreate[2]?.order).toBe(20);
 		});
 
 		it("should start at 0 when no existing folders", () => {
@@ -1215,7 +1215,7 @@ describe("Bulk Create Folders Business Logic", () => {
 				order: nextOrder++,
 			}));
 
-			expect(foldersToCreate[0].order).toBe(0);
+			expect(foldersToCreate[0]?.order).toBe(0);
 		});
 	});
 

@@ -16,6 +16,10 @@ export const recurringPatternSchema = z.object({
 	monthOfYear: z.number().int().min(1).max(12).optional(),
 	endDate: z.string().optional(),
 	occurrences: z.number().int().positive().optional(),
+	notifyAt: z
+		.string()
+		.regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Must be in HH:mm format")
+		.optional(),
 });
 
 export type RecurringPattern = z.infer<typeof recurringPatternSchema>;
@@ -85,7 +89,8 @@ function getNextWeeklyOccurrence(
 
 		if (!foundInCurrentWeek) {
 			// Move to first matching day of next interval week
-			const daysUntilNextWeek = 7 - currentDay + sortedDays[0];
+			const firstDay = sortedDays[0] ?? 0;
+			const daysUntilNextWeek = 7 - currentDay + firstDay;
 			const additionalWeeks = (interval - 1) * 7;
 			next.setDate(next.getDate() + daysUntilNextWeek + additionalWeeks);
 		}
@@ -299,7 +304,7 @@ export function parseRecurringDescription(
 
 	// Every N days
 	const everyNDaysMatch = normalized.match(/^every\s+(\d+)\s+days?$/);
-	if (everyNDaysMatch) {
+	if (everyNDaysMatch?.[1]) {
 		return { type: "daily", interval: Number.parseInt(everyNDaysMatch[1], 10) };
 	}
 
@@ -310,7 +315,7 @@ export function parseRecurringDescription(
 
 	// Every N weeks
 	const everyNWeeksMatch = normalized.match(/^every\s+(\d+)\s+weeks?$/);
-	if (everyNWeeksMatch) {
+	if (everyNWeeksMatch?.[1]) {
 		return {
 			type: "weekly",
 			interval: Number.parseInt(everyNWeeksMatch[1], 10),
@@ -319,7 +324,7 @@ export function parseRecurringDescription(
 
 	// Every specific day(s) of week
 	const everyDayMatch = normalized.match(/^every\s+(.+)$/);
-	if (everyDayMatch) {
+	if (everyDayMatch?.[1]) {
 		const daysStr = everyDayMatch[1];
 		// Split by common separators: comma, "and", whitespace
 		const dayParts = daysStr.split(/[,\s]+(?:and\s+)?|(?:\s+and\s+)/);
@@ -347,7 +352,7 @@ export function parseRecurringDescription(
 
 	// Every N months
 	const everyNMonthsMatch = normalized.match(/^every\s+(\d+)\s+months?$/);
-	if (everyNMonthsMatch) {
+	if (everyNMonthsMatch?.[1]) {
 		return {
 			type: "monthly",
 			interval: Number.parseInt(everyNMonthsMatch[1], 10),
@@ -358,7 +363,7 @@ export function parseRecurringDescription(
 	const monthlyOnDayMatch = normalized.match(
 		/^every\s+month\s+on\s+(?:the\s+)?(\d+)(?:st|nd|rd|th)?$/,
 	);
-	if (monthlyOnDayMatch) {
+	if (monthlyOnDayMatch?.[1]) {
 		const day = Number.parseInt(monthlyOnDayMatch[1], 10);
 		if (day >= 1 && day <= 31) {
 			return { type: "monthly", dayOfMonth: day };
@@ -372,7 +377,7 @@ export function parseRecurringDescription(
 
 	// Every N years
 	const everyNYearsMatch = normalized.match(/^every\s+(\d+)\s+years?$/);
-	if (everyNYearsMatch) {
+	if (everyNYearsMatch?.[1]) {
 		return {
 			type: "yearly",
 			interval: Number.parseInt(everyNYearsMatch[1], 10),
@@ -380,6 +385,53 @@ export function parseRecurringDescription(
 	}
 
 	return null;
+}
+
+/**
+ * Calculate the next notification time based on a recurring pattern's notifyAt field
+ *
+ * Combines the next occurrence date from the pattern with the time-of-day specified
+ * in notifyAt. For daily patterns, if the notification time has already passed today,
+ * it moves to the next occurrence.
+ *
+ * @param pattern - The recurring pattern definition with optional notifyAt field
+ * @param fromDate - The date to calculate from (defaults to current date/time)
+ * @returns The next notification datetime, or null if no notifyAt is set or pattern is expired
+ */
+export function getNextNotificationTime(
+	pattern: RecurringPattern,
+	fromDate: Date = new Date(),
+): Date | null {
+	// Return null if no notifyAt is specified
+	if (!pattern.notifyAt) {
+		return null;
+	}
+
+	// Parse the time from notifyAt (HH:mm format)
+	const [hours = 0, minutes = 0] = pattern.notifyAt.split(":").map(Number);
+
+	// Get the next occurrence date based on pattern type
+	const nextOccurrence = getNextOccurrence(pattern, fromDate);
+	if (!nextOccurrence) {
+		return null;
+	}
+
+	// Set the specific time on the occurrence date
+	nextOccurrence.setHours(hours, minutes, 0, 0);
+
+	// For daily patterns, if the time has already passed today, we need to check
+	// if the next occurrence with the specified time is still in the past
+	if (nextOccurrence <= fromDate) {
+		// The calculated time is in the past, get the next occurrence after that
+		const nextAfterCurrent = getNextOccurrence(pattern, nextOccurrence);
+		if (!nextAfterCurrent) {
+			return null;
+		}
+		nextAfterCurrent.setHours(hours, minutes, 0, 0);
+		return nextAfterCurrent;
+	}
+
+	return nextOccurrence;
 }
 
 /**
@@ -410,7 +462,7 @@ export function formatRecurringPattern(pattern: RecurringPattern): string {
 	const formatOrdinal = (n: number): string => {
 		const s = ["th", "st", "nd", "rd"];
 		const v = n % 100;
-		return n + (s[(v - 20) % 10] || s[v] || s[0]);
+		return n + (s[(v - 20) % 10] ?? s[v] ?? s[0] ?? "th");
 	};
 
 	switch (pattern.type) {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	formatRecurringPattern,
+	getNextNotificationTime,
 	getNextOccurrence,
 	isPatternExpired,
 	parseRecurringDescription,
@@ -818,6 +819,242 @@ describe("formatRecurringPattern", () => {
 			expect(formatRecurringPattern(pattern)).toBe(
 				"Custom: Mon, Wed, Fri every 2 weeks",
 			);
+		});
+	});
+});
+
+describe("getNextNotificationTime", () => {
+	describe("patterns without notifyAt", () => {
+		it("returns null when notifyAt is not set", () => {
+			const pattern: RecurringPattern = { type: "daily" };
+			const result = getNextNotificationTime(
+				pattern,
+				new Date("2026-01-15T10:00:00"),
+			);
+			expect(result).toBeNull();
+		});
+
+		it("returns null for weekly pattern without notifyAt", () => {
+			const pattern: RecurringPattern = {
+				type: "weekly",
+				daysOfWeek: [1, 3, 5],
+			};
+			const result = getNextNotificationTime(
+				pattern,
+				new Date("2026-01-15T10:00:00"),
+			);
+			expect(result).toBeNull();
+		});
+	});
+
+	describe("daily patterns with notifyAt", () => {
+		it("returns tomorrow at specified time for daily pattern", () => {
+			const pattern: RecurringPattern = { type: "daily", notifyAt: "09:00" };
+			const fromDate = new Date("2026-01-15T10:00:00");
+			const result = getNextNotificationTime(pattern, fromDate);
+
+			expect(result).not.toBeNull();
+			expect(result?.getFullYear()).toBe(2026);
+			expect(result?.getMonth()).toBe(0); // January
+			expect(result?.getDate()).toBe(16);
+			expect(result?.getHours()).toBe(9);
+			expect(result?.getMinutes()).toBe(0);
+			expect(result?.getSeconds()).toBe(0);
+		});
+
+		it("returns next occurrence at notifyAt time when calculated time is in past", () => {
+			// fromDate is Jan 15 at 10:00, daily pattern with 09:00 notifyAt
+			// Next occurrence would be Jan 16 at 09:00
+			const pattern: RecurringPattern = { type: "daily", notifyAt: "09:00" };
+			const fromDate = new Date("2026-01-15T10:00:00");
+			const result = getNextNotificationTime(pattern, fromDate);
+
+			expect(result).not.toBeNull();
+			expect(result?.getDate()).toBe(16);
+			expect(result?.getHours()).toBe(9);
+		});
+
+		it("returns correct time for daily with interval 3", () => {
+			const pattern: RecurringPattern = {
+				type: "daily",
+				interval: 3,
+				notifyAt: "14:30",
+			};
+			const fromDate = new Date("2026-01-15T08:00:00");
+			const result = getNextNotificationTime(pattern, fromDate);
+
+			expect(result).not.toBeNull();
+			expect(result?.getDate()).toBe(18); // 15 + 3
+			expect(result?.getHours()).toBe(14);
+			expect(result?.getMinutes()).toBe(30);
+		});
+
+		it("handles midnight notifyAt (00:00)", () => {
+			const pattern: RecurringPattern = { type: "daily", notifyAt: "00:00" };
+			const fromDate = new Date("2026-01-15T10:00:00");
+			const result = getNextNotificationTime(pattern, fromDate);
+
+			expect(result).not.toBeNull();
+			expect(result?.getDate()).toBe(16);
+			expect(result?.getHours()).toBe(0);
+			expect(result?.getMinutes()).toBe(0);
+		});
+
+		it("handles end of day notifyAt (23:59)", () => {
+			const pattern: RecurringPattern = { type: "daily", notifyAt: "23:59" };
+			const fromDate = new Date("2026-01-15T10:00:00");
+			const result = getNextNotificationTime(pattern, fromDate);
+
+			expect(result).not.toBeNull();
+			expect(result?.getDate()).toBe(16);
+			expect(result?.getHours()).toBe(23);
+			expect(result?.getMinutes()).toBe(59);
+		});
+	});
+
+	describe("weekly patterns with notifyAt", () => {
+		it("returns correct day and time for weekly pattern", () => {
+			const pattern: RecurringPattern = {
+				type: "weekly",
+				daysOfWeek: [5], // Friday
+				notifyAt: "12:00",
+			};
+			const fromDate = new Date("2026-01-15T10:00:00"); // Thursday
+			const result = getNextNotificationTime(pattern, fromDate);
+
+			expect(result).not.toBeNull();
+			expect(result?.getDay()).toBe(5); // Friday
+			expect(result?.getDate()).toBe(16); // Jan 16, 2026 is Friday
+			expect(result?.getHours()).toBe(12);
+			expect(result?.getMinutes()).toBe(0);
+		});
+
+		it("returns next week when no matching day in current week", () => {
+			const pattern: RecurringPattern = {
+				type: "weekly",
+				daysOfWeek: [1], // Monday
+				notifyAt: "09:00",
+			};
+			const fromDate = new Date("2026-01-15T10:00:00"); // Thursday
+			const result = getNextNotificationTime(pattern, fromDate);
+
+			expect(result).not.toBeNull();
+			expect(result?.getDay()).toBe(1); // Monday
+			expect(result?.getDate()).toBe(19); // Next Monday
+			expect(result?.getHours()).toBe(9);
+		});
+
+		it("handles multiple days of week with notifyAt", () => {
+			const pattern: RecurringPattern = {
+				type: "weekly",
+				daysOfWeek: [1, 3, 5], // Mon, Wed, Fri
+				notifyAt: "08:00",
+			};
+			const fromDate = new Date("2026-01-15T10:00:00"); // Thursday
+			const result = getNextNotificationTime(pattern, fromDate);
+
+			expect(result).not.toBeNull();
+			expect(result?.getDay()).toBe(5); // Friday
+			expect(result?.getHours()).toBe(8);
+		});
+	});
+
+	describe("monthly patterns with notifyAt", () => {
+		it("returns next month with specified day and time", () => {
+			const pattern: RecurringPattern = {
+				type: "monthly",
+				dayOfMonth: 1,
+				notifyAt: "08:00",
+			};
+			const fromDate = new Date("2026-01-15T10:00:00");
+			const result = getNextNotificationTime(pattern, fromDate);
+
+			expect(result).not.toBeNull();
+			expect(result?.getMonth()).toBe(1); // February
+			expect(result?.getDate()).toBe(1);
+			expect(result?.getHours()).toBe(8);
+			expect(result?.getMinutes()).toBe(0);
+		});
+
+		it("handles months with fewer days", () => {
+			const pattern: RecurringPattern = {
+				type: "monthly",
+				dayOfMonth: 31,
+				notifyAt: "09:00",
+			};
+			const fromDate = new Date("2026-01-31T10:00:00");
+			const result = getNextNotificationTime(pattern, fromDate);
+
+			expect(result).not.toBeNull();
+			expect(result?.getMonth()).toBe(1); // February
+			expect(result?.getDate()).toBe(28); // Last day of Feb 2026
+			expect(result?.getHours()).toBe(9);
+		});
+	});
+
+	describe("yearly patterns with notifyAt", () => {
+		it("returns next year with specified month, day, and time", () => {
+			const pattern: RecurringPattern = {
+				type: "yearly",
+				monthOfYear: 7, // July
+				dayOfMonth: 4,
+				notifyAt: "10:00",
+			};
+			const fromDate = new Date("2026-01-15T10:00:00");
+			const result = getNextNotificationTime(pattern, fromDate);
+
+			expect(result).not.toBeNull();
+			expect(result?.getFullYear()).toBe(2027);
+			expect(result?.getMonth()).toBe(6); // July (0-indexed)
+			expect(result?.getDate()).toBe(4);
+			expect(result?.getHours()).toBe(10);
+		});
+	});
+
+	describe("edge cases", () => {
+		it("returns null for expired pattern", () => {
+			const pattern: RecurringPattern = {
+				type: "daily",
+				endDate: "2026-01-10",
+				notifyAt: "09:00",
+			};
+			const result = getNextNotificationTime(
+				pattern,
+				new Date("2026-01-15T10:00:00"),
+			);
+			expect(result).toBeNull();
+		});
+
+		it("returns null when next occurrence with time would exceed endDate", () => {
+			const pattern: RecurringPattern = {
+				type: "daily",
+				endDate: "2026-01-15",
+				notifyAt: "09:00",
+			};
+			const result = getNextNotificationTime(
+				pattern,
+				new Date("2026-01-15T10:00:00"),
+			);
+			expect(result).toBeNull();
+		});
+
+		it("uses current date when fromDate is not provided", () => {
+			const pattern: RecurringPattern = { type: "daily", notifyAt: "09:00" };
+			const result = getNextNotificationTime(pattern);
+
+			expect(result).not.toBeNull();
+			// Result should be in the future
+			expect(result?.getTime()).toBeGreaterThan(Date.now());
+		});
+
+		it("sets seconds and milliseconds to zero", () => {
+			const pattern: RecurringPattern = { type: "daily", notifyAt: "14:30" };
+			const fromDate = new Date("2026-01-15T10:00:00.123");
+			const result = getNextNotificationTime(pattern, fromDate);
+
+			expect(result).not.toBeNull();
+			expect(result?.getSeconds()).toBe(0);
+			expect(result?.getMilliseconds()).toBe(0);
 		});
 	});
 });

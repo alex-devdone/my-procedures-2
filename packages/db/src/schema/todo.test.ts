@@ -119,4 +119,27 @@ describe("RecurringPattern type", () => {
 		expect(pattern.endDate).toBe("2026-12-31");
 		expect(pattern.occurrences).toBe(10);
 	});
+
+	it("accepts pattern with notifyAt time", () => {
+		const pattern: RecurringPattern = {
+			type: "daily",
+			notifyAt: "09:00",
+		};
+		expect(pattern.type).toBe("daily");
+		expect(pattern.notifyAt).toBe("09:00");
+	});
+
+	it("accepts pattern with notifyAt in HH:mm format", () => {
+		const pattern: RecurringPattern = {
+			type: "weekly",
+			daysOfWeek: [1, 3, 5],
+			notifyAt: "14:30",
+		};
+		expect(pattern.notifyAt).toBe("14:30");
+	});
+
+	it("accepts pattern without notifyAt (undefined)", () => {
+		const pattern: RecurringPattern = { type: "daily" };
+		expect(pattern.notifyAt).toBeUndefined();
+	});
 });

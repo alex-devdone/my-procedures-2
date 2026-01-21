@@ -21,6 +21,8 @@ export interface RecurringPattern {
 	monthOfYear?: number;
 	endDate?: string;
 	occurrences?: number;
+	/** Time of day to send notification in HH:mm format (e.g., "09:00") */
+	notifyAt?: string;
 }
 
 export const todo = pgTable(

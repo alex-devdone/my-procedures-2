@@ -31,6 +31,15 @@ vi.mock("@/app/api/subtask", () => ({
 	}),
 }));
 
+// Mock the reminder provider to avoid supabase dependency
+vi.mock("@/components/notifications/reminder-provider", () => ({
+	useDueReminders: () => ({
+		dueReminderIds: new Set<string>(),
+		dueReminders: [],
+		dismissReminder: vi.fn(),
+	}),
+}));
+
 // Import after mocks
 import {
 	flattenDateGroups,
