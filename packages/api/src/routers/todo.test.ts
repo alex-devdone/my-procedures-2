@@ -3944,4 +3944,706 @@ describe("UpdatePastCompletion Procedure", () => {
 			});
 		});
 	});
+
+	describe("isDateMatchingPattern Logic", () => {
+		// Helper function that mirrors the logic from the router
+		const isDateMatchingPattern = (
+			pattern: RecurringPattern,
+			date: Date,
+			startDate?: Date | null,
+		): boolean => {
+			const dayOfWeek = date.getDay();
+			const dayOfMonth = date.getDate();
+			const month = date.getMonth() + 1; // 1-indexed
+
+			// Check endDate first
+			if (pattern.endDate) {
+				const endDate = new Date(pattern.endDate);
+				if (date > endDate) {
+					return false;
+				}
+			}
+
+			// For interval-based patterns, we need to check if the date falls on a valid interval
+			const interval = pattern.interval ?? 1;
+
+			switch (pattern.type) {
+				case "daily": {
+					if (interval === 1) {
+						return true;
+					}
+					// For intervals > 1, check if the date is on the interval
+					if (startDate) {
+						const daysDiff = Math.floor(
+							(date.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
+						);
+						return daysDiff >= 0 && daysDiff % interval === 0;
+					}
+					return true;
+				}
+
+				case "weekly": {
+					// Check if the day of week matches
+					if (pattern.daysOfWeek && pattern.daysOfWeek.length > 0) {
+						if (!pattern.daysOfWeek.includes(dayOfWeek)) {
+							return false;
+						}
+					}
+					// For intervals > 1, check if the week is on the interval
+					if (interval > 1 && startDate) {
+						const weeksDiff = Math.floor(
+							(date.getTime() - startDate.getTime()) /
+								(1000 * 60 * 60 * 24 * 7),
+						);
+						if (weeksDiff < 0 || weeksDiff % interval !== 0) {
+							return false;
+						}
+					}
+					return true;
+				}
+
+				case "monthly": {
+					// Check if the day of month matches
+					if (pattern.dayOfMonth !== undefined) {
+						if (dayOfMonth !== pattern.dayOfMonth) {
+							return false;
+						}
+					}
+					// For intervals > 1, check if the month is on the interval
+					if (interval > 1 && startDate) {
+						const monthsDiff =
+							(date.getFullYear() - startDate.getFullYear()) * 12 +
+							(date.getMonth() - startDate.getMonth());
+						if (monthsDiff < 0 || monthsDiff % interval !== 0) {
+							return false;
+						}
+					}
+					return true;
+				}
+
+				case "yearly": {
+					// Check if month and day match
+					if (
+						pattern.monthOfYear !== undefined &&
+						pattern.dayOfMonth !== undefined
+					) {
+						if (
+							month !== pattern.monthOfYear ||
+							dayOfMonth !== pattern.dayOfMonth
+						) {
+							return false;
+						}
+					} else if (pattern.monthOfYear !== undefined) {
+						if (month !== pattern.monthOfYear) {
+							return false;
+						}
+					} else if (pattern.dayOfMonth !== undefined) {
+						if (dayOfMonth !== pattern.dayOfMonth) {
+							return false;
+						}
+					}
+					// For intervals > 1, check if the year is on the interval
+					if (interval > 1 && startDate) {
+						const yearsDiff = date.getFullYear() - startDate.getFullYear();
+						if (yearsDiff < 0 || yearsDiff % interval !== 0) {
+							return false;
+						}
+					}
+					return true;
+				}
+
+				case "custom": {
+					// Custom patterns use daysOfWeek like weekly
+					if (pattern.daysOfWeek && pattern.daysOfWeek.length > 0) {
+						if (!pattern.daysOfWeek.includes(dayOfWeek)) {
+							return false;
+						}
+					}
+					// For intervals > 1, check if the week is on the interval
+					if (interval > 1 && startDate) {
+						const weeksDiff = Math.floor(
+							(date.getTime() - startDate.getTime()) /
+								(1000 * 60 * 60 * 24 * 7),
+						);
+						if (weeksDiff < 0 || weeksDiff % interval !== 0) {
+							return false;
+						}
+					}
+					return true;
+				}
+
+				default:
+					return true;
+			}
+		};
+
+		describe("Daily patterns", () => {
+			it("should match any day for simple daily pattern", () => {
+				const pattern: RecurringPattern = { type: "daily" };
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-20"))).toBe(
+					true,
+				);
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-21"))).toBe(
+					true,
+				);
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-22"))).toBe(
+					true,
+				);
+			});
+
+			it("should match every N days when interval is set", () => {
+				const pattern: RecurringPattern = { type: "daily", interval: 3 };
+				const startDate = new Date("2026-01-01");
+
+				// Day 0 (start date)
+				expect(
+					isDateMatchingPattern(pattern, new Date("2026-01-01"), startDate),
+				).toBe(true);
+				// Day 1 - no match
+				expect(
+					isDateMatchingPattern(pattern, new Date("2026-01-02"), startDate),
+				).toBe(false);
+				// Day 2 - no match
+				expect(
+					isDateMatchingPattern(pattern, new Date("2026-01-03"), startDate),
+				).toBe(false);
+				// Day 3 - match
+				expect(
+					isDateMatchingPattern(pattern, new Date("2026-01-04"), startDate),
+				).toBe(true);
+				// Day 6 - match
+				expect(
+					isDateMatchingPattern(pattern, new Date("2026-01-07"), startDate),
+				).toBe(true);
+			});
+		});
+
+		describe("Weekly patterns", () => {
+			it("should match any day when no daysOfWeek specified", () => {
+				const pattern: RecurringPattern = { type: "weekly" };
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-19"))).toBe(
+					true,
+				); // Monday
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-25"))).toBe(
+					true,
+				); // Sunday
+			});
+
+			it("should match only specified days of week", () => {
+				// Monday=1, Wednesday=3, Friday=5
+				const pattern: RecurringPattern = {
+					type: "weekly",
+					daysOfWeek: [1, 3, 5],
+				};
+
+				// 2026-01-19 is Monday
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-19"))).toBe(
+					true,
+				); // Monday - match
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-20"))).toBe(
+					false,
+				); // Tuesday - no match
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-21"))).toBe(
+					true,
+				); // Wednesday - match
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-22"))).toBe(
+					false,
+				); // Thursday - no match
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-23"))).toBe(
+					true,
+				); // Friday - match
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-24"))).toBe(
+					false,
+				); // Saturday - no match
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-25"))).toBe(
+					false,
+				); // Sunday - no match
+			});
+
+			it("should match only on every Nth week when interval is set", () => {
+				const pattern: RecurringPattern = {
+					type: "weekly",
+					interval: 2,
+					daysOfWeek: [1], // Monday
+				};
+				const startDate = new Date("2026-01-05"); // A Monday
+
+				// Week 0 - Monday of start week
+				expect(
+					isDateMatchingPattern(pattern, new Date("2026-01-05"), startDate),
+				).toBe(true);
+				// Week 1 - Monday of next week - no match (bi-weekly)
+				expect(
+					isDateMatchingPattern(pattern, new Date("2026-01-12"), startDate),
+				).toBe(false);
+				// Week 2 - Monday - match
+				expect(
+					isDateMatchingPattern(pattern, new Date("2026-01-19"), startDate),
+				).toBe(true);
+			});
+		});
+
+		describe("Monthly patterns", () => {
+			it("should match any day when no dayOfMonth specified", () => {
+				const pattern: RecurringPattern = { type: "monthly" };
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-01"))).toBe(
+					true,
+				);
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-15"))).toBe(
+					true,
+				);
+				expect(isDateMatchingPattern(pattern, new Date("2026-02-28"))).toBe(
+					true,
+				);
+			});
+
+			it("should match only on the specified day of month", () => {
+				const pattern: RecurringPattern = { type: "monthly", dayOfMonth: 15 };
+
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-15"))).toBe(
+					true,
+				);
+				expect(isDateMatchingPattern(pattern, new Date("2026-02-15"))).toBe(
+					true,
+				);
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-14"))).toBe(
+					false,
+				);
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-16"))).toBe(
+					false,
+				);
+			});
+
+			it("should match only on every Nth month when interval is set", () => {
+				const pattern: RecurringPattern = {
+					type: "monthly",
+					interval: 3,
+					dayOfMonth: 1,
+				};
+				const startDate = new Date("2026-01-01");
+
+				// Month 0 - January
+				expect(
+					isDateMatchingPattern(pattern, new Date("2026-01-01"), startDate),
+				).toBe(true);
+				// Month 1 - February - no match
+				expect(
+					isDateMatchingPattern(pattern, new Date("2026-02-01"), startDate),
+				).toBe(false);
+				// Month 2 - March - no match
+				expect(
+					isDateMatchingPattern(pattern, new Date("2026-03-01"), startDate),
+				).toBe(false);
+				// Month 3 - April - match
+				expect(
+					isDateMatchingPattern(pattern, new Date("2026-04-01"), startDate),
+				).toBe(true);
+			});
+		});
+
+		describe("Yearly patterns", () => {
+			it("should match any day when no monthOfYear or dayOfMonth specified", () => {
+				const pattern: RecurringPattern = { type: "yearly" };
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-01"))).toBe(
+					true,
+				);
+				expect(isDateMatchingPattern(pattern, new Date("2026-12-31"))).toBe(
+					true,
+				);
+			});
+
+			it("should match only on specific month and day", () => {
+				const pattern: RecurringPattern = {
+					type: "yearly",
+					monthOfYear: 3,
+					dayOfMonth: 15,
+				};
+
+				expect(isDateMatchingPattern(pattern, new Date("2026-03-15"))).toBe(
+					true,
+				);
+				expect(isDateMatchingPattern(pattern, new Date("2027-03-15"))).toBe(
+					true,
+				);
+				expect(isDateMatchingPattern(pattern, new Date("2026-03-14"))).toBe(
+					false,
+				);
+				expect(isDateMatchingPattern(pattern, new Date("2026-04-15"))).toBe(
+					false,
+				);
+			});
+
+			it("should match only on every Nth year when interval is set", () => {
+				const pattern: RecurringPattern = {
+					type: "yearly",
+					interval: 2,
+					monthOfYear: 1,
+					dayOfMonth: 1,
+				};
+				const startDate = new Date("2026-01-01");
+
+				// Year 0 - 2026
+				expect(
+					isDateMatchingPattern(pattern, new Date("2026-01-01"), startDate),
+				).toBe(true);
+				// Year 1 - 2027 - no match
+				expect(
+					isDateMatchingPattern(pattern, new Date("2027-01-01"), startDate),
+				).toBe(false);
+				// Year 2 - 2028 - match
+				expect(
+					isDateMatchingPattern(pattern, new Date("2028-01-01"), startDate),
+				).toBe(true);
+			});
+		});
+
+		describe("Custom patterns", () => {
+			it("should match specified days of week like weekly", () => {
+				const pattern: RecurringPattern = {
+					type: "custom",
+					daysOfWeek: [2, 4], // Tuesday, Thursday
+				};
+
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-20"))).toBe(
+					true,
+				); // Tuesday
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-22"))).toBe(
+					true,
+				); // Thursday
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-21"))).toBe(
+					false,
+				); // Wednesday
+			});
+		});
+
+		describe("End date handling", () => {
+			it("should not match dates after endDate", () => {
+				const pattern: RecurringPattern = {
+					type: "daily",
+					endDate: "2026-01-31",
+				};
+
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-31"))).toBe(
+					true,
+				);
+				expect(isDateMatchingPattern(pattern, new Date("2026-02-01"))).toBe(
+					false,
+				);
+			});
+		});
+	});
+
+	describe("getRecurringTodosForDateRange Logic", () => {
+		// Helper function that mirrors the logic from the router
+		const isDateMatchingPattern = (
+			pattern: RecurringPattern,
+			date: Date,
+			startDate?: Date | null,
+		): boolean => {
+			const dayOfWeek = date.getDay();
+			const dayOfMonth = date.getDate();
+			const month = date.getMonth() + 1;
+
+			if (pattern.endDate) {
+				const endDate = new Date(pattern.endDate);
+				if (date > endDate) {
+					return false;
+				}
+			}
+
+			const interval = pattern.interval ?? 1;
+
+			switch (pattern.type) {
+				case "daily": {
+					if (interval === 1) return true;
+					if (startDate) {
+						const daysDiff = Math.floor(
+							(date.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
+						);
+						return daysDiff >= 0 && daysDiff % interval === 0;
+					}
+					return true;
+				}
+				case "weekly": {
+					if (pattern.daysOfWeek && pattern.daysOfWeek.length > 0) {
+						if (!pattern.daysOfWeek.includes(dayOfWeek)) return false;
+					}
+					if (interval > 1 && startDate) {
+						const weeksDiff = Math.floor(
+							(date.getTime() - startDate.getTime()) /
+								(1000 * 60 * 60 * 24 * 7),
+						);
+						if (weeksDiff < 0 || weeksDiff % interval !== 0) return false;
+					}
+					return true;
+				}
+				case "monthly": {
+					if (pattern.dayOfMonth !== undefined) {
+						if (dayOfMonth !== pattern.dayOfMonth) return false;
+					}
+					if (interval > 1 && startDate) {
+						const monthsDiff =
+							(date.getFullYear() - startDate.getFullYear()) * 12 +
+							(date.getMonth() - startDate.getMonth());
+						if (monthsDiff < 0 || monthsDiff % interval !== 0) return false;
+					}
+					return true;
+				}
+				case "yearly": {
+					if (
+						pattern.monthOfYear !== undefined &&
+						pattern.dayOfMonth !== undefined
+					) {
+						if (
+							month !== pattern.monthOfYear ||
+							dayOfMonth !== pattern.dayOfMonth
+						)
+							return false;
+					} else if (pattern.monthOfYear !== undefined) {
+						if (month !== pattern.monthOfYear) return false;
+					} else if (pattern.dayOfMonth !== undefined) {
+						if (dayOfMonth !== pattern.dayOfMonth) return false;
+					}
+					if (interval > 1 && startDate) {
+						const yearsDiff = date.getFullYear() - startDate.getFullYear();
+						if (yearsDiff < 0 || yearsDiff % interval !== 0) return false;
+					}
+					return true;
+				}
+				case "custom": {
+					if (pattern.daysOfWeek && pattern.daysOfWeek.length > 0) {
+						if (!pattern.daysOfWeek.includes(dayOfWeek)) return false;
+					}
+					if (interval > 1 && startDate) {
+						const weeksDiff = Math.floor(
+							(date.getTime() - startDate.getTime()) /
+								(1000 * 60 * 60 * 24 * 7),
+						);
+						if (weeksDiff < 0 || weeksDiff % interval !== 0) return false;
+					}
+					return true;
+				}
+				default:
+					return true;
+			}
+		};
+
+		interface RecurringTodo extends MockTodo {
+			recurringPattern: RecurringPattern;
+		}
+
+		// Helper to simulate getRecurringTodosForDateRange logic
+		const getMatchingDatesForTodo = (
+			todo: RecurringTodo,
+			startDate: Date,
+			endDate: Date,
+		): Date[] => {
+			const pattern = todo.recurringPattern;
+			const matchingDates: Date[] = [];
+			const todoStartDate = todo.dueDate;
+
+			const currentDate = new Date(startDate);
+			currentDate.setHours(0, 0, 0, 0);
+
+			const normalizedEndDate = new Date(endDate);
+			normalizedEndDate.setHours(23, 59, 59, 999);
+
+			while (currentDate <= normalizedEndDate) {
+				if (todoStartDate) {
+					const normalizedTodoStart = new Date(todoStartDate);
+					normalizedTodoStart.setHours(0, 0, 0, 0);
+					if (currentDate < normalizedTodoStart) {
+						currentDate.setDate(currentDate.getDate() + 1);
+						continue;
+					}
+				}
+
+				if (pattern.endDate) {
+					const patternEndDate = new Date(pattern.endDate);
+					if (currentDate > patternEndDate) {
+						break;
+					}
+				}
+
+				if (isDateMatchingPattern(pattern, currentDate, todoStartDate)) {
+					matchingDates.push(new Date(currentDate));
+				}
+
+				currentDate.setDate(currentDate.getDate() + 1);
+			}
+
+			return matchingDates;
+		};
+
+		it("should return all dates in range for a daily pattern", () => {
+			const todo: RecurringTodo = {
+				id: 1,
+				text: "Daily task",
+				completed: false,
+				userId: "user-123",
+				dueDate: new Date("2026-01-01"),
+				recurringPattern: { type: "daily" },
+			};
+
+			const startDate = new Date("2026-01-20");
+			const endDate = new Date("2026-01-25");
+
+			const matchingDates = getMatchingDatesForTodo(todo, startDate, endDate);
+
+			// Should match all 6 days: Jan 20, 21, 22, 23, 24, 25
+			expect(matchingDates.length).toBe(6);
+		});
+
+		it("should return only matching days for weekly pattern with daysOfWeek", () => {
+			const todo: RecurringTodo = {
+				id: 1,
+				text: "Weekly MWF task",
+				completed: false,
+				userId: "user-123",
+				dueDate: new Date("2026-01-05"), // Monday
+				recurringPattern: { type: "weekly", daysOfWeek: [1, 3, 5] }, // Mon, Wed, Fri
+			};
+
+			// Jan 19 (Mon) to Jan 25 (Sun)
+			const startDate = new Date("2026-01-19");
+			const endDate = new Date("2026-01-25");
+
+			const matchingDates = getMatchingDatesForTodo(todo, startDate, endDate);
+
+			// Should match: Jan 19 (Mon), Jan 21 (Wed), Jan 23 (Fri)
+			expect(matchingDates.length).toBe(3);
+			expect(matchingDates[0]?.getDate()).toBe(19);
+			expect(matchingDates[1]?.getDate()).toBe(21);
+			expect(matchingDates[2]?.getDate()).toBe(23);
+		});
+
+		it("should not include dates before todo's start date", () => {
+			const todo: RecurringTodo = {
+				id: 1,
+				text: "Task starting Jan 22",
+				completed: false,
+				userId: "user-123",
+				dueDate: new Date("2026-01-22"),
+				recurringPattern: { type: "daily" },
+			};
+
+			const startDate = new Date("2026-01-19");
+			const endDate = new Date("2026-01-25");
+
+			const matchingDates = getMatchingDatesForTodo(todo, startDate, endDate);
+
+			// Should only match: Jan 22, 23, 24, 25
+			expect(matchingDates.length).toBe(4);
+			expect(matchingDates[0]?.getDate()).toBe(22);
+		});
+
+		it("should respect pattern endDate", () => {
+			const todo: RecurringTodo = {
+				id: 1,
+				text: "Task ending Jan 22",
+				completed: false,
+				userId: "user-123",
+				dueDate: new Date("2026-01-01"),
+				recurringPattern: { type: "daily", endDate: "2026-01-22" },
+			};
+
+			const startDate = new Date("2026-01-19");
+			const endDate = new Date("2026-01-25");
+
+			const matchingDates = getMatchingDatesForTodo(todo, startDate, endDate);
+
+			// Should only match: Jan 19, 20, 21, 22
+			expect(matchingDates.length).toBe(4);
+			expect(matchingDates[3]?.getDate()).toBe(22);
+		});
+
+		it("should handle monthly patterns correctly", () => {
+			const todo: RecurringTodo = {
+				id: 1,
+				text: "Monthly on 15th",
+				completed: false,
+				userId: "user-123",
+				dueDate: new Date("2026-01-15"),
+				recurringPattern: { type: "monthly", dayOfMonth: 15 },
+			};
+
+			const startDate = new Date("2026-01-01");
+			const endDate = new Date("2026-03-31");
+
+			const matchingDates = getMatchingDatesForTodo(todo, startDate, endDate);
+
+			// Should match: Jan 15, Feb 15, Mar 15
+			expect(matchingDates.length).toBe(3);
+			expect(matchingDates[0]?.getMonth()).toBe(0); // January
+			expect(matchingDates[1]?.getMonth()).toBe(1); // February
+			expect(matchingDates[2]?.getMonth()).toBe(2); // March
+		});
+
+		it("should handle bi-weekly patterns correctly", () => {
+			const todo: RecurringTodo = {
+				id: 1,
+				text: "Bi-weekly Monday",
+				completed: false,
+				userId: "user-123",
+				dueDate: new Date("2026-01-05"), // Monday
+				recurringPattern: { type: "weekly", interval: 2, daysOfWeek: [1] },
+			};
+
+			const startDate = new Date("2026-01-05");
+			const endDate = new Date("2026-02-02");
+
+			const matchingDates = getMatchingDatesForTodo(todo, startDate, endDate);
+
+			// Should match: Jan 5 (week 0), Jan 19 (week 2), Feb 2 (week 4)
+			expect(matchingDates.length).toBe(3);
+			expect(matchingDates[0]?.getDate()).toBe(5);
+			expect(matchingDates[1]?.getDate()).toBe(19);
+			expect(matchingDates[2]?.getDate()).toBe(2);
+		});
+
+		it("should handle every 3 days pattern correctly", () => {
+			const todo: RecurringTodo = {
+				id: 1,
+				text: "Every 3 days",
+				completed: false,
+				userId: "user-123",
+				dueDate: new Date("2026-01-01"),
+				recurringPattern: { type: "daily", interval: 3 },
+			};
+
+			const startDate = new Date("2026-01-01");
+			const endDate = new Date("2026-01-10");
+
+			const matchingDates = getMatchingDatesForTodo(todo, startDate, endDate);
+
+			// Should match: Jan 1 (day 0), Jan 4 (day 3), Jan 7 (day 6), Jan 10 (day 9)
+			expect(matchingDates.length).toBe(4);
+			expect(matchingDates[0]?.getDate()).toBe(1);
+			expect(matchingDates[1]?.getDate()).toBe(4);
+			expect(matchingDates[2]?.getDate()).toBe(7);
+			expect(matchingDates[3]?.getDate()).toBe(10);
+		});
+
+		it("should handle yearly patterns correctly", () => {
+			const todo: RecurringTodo = {
+				id: 1,
+				text: "Yearly on March 15",
+				completed: false,
+				userId: "user-123",
+				dueDate: new Date("2025-03-15"),
+				recurringPattern: { type: "yearly", monthOfYear: 3, dayOfMonth: 15 },
+			};
+
+			const startDate = new Date("2026-01-01");
+			const endDate = new Date("2028-12-31");
+
+			const matchingDates = getMatchingDatesForTodo(todo, startDate, endDate);
+
+			// Should match: March 15 2026, March 15 2027, March 15 2028
+			expect(matchingDates.length).toBe(3);
+			expect(matchingDates[0]?.getFullYear()).toBe(2026);
+			expect(matchingDates[1]?.getFullYear()).toBe(2027);
+			expect(matchingDates[2]?.getFullYear()).toBe(2028);
+		});
+	});
 });

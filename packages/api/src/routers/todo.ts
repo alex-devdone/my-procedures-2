@@ -18,6 +18,143 @@ import z from "zod";
 import { protectedProcedure, router } from "../index";
 import { getNextOccurrence } from "../lib/recurring";
 
+/**
+ * Check if a date matches a recurring pattern.
+ * Returns true if the date is a valid day for the pattern to trigger.
+ *
+ * @param pattern - The recurring pattern to check against
+ * @param date - The date to check
+ * @param startDate - Optional start date (the todo's creation/first occurrence date)
+ * @returns true if the date matches the pattern
+ */
+function isDateMatchingPattern(
+	pattern: RecurringPattern,
+	date: Date,
+	startDate?: Date | null,
+): boolean {
+	const dayOfWeek = date.getDay();
+	const dayOfMonth = date.getDate();
+	const month = date.getMonth() + 1; // 1-indexed
+
+	// Check endDate first
+	if (pattern.endDate) {
+		const endDate = new Date(pattern.endDate);
+		if (date > endDate) {
+			return false;
+		}
+	}
+
+	// For interval-based patterns, we need to check if the date falls on a valid interval
+	const interval = pattern.interval ?? 1;
+
+	switch (pattern.type) {
+		case "daily": {
+			if (interval === 1) {
+				return true;
+			}
+			// For intervals > 1, check if the date is on the interval
+			if (startDate) {
+				const daysDiff = Math.floor(
+					(date.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
+				);
+				return daysDiff >= 0 && daysDiff % interval === 0;
+			}
+			return true;
+		}
+
+		case "weekly": {
+			// Check if the day of week matches
+			if (pattern.daysOfWeek && pattern.daysOfWeek.length > 0) {
+				if (!pattern.daysOfWeek.includes(dayOfWeek)) {
+					return false;
+				}
+			}
+			// For intervals > 1, check if the week is on the interval
+			if (interval > 1 && startDate) {
+				const weeksDiff = Math.floor(
+					(date.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 7),
+				);
+				if (weeksDiff < 0 || weeksDiff % interval !== 0) {
+					return false;
+				}
+			}
+			return true;
+		}
+
+		case "monthly": {
+			// Check if the day of month matches
+			if (pattern.dayOfMonth !== undefined) {
+				if (dayOfMonth !== pattern.dayOfMonth) {
+					return false;
+				}
+			}
+			// For intervals > 1, check if the month is on the interval
+			if (interval > 1 && startDate) {
+				const monthsDiff =
+					(date.getFullYear() - startDate.getFullYear()) * 12 +
+					(date.getMonth() - startDate.getMonth());
+				if (monthsDiff < 0 || monthsDiff % interval !== 0) {
+					return false;
+				}
+			}
+			return true;
+		}
+
+		case "yearly": {
+			// Check if month and day match
+			if (
+				pattern.monthOfYear !== undefined &&
+				pattern.dayOfMonth !== undefined
+			) {
+				if (
+					month !== pattern.monthOfYear ||
+					dayOfMonth !== pattern.dayOfMonth
+				) {
+					return false;
+				}
+			} else if (pattern.monthOfYear !== undefined) {
+				if (month !== pattern.monthOfYear) {
+					return false;
+				}
+			} else if (pattern.dayOfMonth !== undefined) {
+				if (dayOfMonth !== pattern.dayOfMonth) {
+					return false;
+				}
+			}
+			// For intervals > 1, check if the year is on the interval
+			if (interval > 1 && startDate) {
+				const yearsDiff = date.getFullYear() - startDate.getFullYear();
+				if (yearsDiff < 0 || yearsDiff % interval !== 0) {
+					return false;
+				}
+			}
+			return true;
+		}
+
+		case "custom": {
+			// Custom patterns use daysOfWeek like weekly
+			if (pattern.daysOfWeek && pattern.daysOfWeek.length > 0) {
+				if (!pattern.daysOfWeek.includes(dayOfWeek)) {
+					return false;
+				}
+			}
+			// For intervals > 1, check if the week is on the interval
+			if (interval > 1 && startDate) {
+				const weeksDiff = Math.floor(
+					(date.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 7),
+				);
+				if (weeksDiff < 0 || weeksDiff % interval !== 0) {
+					return false;
+				}
+			}
+			return true;
+		}
+
+		default:
+			return true;
+	}
+}
+
 // Zod schema for recurring pattern validation
 export const recurringPatternSchema = z.object({
 	type: z.enum(["daily", "weekly", "monthly", "yearly", "custom"]),
@@ -760,5 +897,96 @@ export const todoRouter = router({
 				action: "created" as const,
 				completion: created,
 			};
+		}),
+
+	/**
+	 * Get all recurring todos that match dates within a specified date range.
+	 * Uses pattern matching logic to determine which recurring todos would
+	 * be scheduled on each date in the range.
+	 *
+	 * @param startDate - Start of date range (inclusive)
+	 * @param endDate - End of date range (inclusive)
+	 * @returns Array of objects containing the todo and an array of matching dates
+	 */
+	getRecurringTodosForDateRange: protectedProcedure
+		.input(
+			z.object({
+				startDate: z.string().datetime(),
+				endDate: z.string().datetime(),
+			}),
+		)
+		.query(async ({ ctx, input }) => {
+			const startDate = new Date(input.startDate);
+			const endDate = new Date(input.endDate);
+
+			// Fetch all recurring todos for the user
+			const recurringTodos = await db
+				.select()
+				.from(todo)
+				.where(
+					and(
+						eq(todo.userId, ctx.session.user.id),
+						isNotNull(todo.recurringPattern),
+					),
+				);
+
+			const results: Array<{
+				todo: (typeof recurringTodos)[0];
+				matchingDates: Date[];
+			}> = [];
+
+			for (const t of recurringTodos) {
+				const pattern = t.recurringPattern as RecurringPattern;
+				const matchingDates: Date[] = [];
+
+				// Use the todo's dueDate as the start reference for interval calculations
+				// If no dueDate, pattern matching won't have a reference point for intervals
+				const todoStartDate = t.dueDate;
+
+				// Iterate through each date in the range
+				const currentDate = new Date(startDate);
+				// Normalize to start of day for consistent comparison
+				currentDate.setHours(0, 0, 0, 0);
+
+				const normalizedEndDate = new Date(endDate);
+				normalizedEndDate.setHours(23, 59, 59, 999);
+
+				while (currentDate <= normalizedEndDate) {
+					// Check if this date is before the todo's start date (if it has one)
+					if (todoStartDate) {
+						const normalizedTodoStart = new Date(todoStartDate);
+						normalizedTodoStart.setHours(0, 0, 0, 0);
+						if (currentDate < normalizedTodoStart) {
+							currentDate.setDate(currentDate.getDate() + 1);
+							continue;
+						}
+					}
+
+					// Check if pattern has expired by this date (based on occurrences)
+					// We don't track completedOccurrences here, so we can only check endDate
+					if (pattern.endDate) {
+						const patternEndDate = new Date(pattern.endDate);
+						if (currentDate > patternEndDate) {
+							break; // Pattern has ended, no more matches possible
+						}
+					}
+
+					// Check if the current date matches the pattern
+					if (isDateMatchingPattern(pattern, currentDate, todoStartDate)) {
+						matchingDates.push(new Date(currentDate));
+					}
+
+					currentDate.setDate(currentDate.getDate() + 1);
+				}
+
+				if (matchingDates.length > 0) {
+					results.push({
+						todo: t,
+						matchingDates,
+					});
+				}
+			}
+
+			return results;
 		}),
 });
