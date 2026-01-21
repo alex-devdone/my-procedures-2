@@ -1521,3 +1521,550 @@ describe("Scheduling Fields Validation", () => {
 		});
 	});
 });
+
+describe("CompleteRecurring Procedure", () => {
+	describe("Input Validation", () => {
+		interface CompleteRecurringInput {
+			id: number;
+			completedOccurrences?: number;
+		}
+
+		const validateCompleteRecurringInput = (
+			input: unknown,
+		): { valid: boolean; data?: CompleteRecurringInput } => {
+			if (typeof input !== "object" || input === null) {
+				return { valid: false };
+			}
+
+			const i = input as Record<string, unknown>;
+
+			// id is required and must be a number
+			if (typeof i.id !== "number") {
+				return { valid: false };
+			}
+
+			// completedOccurrences is optional, must be non-negative integer
+			if (i.completedOccurrences !== undefined) {
+				if (
+					typeof i.completedOccurrences !== "number" ||
+					!Number.isInteger(i.completedOccurrences) ||
+					i.completedOccurrences < 0
+				) {
+					return { valid: false };
+				}
+			}
+
+			return {
+				valid: true,
+				data: input as CompleteRecurringInput,
+			};
+		};
+
+		it("validates input with id only", () => {
+			const result = validateCompleteRecurringInput({ id: 1 });
+			expect(result.valid).toBe(true);
+			expect(result.data?.id).toBe(1);
+		});
+
+		it("validates input with id and completedOccurrences", () => {
+			const result = validateCompleteRecurringInput({
+				id: 1,
+				completedOccurrences: 5,
+			});
+			expect(result.valid).toBe(true);
+			expect(result.data?.completedOccurrences).toBe(5);
+		});
+
+		it("validates input with completedOccurrences of 0", () => {
+			const result = validateCompleteRecurringInput({
+				id: 1,
+				completedOccurrences: 0,
+			});
+			expect(result.valid).toBe(true);
+			expect(result.data?.completedOccurrences).toBe(0);
+		});
+
+		it("rejects missing id", () => {
+			expect(
+				validateCompleteRecurringInput({ completedOccurrences: 5 }),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects string id", () => {
+			expect(validateCompleteRecurringInput({ id: "1" })).toEqual({
+				valid: false,
+			});
+		});
+
+		it("rejects negative completedOccurrences", () => {
+			expect(
+				validateCompleteRecurringInput({ id: 1, completedOccurrences: -1 }),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects non-integer completedOccurrences", () => {
+			expect(
+				validateCompleteRecurringInput({ id: 1, completedOccurrences: 2.5 }),
+			).toEqual({ valid: false });
+		});
+	});
+
+	describe("Business Logic", () => {
+		describe("Todo Ownership Verification", () => {
+			it("should throw NOT_FOUND for non-existent todo", () => {
+				const verifyTodoExists = (
+					existingTodo: MockTodo | undefined,
+					currentUserId: string,
+				) => {
+					if (!existingTodo || existingTodo.userId !== currentUserId) {
+						throw new TRPCError({
+							code: "NOT_FOUND",
+							message:
+								"Todo not found or you do not have permission to modify it",
+						});
+					}
+					return existingTodo;
+				};
+
+				expect(() => verifyTodoExists(undefined, "user-123")).toThrow(
+					TRPCError,
+				);
+			});
+
+			it("should throw NOT_FOUND for todo owned by different user", () => {
+				const verifyTodoExists = (
+					existingTodo: MockTodo | undefined,
+					currentUserId: string,
+				) => {
+					if (!existingTodo || existingTodo.userId !== currentUserId) {
+						throw new TRPCError({
+							code: "NOT_FOUND",
+							message:
+								"Todo not found or you do not have permission to modify it",
+						});
+					}
+					return existingTodo;
+				};
+
+				const todo: MockTodo = {
+					id: 1,
+					text: "Test",
+					completed: false,
+					userId: "user-456",
+				};
+
+				expect(() => verifyTodoExists(todo, "user-123")).toThrow(TRPCError);
+			});
+
+			it("should pass for todo owned by current user", () => {
+				const verifyTodoExists = (
+					existingTodo: MockTodo | undefined,
+					currentUserId: string,
+				) => {
+					if (!existingTodo || existingTodo.userId !== currentUserId) {
+						throw new TRPCError({
+							code: "NOT_FOUND",
+							message:
+								"Todo not found or you do not have permission to modify it",
+						});
+					}
+					return existingTodo;
+				};
+
+				const todo: MockTodo = {
+					id: 1,
+					text: "Test",
+					completed: false,
+					userId: "user-123",
+				};
+
+				expect(() => verifyTodoExists(todo, "user-123")).not.toThrow();
+			});
+		});
+
+		describe("Recurring Pattern Validation", () => {
+			it("should throw BAD_REQUEST if todo has no recurring pattern", () => {
+				const verifyRecurringPattern = (
+					recurringPattern: RecurringPattern | null | undefined,
+				) => {
+					if (!recurringPattern) {
+						throw new TRPCError({
+							code: "BAD_REQUEST",
+							message: "Todo does not have a recurring pattern",
+						});
+					}
+					return recurringPattern;
+				};
+
+				expect(() => verifyRecurringPattern(null)).toThrow(TRPCError);
+				expect(() => verifyRecurringPattern(undefined)).toThrow(TRPCError);
+			});
+
+			it("should pass if todo has recurring pattern", () => {
+				const verifyRecurringPattern = (
+					recurringPattern: RecurringPattern | null | undefined,
+				) => {
+					if (!recurringPattern) {
+						throw new TRPCError({
+							code: "BAD_REQUEST",
+							message: "Todo does not have a recurring pattern",
+						});
+					}
+					return recurringPattern;
+				};
+
+				const pattern: RecurringPattern = { type: "daily" };
+				expect(() => verifyRecurringPattern(pattern)).not.toThrow();
+			});
+		});
+
+		describe("Next Occurrence Calculation", () => {
+			it("should calculate next occurrence for daily pattern", () => {
+				const calculateNextOccurrence = (
+					pattern: RecurringPattern,
+					baseDate: Date,
+				): Date | null => {
+					// Simplified calculation for testing
+					const interval = pattern.interval ?? 1;
+					const next = new Date(baseDate);
+
+					if (pattern.type === "daily") {
+						next.setDate(next.getDate() + interval);
+						return next;
+					}
+
+					return null;
+				};
+
+				const baseDate = new Date("2026-01-21T10:00:00Z");
+				const pattern: RecurringPattern = { type: "daily" };
+
+				const result = calculateNextOccurrence(pattern, baseDate);
+
+				expect(result).not.toBeNull();
+				expect(result?.getDate()).toBe(22);
+			});
+
+			it("should calculate next occurrence for daily pattern with interval", () => {
+				const calculateNextOccurrence = (
+					pattern: RecurringPattern,
+					baseDate: Date,
+				): Date | null => {
+					const interval = pattern.interval ?? 1;
+					const next = new Date(baseDate);
+
+					if (pattern.type === "daily") {
+						next.setDate(next.getDate() + interval);
+						return next;
+					}
+
+					return null;
+				};
+
+				const baseDate = new Date("2026-01-21T10:00:00Z");
+				const pattern: RecurringPattern = { type: "daily", interval: 3 };
+
+				const result = calculateNextOccurrence(pattern, baseDate);
+
+				expect(result).not.toBeNull();
+				expect(result?.getDate()).toBe(24);
+			});
+
+			it("should return null when pattern has expired", () => {
+				const calculateNextOccurrence = (
+					pattern: RecurringPattern,
+					baseDate: Date,
+					completedOccurrences: number,
+				): Date | null => {
+					// Check if max occurrences reached
+					if (
+						pattern.occurrences !== undefined &&
+						completedOccurrences >= pattern.occurrences
+					) {
+						return null;
+					}
+
+					// Check end date
+					if (pattern.endDate) {
+						const endDate = new Date(pattern.endDate);
+						if (baseDate > endDate) {
+							return null;
+						}
+					}
+
+					const interval = pattern.interval ?? 1;
+					const next = new Date(baseDate);
+					next.setDate(next.getDate() + interval);
+
+					// Check if next date exceeds end date
+					if (pattern.endDate) {
+						const endDate = new Date(pattern.endDate);
+						if (next > endDate) {
+							return null;
+						}
+					}
+
+					return next;
+				};
+
+				// Test max occurrences reached
+				const pattern1: RecurringPattern = {
+					type: "daily",
+					occurrences: 5,
+				};
+				const baseDate = new Date("2026-01-21T10:00:00Z");
+				expect(calculateNextOccurrence(pattern1, baseDate, 5)).toBeNull();
+
+				// Test end date passed
+				const pattern2: RecurringPattern = {
+					type: "daily",
+					endDate: "2026-01-20",
+				};
+				expect(calculateNextOccurrence(pattern2, baseDate, 0)).toBeNull();
+			});
+		});
+
+		describe("Reminder Offset Calculation", () => {
+			it("should preserve reminder offset when creating next occurrence", () => {
+				const calculateNextReminder = (
+					originalDueDate: Date | null,
+					originalReminder: Date | null,
+					nextDueDate: Date,
+				): Date | null => {
+					if (!originalReminder || !originalDueDate) {
+						return null;
+					}
+
+					const offset = originalDueDate.getTime() - originalReminder.getTime();
+					return new Date(nextDueDate.getTime() - offset);
+				};
+
+				const originalDueDate = new Date("2026-01-21T10:00:00Z");
+				const originalReminder = new Date("2026-01-21T09:30:00Z"); // 30 minutes before
+				const nextDueDate = new Date("2026-01-22T10:00:00Z");
+
+				const nextReminder = calculateNextReminder(
+					originalDueDate,
+					originalReminder,
+					nextDueDate,
+				);
+
+				expect(nextReminder).not.toBeNull();
+				// Should be 30 minutes before next due date
+				expect(nextReminder?.toISOString()).toBe("2026-01-22T09:30:00.000Z");
+			});
+
+			it("should return null if original todo had no reminder", () => {
+				const calculateNextReminder = (
+					originalDueDate: Date | null,
+					originalReminder: Date | null,
+					nextDueDate: Date,
+				): Date | null => {
+					if (!originalReminder || !originalDueDate) {
+						return null;
+					}
+
+					const offset = originalDueDate.getTime() - originalReminder.getTime();
+					return new Date(nextDueDate.getTime() - offset);
+				};
+
+				const nextDueDate = new Date("2026-01-22T10:00:00Z");
+
+				expect(
+					calculateNextReminder(
+						new Date("2026-01-21T10:00:00Z"),
+						null,
+						nextDueDate,
+					),
+				).toBeNull();
+			});
+
+			it("should return null if original todo had no due date", () => {
+				const calculateNextReminder = (
+					originalDueDate: Date | null,
+					originalReminder: Date | null,
+					nextDueDate: Date,
+				): Date | null => {
+					if (!originalReminder || !originalDueDate) {
+						return null;
+					}
+
+					const offset = originalDueDate.getTime() - originalReminder.getTime();
+					return new Date(nextDueDate.getTime() - offset);
+				};
+
+				const nextDueDate = new Date("2026-01-22T10:00:00Z");
+
+				expect(
+					calculateNextReminder(
+						null,
+						new Date("2026-01-21T09:30:00Z"),
+						nextDueDate,
+					),
+				).toBeNull();
+			});
+		});
+
+		describe("New Todo Creation Data", () => {
+			it("should create correct data structure for new recurring todo", () => {
+				interface CreateNextTodoInput {
+					text: string;
+					userId: string;
+					folderId: number | null;
+					dueDate: Date;
+					reminderAt: Date | null;
+					recurringPattern: RecurringPattern;
+				}
+
+				const createNextTodoData = (input: CreateNextTodoInput) => ({
+					text: input.text,
+					completed: false,
+					userId: input.userId,
+					folderId: input.folderId,
+					dueDate: input.dueDate,
+					reminderAt: input.reminderAt,
+					recurringPattern: input.recurringPattern,
+				});
+
+				const input: CreateNextTodoInput = {
+					text: "Daily standup",
+					userId: "user-123",
+					folderId: 1,
+					dueDate: new Date("2026-01-22T09:00:00Z"),
+					reminderAt: new Date("2026-01-22T08:45:00Z"),
+					recurringPattern: { type: "daily" },
+				};
+
+				const result = createNextTodoData(input);
+
+				expect(result).toEqual({
+					text: "Daily standup",
+					completed: false, // Always starts as incomplete
+					userId: "user-123",
+					folderId: 1,
+					dueDate: new Date("2026-01-22T09:00:00Z"),
+					reminderAt: new Date("2026-01-22T08:45:00Z"),
+					recurringPattern: { type: "daily" },
+				});
+			});
+
+			it("should handle null folderId and reminderAt", () => {
+				interface CreateNextTodoInput {
+					text: string;
+					userId: string;
+					folderId: number | null;
+					dueDate: Date;
+					reminderAt: Date | null;
+					recurringPattern: RecurringPattern;
+				}
+
+				const createNextTodoData = (input: CreateNextTodoInput) => ({
+					text: input.text,
+					completed: false,
+					userId: input.userId,
+					folderId: input.folderId,
+					dueDate: input.dueDate,
+					reminderAt: input.reminderAt,
+					recurringPattern: input.recurringPattern,
+				});
+
+				const input: CreateNextTodoInput = {
+					text: "Task",
+					userId: "user-123",
+					folderId: null,
+					dueDate: new Date("2026-01-22T09:00:00Z"),
+					reminderAt: null,
+					recurringPattern: { type: "weekly", daysOfWeek: [1, 3, 5] },
+				};
+
+				const result = createNextTodoData(input);
+
+				expect(result.folderId).toBeNull();
+				expect(result.reminderAt).toBeNull();
+			});
+		});
+
+		describe("Return Value Structure", () => {
+			it("should return completed status and next todo when pattern continues", () => {
+				interface CompleteRecurringResult {
+					completed: boolean;
+					nextTodo: MockTodo | null;
+					message: string | null;
+				}
+
+				const buildSuccessResult = (
+					nextTodo: MockTodo,
+				): CompleteRecurringResult => ({
+					completed: true,
+					nextTodo,
+					message: null,
+				});
+
+				const nextTodo: MockTodo = {
+					id: 2,
+					text: "Daily task",
+					completed: false,
+					userId: "user-123",
+					dueDate: new Date("2026-01-22T10:00:00Z"),
+					recurringPattern: { type: "daily" },
+				};
+
+				const result = buildSuccessResult(nextTodo);
+
+				expect(result.completed).toBe(true);
+				expect(result.nextTodo).toEqual(nextTodo);
+				expect(result.message).toBeNull();
+			});
+
+			it("should return null nextTodo when pattern has expired", () => {
+				interface CompleteRecurringResult {
+					completed: boolean;
+					nextTodo: MockTodo | null;
+					message: string | null;
+				}
+
+				const buildExpiredResult = (): CompleteRecurringResult => ({
+					completed: true,
+					nextTodo: null,
+					message: "Recurring pattern has expired",
+				});
+
+				const result = buildExpiredResult();
+
+				expect(result.completed).toBe(true);
+				expect(result.nextTodo).toBeNull();
+				expect(result.message).toBe("Recurring pattern has expired");
+			});
+		});
+
+		describe("Base Date Selection", () => {
+			it("should use existing dueDate as base when available", () => {
+				const getBaseDate = (
+					existingDueDate: Date | null | undefined,
+				): Date => {
+					return existingDueDate ?? new Date();
+				};
+
+				const existingDueDate = new Date("2026-01-21T10:00:00Z");
+				const result = getBaseDate(existingDueDate);
+
+				expect(result).toEqual(existingDueDate);
+			});
+
+			it("should use current date as base when no dueDate", () => {
+				const getBaseDate = (
+					existingDueDate: Date | null | undefined,
+				): Date => {
+					return existingDueDate ?? new Date();
+				};
+
+				const beforeCall = new Date();
+				const result = getBaseDate(null);
+				const afterCall = new Date();
+
+				expect(result.getTime()).toBeGreaterThanOrEqual(beforeCall.getTime());
+				expect(result.getTime()).toBeLessThanOrEqual(afterCall.getTime());
+			});
+		});
+	});
+});

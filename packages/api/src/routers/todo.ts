@@ -1,9 +1,11 @@
 import { and, db, eq, gte, lte } from "@my-procedures-2/db";
+import type { RecurringPattern } from "@my-procedures-2/db/schema/todo";
 import { todo } from "@my-procedures-2/db/schema/todo";
 import { TRPCError } from "@trpc/server";
 import z from "zod";
 
 import { protectedProcedure, router } from "../index";
+import { getNextOccurrence } from "../lib/recurring";
 
 // Zod schema for recurring pattern validation
 export const recurringPatternSchema = z.object({
@@ -212,5 +214,100 @@ export const todoRouter = router({
 						lte(todo.dueDate, new Date(input.endDate)),
 					),
 				);
+		}),
+
+	/**
+	 * Complete a recurring todo:
+	 * 1. Marks the current todo as completed
+	 * 2. Creates a new todo with the next occurrence date (if pattern hasn't expired)
+	 *
+	 * @returns { completed: true, nextTodo: <new todo> | null }
+	 */
+	completeRecurring: protectedProcedure
+		.input(
+			z.object({
+				id: z.number(),
+				completedOccurrences: z.number().int().nonnegative().optional(),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			// Fetch the existing todo
+			const [existing] = await db
+				.select()
+				.from(todo)
+				.where(
+					and(eq(todo.id, input.id), eq(todo.userId, ctx.session.user.id)),
+				);
+
+			if (!existing) {
+				throw new TRPCError({
+					code: "NOT_FOUND",
+					message: "Todo not found or you do not have permission to modify it",
+				});
+			}
+
+			// Check if todo has a recurring pattern
+			if (!existing.recurringPattern) {
+				throw new TRPCError({
+					code: "BAD_REQUEST",
+					message: "Todo does not have a recurring pattern",
+				});
+			}
+
+			const pattern = existing.recurringPattern as RecurringPattern;
+			const completedOccurrences = input.completedOccurrences ?? 0;
+
+			// Mark the current todo as completed
+			await db
+				.update(todo)
+				.set({ completed: true })
+				.where(eq(todo.id, input.id));
+
+			// Calculate the next occurrence date
+			// Use the current due date as the base, or now if no due date
+			const baseDate = existing.dueDate ?? new Date();
+			const nextDate = getNextOccurrence(
+				pattern,
+				baseDate,
+				completedOccurrences + 1,
+			);
+
+			// If the pattern has expired, don't create a new todo
+			if (!nextDate) {
+				return {
+					completed: true,
+					nextTodo: null,
+					message: "Recurring pattern has expired",
+				};
+			}
+
+			// Calculate the next reminder if the original had one
+			let nextReminderAt: Date | null = null;
+			if (existing.reminderAt && existing.dueDate) {
+				// Keep the same time offset between reminder and due date
+				const reminderOffset =
+					existing.dueDate.getTime() - existing.reminderAt.getTime();
+				nextReminderAt = new Date(nextDate.getTime() - reminderOffset);
+			}
+
+			// Create the next occurrence
+			const [newTodo] = await db
+				.insert(todo)
+				.values({
+					text: existing.text,
+					completed: false,
+					userId: ctx.session.user.id,
+					folderId: existing.folderId,
+					dueDate: nextDate,
+					reminderAt: nextReminderAt,
+					recurringPattern: pattern,
+				})
+				.returning();
+
+			return {
+				completed: true,
+				nextTodo: newTodo,
+				message: null,
+			};
 		}),
 });

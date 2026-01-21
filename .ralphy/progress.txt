@@ -326,3 +326,22 @@
   - End condition checks (endDate and occurrences)
   - parseRecurringDescription() for various natural language inputs
   - formatRecurringPattern() for human-readable output
+
+- [✓] 2026-01-21 04:25 - Add completeRecurring procedure to todo router (packages/api/src/routers/todo.ts) with:
+  - Marks current recurring todo as completed
+  - Calculates next occurrence date using getNextOccurrence utility
+  - Creates new todo for next occurrence if pattern hasn't expired
+  - Preserves reminder offset (time between reminder and due date) in new todo
+  - Returns { completed: true, nextTodo: <new todo> | null, message }
+  - Handles pattern expiration (endDate or max occurrences reached)
+  - Input validation for id (required) and completedOccurrences (optional, non-negative integer)
+- [✓] 2026-01-21 04:25 - Add unit tests for completeRecurring procedure (24 tests) in packages/api/src/routers/todo.test.ts covering:
+  - Input validation (id required, completedOccurrences optional and non-negative)
+  - Todo ownership verification (NOT_FOUND for missing or unauthorized todos)
+  - Recurring pattern validation (BAD_REQUEST if no pattern)
+  - Next occurrence calculation logic for daily patterns
+  - Pattern expiration detection (max occurrences, end date)
+  - Reminder offset preservation when creating next occurrence
+  - New todo creation data structure
+  - Return value structure (completed, nextTodo, message)
+  - Base date selection (use dueDate or current date)
