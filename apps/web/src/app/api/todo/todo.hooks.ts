@@ -510,12 +510,18 @@ export function useSyncTodos(): UseSyncTodosReturn {
 			try {
 				switch (action) {
 					case "sync": {
-						// Upload local todos to server, then clear local storage
+						// Upload local todos to server with all fields, then clear local storage
 						if (localTodos.length > 0) {
 							await bulkCreateMutation.mutateAsync({
 								todos: localTodos.map((t) => ({
 									text: t.text,
 									completed: t.completed,
+									// Note: folderId is not synced because local folders use string UUIDs
+									// while remote folders use numeric IDs - folder sync is handled separately
+									folderId: null,
+									dueDate: t.dueDate ?? null,
+									reminderAt: t.reminderAt ?? null,
+									recurringPattern: t.recurringPattern ?? null,
 								})),
 							});
 						}
@@ -528,12 +534,18 @@ export function useSyncTodos(): UseSyncTodosReturn {
 						break;
 					}
 					case "keep_both": {
-						// Upload local todos and keep remote ones (they're already there)
+						// Upload local todos with all fields and keep remote ones (they're already there)
 						if (localTodos.length > 0) {
 							await bulkCreateMutation.mutateAsync({
 								todos: localTodos.map((t) => ({
 									text: t.text,
 									completed: t.completed,
+									// Note: folderId is not synced because local folders use string UUIDs
+									// while remote folders use numeric IDs - folder sync is handled separately
+									folderId: null,
+									dueDate: t.dueDate ?? null,
+									reminderAt: t.reminderAt ?? null,
+									recurringPattern: t.recurringPattern ?? null,
 								})),
 							});
 						}

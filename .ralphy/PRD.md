@@ -289,8 +289,8 @@ Extend realtime sync to folders and subtasks. Can proceed after Phase 14.
 
 Update localStorage sync mechanism to handle new fields. Can proceed after Phases 9, 6, and 3.
 
-- [ ] Update `apps/web/src/app/api/todo/todo.hooks.ts` useSyncTodos to include scheduling fields and subtasks
-- [ ] Add unit tests for sync with scheduling fields
+- [x] Update `apps/web/src/app/api/todo/todo.hooks.ts` useSyncTodos to include scheduling fields and subtasks
+- [x] Add unit tests for sync with scheduling fields
 - [ ] Update bulk create mutation to include folderId, scheduling fields, and subtasks
 - [ ] Create folder sync mechanism in useSyncTodos for syncing local folders on login
 - [ ] Add unit tests for folder sync mechanism

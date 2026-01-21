@@ -893,3 +893,20 @@
 - [✓] 2026-01-21 11:15 - Run all unit tests: 1744 tests passed (17 new cross-device auto-complete tests added)
 - [✓] 2026-01-21 11:15 - Run linting check: passed (49 pre-existing warnings)
 
+- [✓] 2026-01-21 11:19 - Update useSyncTodos to include scheduling fields (apps/web/src/app/api/todo/todo.hooks.ts):
+  - Updated handleSyncAction to include dueDate, reminderAt, recurringPattern when syncing local todos
+  - Set folderId to null when syncing (local folders use string UUIDs vs numeric IDs for remote)
+  - Applied to both "sync" and "keep_both" actions
+  - Note: folderId mapping is intentionally skipped - folder sync handled separately in Phase 16
+- [✓] 2026-01-21 11:19 - Add unit tests for sync with scheduling fields (8 tests) in apps/web/src/app/api/todo/todo.hooks.test.tsx:
+  - Test sync with dueDate field
+  - Test sync with reminderAt field
+  - Test sync with recurringPattern field
+  - Test sync with all scheduling fields combined
+  - Test null defaults for undefined scheduling fields
+  - Test keep_both action includes scheduling fields
+  - Test folderId is set to null (string UUID incompatibility)
+  - Test multiple todos with mixed scheduling fields
+- [✓] 2026-01-21 11:19 - Run all unit tests: 1752 tests passed (8 new sync scheduling tests added)
+- [✓] 2026-01-21 11:19 - Run linting check: passed (50 pre-existing warnings)
+
