@@ -231,12 +231,12 @@ Smart views based on scheduling data. Can proceed after Phase 10.
 - [x] Create `apps/web/src/components/views/overdue-view.tsx` - shows overdue todos
 - [x] Add unit tests for OverdueView in `apps/web/src/components/views/overdue-view.test.tsx`
 - [x] Add smart view navigation to sidebar alongside folders
-- [ ] Create E2E tests for smart views in localStorage mode at `apps/web/e2e/smart-views.spec.ts`:
-  - [ ] E2E: Navigate to Today view and see only today's todos
-  - [ ] E2E: Navigate to Upcoming view and see todos grouped by date
-  - [ ] E2E: Navigate to Overdue view and see only past-due todos
-  - [ ] E2E: Complete todo from smart view and verify it updates
-  - [ ] E2E: Empty state shown when no todos match view criteria
+- [x] Create E2E tests for smart views in localStorage mode at `apps/web/e2e/smart-views.spec.ts`:
+  - [x] E2E: Navigate to Today view and see only today's todos
+  - [x] E2E: Navigate to Upcoming view and see todos grouped by date
+  - [x] E2E: Navigate to Overdue view and see only past-due todos
+  - [x] E2E: Complete todo from smart view and verify it updates
+  - [x] E2E: Empty state shown when no todos match view criteria
 
 ---
 

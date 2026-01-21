@@ -736,4 +736,21 @@
   - Smart Views Positioning: renders above folders
   - Updated accessibility test for navigation landmark
 - [✓] 2026-01-21 08:30 - Total tests for folder-sidebar: 67 (45 original + 22 new smart view tests)
+- [✓] 2026-01-21 09:01 - Integrate smart views into todos page (apps/web/src/app/todos/page.tsx):
+  - Added SmartViewType and RecurringPattern imports
+  - Added smart view components (TodayView, UpcomingView, OverdueView) imports
+  - Added isSmartView and smartViewType memoized helpers to detect smart view selection
+  - Integrated conditional rendering: smart views render all todos, folder view renders filtered todos
+  - Updated sign-in prompt to only show in folder view (not in smart views)
+  - Added RecurringPattern type to handleScheduleChange callback
+- [✓] 2026-01-21 09:01 - Fix todo.spec.ts placeholder to match new "Add task to" format
+- [✓] 2026-01-21 09:01 - Create E2E tests for smart views (apps/web/e2e/smart-views.spec.ts):
+  - Today View tests: navigate and filter, empty states, complete todos, status filtering
+  - Upcoming View tests: navigate and group by date, empty states
+  - Overdue View tests: navigate and filter past-due todos, empty states
+  - Navigation tests: switch between smart views and Inbox, persist selection after reload
+  - Empty State tests: all done empty state, search empty state
+- [✓] 2026-01-21 09:01 - Run all unit tests: 1631 tests passed
+- [✓] 2026-01-21 09:01 - Run E2E tests: 109 passed (includes fixed todo.spec.ts tests)
+- [✓] 2026-01-21 09:01 - Run linting check: passed (auto-formatted, 41 warnings pre-existing)
 

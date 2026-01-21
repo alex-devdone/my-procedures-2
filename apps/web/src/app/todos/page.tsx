@@ -26,14 +26,21 @@ import type {
 } from "@/app/api/folder";
 import { useFolderStorage } from "@/app/api/folder";
 import { useAllSubtasksProgress } from "@/app/api/subtask";
+import type { RecurringPattern } from "@/app/api/todo";
 import { FolderCreateDialog } from "@/components/folders/folder-create-dialog";
 import { FolderEditDialog } from "@/components/folders/folder-edit-dialog";
-import { FolderSidebar } from "@/components/folders/folder-sidebar";
+import {
+	FolderSidebar,
+	type SmartViewType,
+} from "@/components/folders/folder-sidebar";
 import { TodoExpandableItem } from "@/components/todos";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { OverdueView } from "@/components/views/overdue-view";
+import { TodayView } from "@/components/views/today-view";
+import { UpcomingView } from "@/components/views/upcoming-view";
 import type { SelectedFolderId } from "@/hooks/use-todo-storage";
 import { useTodoStorage } from "@/hooks/use-todo-storage";
 import { cn } from "@/lib/utils";
@@ -106,6 +113,7 @@ export default function TodosPage() {
 		selectedFolderId,
 		setSelectedFolderId,
 		filteredTodos: folderFilteredTodos,
+		todos: allTodos,
 	} = useTodoStorage();
 
 	const {
@@ -144,7 +152,7 @@ export default function TodosPage() {
 		schedule: {
 			dueDate?: string | null;
 			reminderAt?: string | null;
-			recurringPattern?: unknown;
+			recurringPattern?: RecurringPattern | null;
 		},
 	) => {
 		updateSchedule(id, schedule);
@@ -213,6 +221,27 @@ export default function TodosPage() {
 		if (!folderId) return null;
 		return folders.find((f) => f.id === folderId) ?? null;
 	};
+
+	// Check if currently viewing a smart view
+	const isSmartView = useMemo(() => {
+		return (
+			selectedFolderId === "today" ||
+			selectedFolderId === "upcoming" ||
+			selectedFolderId === "overdue"
+		);
+	}, [selectedFolderId]);
+
+	// Get the smart view type
+	const smartViewType = useMemo((): SmartViewType | null => {
+		if (
+			selectedFolderId === "today" ||
+			selectedFolderId === "upcoming" ||
+			selectedFolderId === "overdue"
+		) {
+			return selectedFolderId;
+		}
+		return null;
+	}, [selectedFolderId]);
 
 	return (
 		<div className="flex min-h-full">
@@ -321,7 +350,7 @@ export default function TodosPage() {
 					</div>
 
 					{/* Sign in prompt for guests */}
-					{!isAuthenticated && (
+					{!isAuthenticated && !isSmartView && (
 						<Card className="stagger-1 mb-6 animate-fade-up border-accent/20 bg-gradient-to-r from-accent/5 to-accent/10 opacity-0">
 							<CardContent className="flex items-center gap-4 p-4">
 								<div className="rounded-xl bg-accent/20 p-2.5">
@@ -345,151 +374,189 @@ export default function TodosPage() {
 						</Card>
 					)}
 
-					{/* Add Task Form */}
-					<Card className="stagger-1 mb-6 animate-fade-up border-border/50 opacity-0 shadow-soft">
-						<CardContent className="p-4">
-							<form onSubmit={handleAddTodo} className="flex gap-3">
-								<div className="relative flex-1">
-									<Plus className="absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-									<Input
-										value={newTodoText}
-										onChange={(e) => setNewTodoText(e.target.value)}
-										placeholder={`Add task to ${selectedFolderName}...`}
-										disabled={isCreating}
-										className="h-12 pl-10 text-base transition-all duration-200 focus:ring-2 focus:ring-accent/20"
-									/>
-								</div>
-								<Button
-									type="submit"
-									disabled={isCreating || !newTodoText.trim()}
-									className="h-12 bg-accent px-6 text-accent-foreground shadow-soft transition-all duration-300 hover:bg-accent/90 hover:shadow-medium disabled:opacity-50"
-								>
-									{isCreating ? (
-										<div className="h-4 w-4 animate-spin rounded-full border-2 border-accent-foreground/30 border-t-accent-foreground" />
-									) : (
-										"Add"
-									)}
-								</Button>
-							</form>
-						</CardContent>
-					</Card>
-
-					{/* Filters and Search */}
-					<div className="stagger-2 mb-6 flex animate-fade-up flex-col gap-4 opacity-0 sm:flex-row sm:items-center sm:justify-between">
-						{/* Filter Tabs */}
-						<div className="flex items-center gap-1 rounded-xl bg-secondary/50 p-1">
-							{(["all", "active", "completed"] as const).map((type) => (
-								<button
-									type="button"
-									key={type}
-									onClick={() => setFilter(type)}
-									className={cn(
-										"relative rounded-lg px-4 py-2 font-medium text-sm transition-all duration-200",
-										filter === type
-											? "bg-card text-foreground shadow-soft"
-											: "text-muted-foreground hover:text-foreground",
-									)}
-								>
-									{type.charAt(0).toUpperCase() + type.slice(1)}
-									{type === "all" && stats.total > 0 && (
-										<span className="ml-1.5 text-muted-foreground text-xs">
-											({stats.total})
-										</span>
-									)}
-									{type === "active" && stats.active > 0 && (
-										<span className="ml-1.5 text-muted-foreground text-xs">
-											({stats.active})
-										</span>
-									)}
-									{type === "completed" && stats.completed > 0 && (
-										<span className="ml-1.5 text-muted-foreground text-xs">
-											({stats.completed})
-										</span>
-									)}
-								</button>
-							))}
-						</div>
-
-						{/* Search */}
-						<div className="relative">
-							<Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-							<Input
-								value={searchQuery}
-								onChange={(e) => setSearchQuery(e.target.value)}
-								placeholder="Search tasks..."
-								className="h-10 w-full pr-9 pl-9 sm:w-64"
-							/>
-							{searchQuery && (
-								<button
-									type="button"
-									onClick={() => setSearchQuery("")}
-									className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
-								>
-									<X className="h-4 w-4" />
-								</button>
+					{/* Smart Views */}
+					{isSmartView && smartViewType && (
+						<>
+							{smartViewType === "today" && (
+								<TodayView
+									todos={allTodos}
+									isLoading={isLoading}
+									onToggle={handleToggleTodo}
+									onDelete={handleDeleteTodo}
+									onScheduleChange={handleScheduleChange}
+								/>
 							)}
-						</div>
-					</div>
+							{smartViewType === "upcoming" && (
+								<UpcomingView
+									todos={allTodos}
+									isLoading={isLoading}
+									onToggle={handleToggleTodo}
+									onDelete={handleDeleteTodo}
+									onScheduleChange={handleScheduleChange}
+								/>
+							)}
+							{smartViewType === "overdue" && (
+								<OverdueView
+									todos={allTodos}
+									isLoading={isLoading}
+									onToggle={handleToggleTodo}
+									onDelete={handleDeleteTodo}
+									onScheduleChange={handleScheduleChange}
+								/>
+							)}
+						</>
+					)}
 
-					{/* Task List */}
-					<Card className="stagger-3 animate-fade-up border-border/50 opacity-0 shadow-soft">
-						<CardContent className="p-4">
-							{isLoading ? (
-								<div className="space-y-3">
-									{[1, 2, 3, 4].map((i) => (
-										<div
-											key={i}
-											className="flex items-center gap-4 rounded-xl bg-secondary/30 p-4"
-										>
-											<Skeleton className="h-6 w-6 rounded-full" />
-											<Skeleton className="h-4 flex-1" />
+					{/* Folder View (Inbox and custom folders) */}
+					{!isSmartView && (
+						<>
+							{/* Add Task Form */}
+							<Card className="stagger-1 mb-6 animate-fade-up border-border/50 opacity-0 shadow-soft">
+								<CardContent className="p-4">
+									<form onSubmit={handleAddTodo} className="flex gap-3">
+										<div className="relative flex-1">
+											<Plus className="absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+											<Input
+												value={newTodoText}
+												onChange={(e) => setNewTodoText(e.target.value)}
+												placeholder={`Add task to ${selectedFolderName}...`}
+												disabled={isCreating}
+												className="h-12 pl-10 text-base transition-all duration-200 focus:ring-2 focus:ring-accent/20"
+											/>
 										</div>
+										<Button
+											type="submit"
+											disabled={isCreating || !newTodoText.trim()}
+											className="h-12 bg-accent px-6 text-accent-foreground shadow-soft transition-all duration-300 hover:bg-accent/90 hover:shadow-medium disabled:opacity-50"
+										>
+											{isCreating ? (
+												<div className="h-4 w-4 animate-spin rounded-full border-2 border-accent-foreground/30 border-t-accent-foreground" />
+											) : (
+												"Add"
+											)}
+										</Button>
+									</form>
+								</CardContent>
+							</Card>
+
+							{/* Filters and Search */}
+							<div className="stagger-2 mb-6 flex animate-fade-up flex-col gap-4 opacity-0 sm:flex-row sm:items-center sm:justify-between">
+								{/* Filter Tabs */}
+								<div className="flex items-center gap-1 rounded-xl bg-secondary/50 p-1">
+									{(["all", "active", "completed"] as const).map((type) => (
+										<button
+											type="button"
+											key={type}
+											onClick={() => setFilter(type)}
+											className={cn(
+												"relative rounded-lg px-4 py-2 font-medium text-sm transition-all duration-200",
+												filter === type
+													? "bg-card text-foreground shadow-soft"
+													: "text-muted-foreground hover:text-foreground",
+											)}
+										>
+											{type.charAt(0).toUpperCase() + type.slice(1)}
+											{type === "all" && stats.total > 0 && (
+												<span className="ml-1.5 text-muted-foreground text-xs">
+													({stats.total})
+												</span>
+											)}
+											{type === "active" && stats.active > 0 && (
+												<span className="ml-1.5 text-muted-foreground text-xs">
+													({stats.active})
+												</span>
+											)}
+											{type === "completed" && stats.completed > 0 && (
+												<span className="ml-1.5 text-muted-foreground text-xs">
+													({stats.completed})
+												</span>
+											)}
+										</button>
 									))}
 								</div>
-							) : filteredTodos.length === 0 ? (
-								<EmptyState
-									filter={filter}
-									searchQuery={searchQuery}
-									hasAnyTodos={folderFilteredTodos.length > 0}
-									folderName={selectedFolderName}
-								/>
-							) : (
-								<ul className="space-y-2" data-testid="todo-list">
-									{filteredTodos.map((todo, index) => {
-										const todoFolder = getFolderForTodo(todo.folderId);
-										return (
-											<TodoExpandableItem
-												key={todo.id}
-												todo={todo}
-												subtaskProgress={getProgress(todo.id)}
-												onToggle={handleToggleTodo}
-												onDelete={handleDeleteTodo}
-												onScheduleChange={handleScheduleChange}
-												folder={todoFolder}
-												showFolderBadge={selectedFolderId === "inbox"}
-												folderColorBgClasses={folderColorBgClasses}
-												animationDelay={`${index * 0.03}s`}
-											/>
-										);
-									})}
-								</ul>
-							)}
-						</CardContent>
-					</Card>
 
-					{/* Summary Footer */}
-					{folderFilteredTodos.length > 0 && (
-						<div className="stagger-4 mt-4 flex animate-fade-up items-center justify-between text-muted-foreground text-sm opacity-0">
-							<span>
-								{stats.active} task{stats.active !== 1 ? "s" : ""} remaining
-							</span>
-							{stats.completed > 0 && (
-								<span className="flex items-center gap-1.5">
-									<CheckCircle2 className="h-4 w-4 text-accent" />
-									{stats.completed} completed
-								</span>
+								{/* Search */}
+								<div className="relative">
+									<Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+									<Input
+										value={searchQuery}
+										onChange={(e) => setSearchQuery(e.target.value)}
+										placeholder="Search tasks..."
+										className="h-10 w-full pr-9 pl-9 sm:w-64"
+									/>
+									{searchQuery && (
+										<button
+											type="button"
+											onClick={() => setSearchQuery("")}
+											className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+										>
+											<X className="h-4 w-4" />
+										</button>
+									)}
+								</div>
+							</div>
+
+							{/* Task List */}
+							<Card className="stagger-3 animate-fade-up border-border/50 opacity-0 shadow-soft">
+								<CardContent className="p-4">
+									{isLoading ? (
+										<div className="space-y-3">
+											{[1, 2, 3, 4].map((i) => (
+												<div
+													key={i}
+													className="flex items-center gap-4 rounded-xl bg-secondary/30 p-4"
+												>
+													<Skeleton className="h-6 w-6 rounded-full" />
+													<Skeleton className="h-4 flex-1" />
+												</div>
+											))}
+										</div>
+									) : filteredTodos.length === 0 ? (
+										<EmptyState
+											filter={filter}
+											searchQuery={searchQuery}
+											hasAnyTodos={folderFilteredTodos.length > 0}
+											folderName={selectedFolderName}
+										/>
+									) : (
+										<ul className="space-y-2" data-testid="todo-list">
+											{filteredTodos.map((todo, index) => {
+												const todoFolder = getFolderForTodo(todo.folderId);
+												return (
+													<TodoExpandableItem
+														key={todo.id}
+														todo={todo}
+														subtaskProgress={getProgress(todo.id)}
+														onToggle={handleToggleTodo}
+														onDelete={handleDeleteTodo}
+														onScheduleChange={handleScheduleChange}
+														folder={todoFolder}
+														showFolderBadge={selectedFolderId === "inbox"}
+														folderColorBgClasses={folderColorBgClasses}
+														animationDelay={`${index * 0.03}s`}
+													/>
+												);
+											})}
+										</ul>
+									)}
+								</CardContent>
+							</Card>
+
+							{/* Summary Footer */}
+							{folderFilteredTodos.length > 0 && (
+								<div className="stagger-4 mt-4 flex animate-fade-up items-center justify-between text-muted-foreground text-sm opacity-0">
+									<span>
+										{stats.active} task{stats.active !== 1 ? "s" : ""} remaining
+									</span>
+									{stats.completed > 0 && (
+										<span className="flex items-center gap-1.5">
+											<CheckCircle2 className="h-4 w-4 text-accent" />
+											{stats.completed} completed
+										</span>
+									)}
+								</div>
 							)}
-						</div>
+						</>
 					)}
 				</div>
 			</div>
