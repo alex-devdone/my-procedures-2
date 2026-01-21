@@ -549,3 +549,20 @@
   - Show overdue styling: past-due incomplete, not for completed, not for future
   - Persist scheduling data after reload: due date, recurring pattern, combined schedule
   - Schedule display in todo list: due date badge, recurring indicator, combined display
+
+- [✓] 2026-01-21 06:49 - Create use-notifications.ts hook (apps/web/src/hooks/use-notifications.ts) with:
+  - NotificationPermission type ("default" | "granted" | "denied")
+  - NotificationState interface (isSupported, permission, isRequesting)
+  - UseNotificationsReturn interface extending state with requestPermission and showNotification methods
+  - Pure functions for testability: isNotificationSupported, getNotificationPermission, deriveNotificationState, canShowNotification
+  - useNotifications hook with permission polling (5s interval)
+  - requestPermission() to prompt user for browser notification access
+  - showNotification() to create browser Notification when granted
+  - SSR-safe with client-side initialization
+- [✓] 2026-01-21 06:49 - Add unit tests for useNotifications hook (43 tests) in apps/web/src/hooks/use-notifications.test.ts covering:
+  - Pure functions: isNotificationSupported, getNotificationPermission, deriveNotificationState, canShowNotification
+  - Initial state: isSupported detection, permission states (default/granted/denied), isRequesting
+  - requestPermission: returns denied when unsupported, returns current when already granted/denied, calls Notification.requestPermission, updates state, handles errors
+  - showNotification: returns null when unsupported/denied, creates Notification when granted, passes options, handles constructor errors
+  - Permission polling: polls for changes, cleans up on unmount, skips when unsupported
+  - Function stability: stable references across rerenders

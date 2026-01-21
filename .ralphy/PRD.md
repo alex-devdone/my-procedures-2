@@ -205,8 +205,8 @@ UI for setting due dates, reminders, and recurring patterns. Can proceed after P
 
 Notification system for due reminders. Can proceed after Phase 10.
 
-- [ ] Create `apps/web/src/hooks/use-notifications.ts` - hook for requesting/managing browser notification permissions
-- [ ] Add unit tests for useNotifications hook in `apps/web/src/hooks/use-notifications.test.ts`
+- [x] Create `apps/web/src/hooks/use-notifications.ts` - hook for requesting/managing browser notification permissions
+- [x] Add unit tests for useNotifications hook in `apps/web/src/hooks/use-notifications.test.ts`
 - [ ] Create `apps/web/src/hooks/use-reminder-checker.ts` - hook that polls for due reminders and triggers notifications
 - [ ] Add unit tests for useReminderChecker in `apps/web/src/hooks/use-reminder-checker.test.ts`
 - [ ] Create `apps/web/src/components/notifications/reminder-toast.tsx` - in-app toast component for reminders
