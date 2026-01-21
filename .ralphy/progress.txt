@@ -84,3 +84,13 @@
 - [✓] 2026-01-21 00:51 - Add clearFolderFromTodos function to local-todo-storage.ts to move todos to Inbox when folder is deleted
 - [✓] 2026-01-21 00:51 - Update folder hooks to clear todo folderId when folder is deleted in localStorage mode
 - [✓] 2026-01-21 00:51 - Export notifyLocalTodosListeners from todo hooks for cross-module notifications
+
+- [✓] 2026-01-21 01:05 - Create subtask router (packages/api/src/routers/subtask.ts) with CRUD procedures: list, create, update, delete, toggle, reorder
+- [✓] 2026-01-21 01:05 - Add Zod validation schemas for subtask inputs (createSubtaskInputSchema, updateSubtaskInputSchema, deleteSubtaskInputSchema, toggleSubtaskInputSchema, reorderSubtaskInputSchema, listSubtasksInputSchema)
+- [✓] 2026-01-21 01:05 - Add logic to auto-complete parent todo when all subtasks are completed (checkAndAutoCompleteTodo helper)
+- [✓] 2026-01-21 01:05 - Add subtask router to main tRPC router (packages/api/src/routers/index.ts)
+- [✓] 2026-01-21 01:05 - Add unit tests for subtask router (61 tests) in packages/api/src/routers/subtask.test.ts covering:
+  - Input validation for all subtask operations
+  - Authorization and ownership verification logic
+  - CRUD operations business logic
+  - Auto-complete parent todo logic when all subtasks completed

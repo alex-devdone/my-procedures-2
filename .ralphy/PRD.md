@@ -97,12 +97,12 @@ UI components for folder management. Can proceed after Phase 3.
 
 Backend API layer for subtasks. Can proceed after Phase 1.
 
-- [ ] Create `packages/api/src/routers/subtask.ts` with CRUD procedures (list, create, update, delete, toggle, reorder)
-- [ ] Add unit tests for subtask router in `packages/api/src/routers/subtask.test.ts`
-- [ ] Add subtask router to main tRPC router in `packages/api/src/index.ts`
-- [ ] Add Zod validation schemas for subtask inputs in router
-- [ ] Add logic to auto-complete parent todo when all subtasks are completed
-- [ ] Add unit tests for auto-complete logic in `packages/api/src/routers/subtask.test.ts`
+- [x] Create `packages/api/src/routers/subtask.ts` with CRUD procedures (list, create, update, delete, toggle, reorder)
+- [x] Add unit tests for subtask router in `packages/api/src/routers/subtask.test.ts`
+- [x] Add subtask router to main tRPC router in `packages/api/src/index.ts`
+- [x] Add Zod validation schemas for subtask inputs in router
+- [x] Add logic to auto-complete parent todo when all subtasks are completed
+- [x] Add unit tests for auto-complete logic in `packages/api/src/routers/subtask.test.ts`
 
 ---
 
