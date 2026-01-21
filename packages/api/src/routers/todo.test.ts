@@ -2154,3 +2154,465 @@ describe("CompleteRecurring Procedure", () => {
 		});
 	});
 });
+
+describe("GetCompletionHistory Procedure", () => {
+	describe("Input Validation", () => {
+		interface GetCompletionHistoryInput {
+			startDate: string;
+			endDate: string;
+		}
+
+		const validateGetCompletionHistoryInput = (
+			input: unknown,
+		): { valid: boolean; data?: GetCompletionHistoryInput } => {
+			if (typeof input !== "object" || input === null) {
+				return { valid: false };
+			}
+
+			const i = input as Record<string, unknown>;
+
+			// startDate is required and must be valid datetime string
+			if (typeof i.startDate !== "string") {
+				return { valid: false };
+			}
+			const startDate = new Date(i.startDate);
+			if (Number.isNaN(startDate.getTime())) {
+				return { valid: false };
+			}
+
+			// endDate is required and must be valid datetime string
+			if (typeof i.endDate !== "string") {
+				return { valid: false };
+			}
+			const endDate = new Date(i.endDate);
+			if (Number.isNaN(endDate.getTime())) {
+				return { valid: false };
+			}
+
+			return {
+				valid: true,
+				data: input as GetCompletionHistoryInput,
+			};
+		};
+
+		it("validates valid date range", () => {
+			const result = validateGetCompletionHistoryInput({
+				startDate: "2026-01-01T00:00:00Z",
+				endDate: "2026-01-31T23:59:59Z",
+			});
+			expect(result.valid).toBe(true);
+			expect(result.data?.startDate).toBe("2026-01-01T00:00:00Z");
+			expect(result.data?.endDate).toBe("2026-01-31T23:59:59Z");
+		});
+
+		it("validates same day range", () => {
+			const result = validateGetCompletionHistoryInput({
+				startDate: "2026-01-15T00:00:00Z",
+				endDate: "2026-01-15T23:59:59Z",
+			});
+			expect(result.valid).toBe(true);
+		});
+
+		it("rejects missing startDate", () => {
+			expect(
+				validateGetCompletionHistoryInput({
+					endDate: "2026-01-31T23:59:59Z",
+				}),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects missing endDate", () => {
+			expect(
+				validateGetCompletionHistoryInput({
+					startDate: "2026-01-01T00:00:00Z",
+				}),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects invalid startDate string", () => {
+			expect(
+				validateGetCompletionHistoryInput({
+					startDate: "not-a-date",
+					endDate: "2026-01-31T23:59:59Z",
+				}),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects invalid endDate string", () => {
+			expect(
+				validateGetCompletionHistoryInput({
+					startDate: "2026-01-01T00:00:00Z",
+					endDate: "invalid",
+				}),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects non-object input", () => {
+			expect(validateGetCompletionHistoryInput("invalid")).toEqual({
+				valid: false,
+			});
+		});
+
+		it("rejects null input", () => {
+			expect(validateGetCompletionHistoryInput(null)).toEqual({ valid: false });
+		});
+	});
+
+	describe("Business Logic", () => {
+		interface CompletionRecord {
+			id: number;
+			todoId: number;
+			scheduledDate: Date;
+			completedAt: Date | null;
+			createdAt: Date;
+			userId: string;
+		}
+
+		interface CompletionWithTodoText extends CompletionRecord {
+			todoText: string;
+		}
+
+		describe("Filtering by Date Range", () => {
+			it("should filter completions within date range", () => {
+				const completions: CompletionRecord[] = [
+					{
+						id: 1,
+						todoId: 10,
+						scheduledDate: new Date("2026-01-05T10:00:00Z"),
+						completedAt: new Date("2026-01-05T10:30:00Z"),
+						createdAt: new Date("2026-01-01T00:00:00Z"),
+						userId: "user-123",
+					},
+					{
+						id: 2,
+						todoId: 10,
+						scheduledDate: new Date("2026-01-15T10:00:00Z"),
+						completedAt: new Date("2026-01-15T11:00:00Z"),
+						createdAt: new Date("2026-01-01T00:00:00Z"),
+						userId: "user-123",
+					},
+					{
+						id: 3,
+						todoId: 10,
+						scheduledDate: new Date("2026-02-01T10:00:00Z"),
+						completedAt: null,
+						createdAt: new Date("2026-01-01T00:00:00Z"),
+						userId: "user-123",
+					},
+				];
+
+				const filterByDateRange = (
+					records: CompletionRecord[],
+					startDate: Date,
+					endDate: Date,
+				) => {
+					return records.filter(
+						(r) => r.scheduledDate >= startDate && r.scheduledDate <= endDate,
+					);
+				};
+
+				const startDate = new Date("2026-01-01T00:00:00Z");
+				const endDate = new Date("2026-01-31T23:59:59Z");
+
+				const result = filterByDateRange(completions, startDate, endDate);
+
+				expect(result).toHaveLength(2);
+				expect(result.map((r) => r.id)).toEqual([1, 2]);
+			});
+
+			it("should return empty array when no completions in range", () => {
+				const completions: CompletionRecord[] = [
+					{
+						id: 1,
+						todoId: 10,
+						scheduledDate: new Date("2026-03-01T10:00:00Z"),
+						completedAt: new Date("2026-03-01T10:30:00Z"),
+						createdAt: new Date("2026-03-01T00:00:00Z"),
+						userId: "user-123",
+					},
+				];
+
+				const filterByDateRange = (
+					records: CompletionRecord[],
+					startDate: Date,
+					endDate: Date,
+				) => {
+					return records.filter(
+						(r) => r.scheduledDate >= startDate && r.scheduledDate <= endDate,
+					);
+				};
+
+				const startDate = new Date("2026-01-01T00:00:00Z");
+				const endDate = new Date("2026-01-31T23:59:59Z");
+
+				const result = filterByDateRange(completions, startDate, endDate);
+
+				expect(result).toHaveLength(0);
+			});
+		});
+
+		describe("Filtering by User", () => {
+			it("should only return completions for the authenticated user", () => {
+				const completions: CompletionRecord[] = [
+					{
+						id: 1,
+						todoId: 10,
+						scheduledDate: new Date("2026-01-15T10:00:00Z"),
+						completedAt: new Date("2026-01-15T10:30:00Z"),
+						createdAt: new Date("2026-01-01T00:00:00Z"),
+						userId: "user-123",
+					},
+					{
+						id: 2,
+						todoId: 20,
+						scheduledDate: new Date("2026-01-15T10:00:00Z"),
+						completedAt: new Date("2026-01-15T11:00:00Z"),
+						createdAt: new Date("2026-01-01T00:00:00Z"),
+						userId: "user-456", // Different user
+					},
+					{
+						id: 3,
+						todoId: 30,
+						scheduledDate: new Date("2026-01-16T10:00:00Z"),
+						completedAt: null,
+						createdAt: new Date("2026-01-01T00:00:00Z"),
+						userId: "user-123",
+					},
+				];
+
+				const filterByUser = (records: CompletionRecord[], userId: string) => {
+					return records.filter((r) => r.userId === userId);
+				};
+
+				const result = filterByUser(completions, "user-123");
+
+				expect(result).toHaveLength(2);
+				expect(result.every((r) => r.userId === "user-123")).toBe(true);
+			});
+		});
+
+		describe("Join with Todo Data", () => {
+			it("should include todo text in completion record", () => {
+				const todos = [
+					{ id: 10, text: "Daily standup", userId: "user-123" },
+					{ id: 20, text: "Weekly review", userId: "user-123" },
+				];
+
+				const completions: CompletionRecord[] = [
+					{
+						id: 1,
+						todoId: 10,
+						scheduledDate: new Date("2026-01-15T10:00:00Z"),
+						completedAt: new Date("2026-01-15T10:30:00Z"),
+						createdAt: new Date("2026-01-01T00:00:00Z"),
+						userId: "user-123",
+					},
+					{
+						id: 2,
+						todoId: 20,
+						scheduledDate: new Date("2026-01-15T14:00:00Z"),
+						completedAt: null,
+						createdAt: new Date("2026-01-01T00:00:00Z"),
+						userId: "user-123",
+					},
+				];
+
+				const joinWithTodoText = (
+					completionRecords: CompletionRecord[],
+					todoRecords: Array<{ id: number; text: string; userId: string }>,
+				): CompletionWithTodoText[] => {
+					return completionRecords
+						.map((completion) => {
+							const todo = todoRecords.find((t) => t.id === completion.todoId);
+							if (!todo) return null;
+							return {
+								...completion,
+								todoText: todo.text,
+							};
+						})
+						.filter((r): r is CompletionWithTodoText => r !== null);
+				};
+
+				const result = joinWithTodoText(completions, todos);
+
+				expect(result).toHaveLength(2);
+				expect(result[0]?.todoText).toBe("Daily standup");
+				expect(result[1]?.todoText).toBe("Weekly review");
+			});
+
+			it("should exclude completions where todo no longer exists (inner join behavior)", () => {
+				const todos = [{ id: 10, text: "Existing todo", userId: "user-123" }];
+
+				const completions: CompletionRecord[] = [
+					{
+						id: 1,
+						todoId: 10,
+						scheduledDate: new Date("2026-01-15T10:00:00Z"),
+						completedAt: new Date("2026-01-15T10:30:00Z"),
+						createdAt: new Date("2026-01-01T00:00:00Z"),
+						userId: "user-123",
+					},
+					{
+						id: 2,
+						todoId: 99, // Todo was deleted
+						scheduledDate: new Date("2026-01-16T10:00:00Z"),
+						completedAt: null,
+						createdAt: new Date("2026-01-01T00:00:00Z"),
+						userId: "user-123",
+					},
+				];
+
+				const joinWithTodoText = (
+					completionRecords: CompletionRecord[],
+					todoRecords: Array<{ id: number; text: string; userId: string }>,
+				): CompletionWithTodoText[] => {
+					return completionRecords
+						.map((completion) => {
+							const todo = todoRecords.find((t) => t.id === completion.todoId);
+							if (!todo) return null;
+							return {
+								...completion,
+								todoText: todo.text,
+							};
+						})
+						.filter((r): r is CompletionWithTodoText => r !== null);
+				};
+
+				const result = joinWithTodoText(completions, todos);
+
+				expect(result).toHaveLength(1);
+				expect(result[0]?.todoId).toBe(10);
+			});
+		});
+
+		describe("Return Value Structure", () => {
+			it("should return correct shape for completion history records", () => {
+				interface CompletionHistoryRecord {
+					id: number;
+					todoId: number;
+					scheduledDate: Date;
+					completedAt: Date | null;
+					createdAt: Date;
+					todoText: string;
+				}
+
+				const createCompletionHistoryRecord = (data: {
+					id: number;
+					todoId: number;
+					scheduledDate: Date;
+					completedAt: Date | null;
+					createdAt: Date;
+					todoText: string;
+				}): CompletionHistoryRecord => ({
+					id: data.id,
+					todoId: data.todoId,
+					scheduledDate: data.scheduledDate,
+					completedAt: data.completedAt,
+					createdAt: data.createdAt,
+					todoText: data.todoText,
+				});
+
+				const record = createCompletionHistoryRecord({
+					id: 1,
+					todoId: 10,
+					scheduledDate: new Date("2026-01-15T10:00:00Z"),
+					completedAt: new Date("2026-01-15T10:30:00Z"),
+					createdAt: new Date("2026-01-01T00:00:00Z"),
+					todoText: "Daily standup",
+				});
+
+				expect(record).toHaveProperty("id");
+				expect(record).toHaveProperty("todoId");
+				expect(record).toHaveProperty("scheduledDate");
+				expect(record).toHaveProperty("completedAt");
+				expect(record).toHaveProperty("createdAt");
+				expect(record).toHaveProperty("todoText");
+			});
+
+			it("should handle completedAt being null for incomplete records", () => {
+				interface CompletionHistoryRecord {
+					id: number;
+					todoId: number;
+					scheduledDate: Date;
+					completedAt: Date | null;
+					createdAt: Date;
+					todoText: string;
+				}
+
+				const record: CompletionHistoryRecord = {
+					id: 1,
+					todoId: 10,
+					scheduledDate: new Date("2026-01-15T10:00:00Z"),
+					completedAt: null, // Not yet completed
+					createdAt: new Date("2026-01-01T00:00:00Z"),
+					todoText: "Pending task",
+				};
+
+				expect(record.completedAt).toBeNull();
+			});
+		});
+
+		describe("Combined Filters", () => {
+			it("should apply both user and date range filters", () => {
+				const completions: CompletionRecord[] = [
+					{
+						id: 1,
+						todoId: 10,
+						scheduledDate: new Date("2026-01-15T10:00:00Z"),
+						completedAt: new Date("2026-01-15T10:30:00Z"),
+						createdAt: new Date("2026-01-01T00:00:00Z"),
+						userId: "user-123",
+					},
+					{
+						id: 2,
+						todoId: 20,
+						scheduledDate: new Date("2026-01-15T10:00:00Z"),
+						completedAt: new Date("2026-01-15T11:00:00Z"),
+						createdAt: new Date("2026-01-01T00:00:00Z"),
+						userId: "user-456", // Different user - should be excluded
+					},
+					{
+						id: 3,
+						todoId: 30,
+						scheduledDate: new Date("2026-02-15T10:00:00Z"), // Outside range
+						completedAt: null,
+						createdAt: new Date("2026-01-01T00:00:00Z"),
+						userId: "user-123",
+					},
+					{
+						id: 4,
+						todoId: 40,
+						scheduledDate: new Date("2026-01-20T10:00:00Z"),
+						completedAt: new Date("2026-01-20T10:30:00Z"),
+						createdAt: new Date("2026-01-01T00:00:00Z"),
+						userId: "user-123",
+					},
+				];
+
+				const filterCompletions = (
+					records: CompletionRecord[],
+					userId: string,
+					startDate: Date,
+					endDate: Date,
+				) => {
+					return records.filter(
+						(r) =>
+							r.userId === userId &&
+							r.scheduledDate >= startDate &&
+							r.scheduledDate <= endDate,
+					);
+				};
+
+				const result = filterCompletions(
+					completions,
+					"user-123",
+					new Date("2026-01-01T00:00:00Z"),
+					new Date("2026-01-31T23:59:59Z"),
+				);
+
+				expect(result).toHaveLength(2);
+				expect(result.map((r) => r.id)).toEqual([1, 4]);
+			});
+		});
+	});
+});

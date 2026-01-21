@@ -1,6 +1,6 @@
 import { and, db, eq, gte, lte } from "@my-procedures-2/db";
 import type { RecurringPattern } from "@my-procedures-2/db/schema/todo";
-import { todo } from "@my-procedures-2/db/schema/todo";
+import { recurringTodoCompletion, todo } from "@my-procedures-2/db/schema/todo";
 import { TRPCError } from "@trpc/server";
 import z from "zod";
 
@@ -317,5 +317,46 @@ export const todoRouter = router({
 				nextTodo: newTodo,
 				message: null,
 			};
+		}),
+
+	/**
+	 * Get completion history for recurring todos within a date range.
+	 * Joins with todo data to include todo text.
+	 *
+	 * @param startDate - Start of date range (inclusive)
+	 * @param endDate - End of date range (inclusive)
+	 * @returns Array of completion records with associated todo data
+	 */
+	getCompletionHistory: protectedProcedure
+		.input(
+			z.object({
+				startDate: z.string().datetime(),
+				endDate: z.string().datetime(),
+			}),
+		)
+		.query(async ({ ctx, input }) => {
+			const completions = await db
+				.select({
+					id: recurringTodoCompletion.id,
+					todoId: recurringTodoCompletion.todoId,
+					scheduledDate: recurringTodoCompletion.scheduledDate,
+					completedAt: recurringTodoCompletion.completedAt,
+					createdAt: recurringTodoCompletion.createdAt,
+					todoText: todo.text,
+				})
+				.from(recurringTodoCompletion)
+				.innerJoin(todo, eq(recurringTodoCompletion.todoId, todo.id))
+				.where(
+					and(
+						eq(recurringTodoCompletion.userId, ctx.session.user.id),
+						gte(
+							recurringTodoCompletion.scheduledDate,
+							new Date(input.startDate),
+						),
+						lte(recurringTodoCompletion.scheduledDate, new Date(input.endDate)),
+					),
+				);
+
+			return completions;
 		}),
 });
