@@ -153,3 +153,15 @@
   - Type exports: all subtask types (Subtask, RemoteSubtask, LocalSubtask, etc.)
   - Schema exports: all Zod validation schemas for remote and local operations
   - Helper exports: calculateSubtaskProgress and areAllSubtasksCompleted utilities
+
+- [✓] 2026-01-21 01:51 - Update local-todo-storage.ts to integrate with subtask storage:
+  - Added import for local-subtask-storage module
+  - Updated deleteTodo() to call localSubtaskStorage.deleteByTodoId() to delete associated subtasks when a todo is deleted
+- [✓] 2026-01-21 01:51 - Add unit tests for local-todo-storage (48 tests) in apps/web/src/lib/local-todo-storage.test.ts covering:
+  - getAll(): empty state, validation of todo structure, field type checking, folderId handling, SSR safety
+  - create(): default values, folderId support, UUID generation, appending to existing todos
+  - toggle(): completion state toggling, persistence, non-existent todo handling
+  - deleteTodo(): todo removal, subtask cascade deletion via localSubtaskStorage.deleteByTodoId()
+  - updateFolder(): folderId updates, move to Inbox (null), persistence
+  - clearAll(): localStorage removal, SSR safety
+  - clearFolderFromTodos(): batch folderId clearing when folder is deleted

@@ -1,3 +1,5 @@
+import * as localSubtaskStorage from "./local-subtask-storage";
+
 const STORAGE_KEY = "todos";
 
 export interface LocalTodo {
@@ -69,6 +71,10 @@ export function deleteTodo(id: string): boolean {
 
 	todos.splice(index, 1);
 	localStorage.setItem(STORAGE_KEY, JSON.stringify(todos));
+
+	// Delete associated subtasks
+	localSubtaskStorage.deleteByTodoId(id);
+
 	return true;
 }
 
