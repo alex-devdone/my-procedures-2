@@ -655,3 +655,67 @@
   - Schedule change: passes callback to items, renders without callback
   - Accessibility: button types, search input placeholder, list structure
 - [✓] 2026-01-21 07:52 - Create barrel export for views (apps/web/src/components/views/index.ts)
+
+- [✓] 2026-01-21 08:10 - Create UpcomingView component (apps/web/src/components/views/upcoming-view.tsx) with:
+  - getTodosUpcoming() pure function for filtering todos due in next 7 days and grouping by date
+  - TodoDateGroup interface for representing date groups (dateKey, label, todos)
+  - isWithinDays() helper to check if date is within N days from now
+  - getDateKey() helper to generate YYYY-MM-DD keys for grouping
+  - formatDateLabel() helper for human-readable labels ("Today", "Tomorrow", "Mon, Jan 15")
+  - flattenDateGroups() helper to flatten date groups into a flat todo array
+  - UpcomingView component showing todos grouped by due date with Calendar icon header
+  - Date section headers with todo counts per date
+  - Status filter tabs (All/Active/Completed) with counts for all upcoming todos
+  - Search input with clear button for filtering by text
+  - Stats computation (total, active, completed) for all upcoming todos
+  - Footer showing remaining tasks and completed count
+  - Loading skeleton state while data is loading
+  - Empty state messages for no todos, all done, no completed, no matches
+  - Folder badge display on todo items (always shown since viewing across all folders)
+  - Integration with useFolderStorage for folder info and useAllSubtasksProgress for subtask progress
+  - Passes onScheduleChange to TodoExpandableItem for schedule editing
+- [✓] 2026-01-21 08:10 - Add unit tests for UpcomingView (65 tests) in apps/web/src/components/views/upcoming-view.test.tsx covering:
+  - isWithinDays: today, tomorrow, 6/7/8 days, yesterday, Date objects vs strings
+  - getDateKey: YYYY-MM-DD format, padding single digits
+  - formatDateLabel: Today, Tomorrow, formatted date for others
+  - getTodosUpcoming: empty arrays, filtering, grouping, sorting chronologically, completed inclusion
+  - flattenDateGroups: empty, single group, multiple groups
+  - Rendering: header, calendar icon, className, filter tabs, search input
+  - Loading state: skeleton display and hiding
+  - Empty state: no todos, all done, no completed, no matches
+  - Date Grouping: groups by date, shows counts in headers, renders todos in groups
+  - Filtering: active status, completed status, search query, case insensitive, hides empty groups
+  - Todo interactions: onToggle, onDelete callbacks
+  - Statistics: counts in filter tabs, footer counts, singular/plural
+  - Folder integration: shows folder badge, no badge for null folderId
+  - Schedule change: passes callback to items, renders without callback
+  - Accessibility: button types, search input placeholder, date group structure
+- [✓] 2026-01-21 08:10 - Update barrel export for views (apps/web/src/components/views/index.ts) to include UpcomingView exports
+- [✓] 2026-01-21 08:19 - Create OverdueView component (apps/web/src/components/views/overdue-view.tsx) with:
+  - getTodosOverdue() pure function for filtering overdue todos (past due date)
+  - OverdueView component showing overdue todos with AlertCircle icon and header
+  - Status filter tabs (All/Active/Completed) with counts
+  - Search input with clear button for filtering by text
+  - Stats computation (total, active, completed) for overdue todos
+  - Footer showing remaining tasks and completed count
+  - Loading skeleton state while data is loading
+  - Empty state messages for no todos, all done, no completed, no matches
+  - Sorted todos: active first (by most overdue), then completed (newest due date first)
+  - Folder badge display on todo items (always shown since viewing across all folders)
+  - Integration with useFolderStorage for folder info and useAllSubtasksProgress for subtask progress
+  - Passes onScheduleChange to TodoExpandableItem for schedule editing
+- [✓] 2026-01-21 08:19 - Add unit tests for OverdueView (42 tests) in apps/web/src/components/views/overdue-view.test.tsx covering:
+  - getTodosOverdue: empty arrays, filtering, completed inclusion
+  - Rendering: header, alert icon, className, filter tabs, search input
+  - Loading state: skeleton display and hiding
+  - Empty state: no todos, all done, no completed, no matches
+  - Todo list: renders overdue todos, filters out non-overdue, sorting by due date
+  - Sorting: active todos first (most overdue first), completed after
+  - Filtering: active status, completed status, search query, case insensitive
+  - Todo interactions: onToggle, onDelete callbacks
+  - Statistics: counts in filter tabs, footer counts, singular/plural
+  - Folder integration: shows folder badge, no badge for null folderId
+  - Schedule change: passes callback to items, renders without callback
+  - Accessibility: button types, search input placeholder, list structure
+- [✓] 2026-01-21 08:19 - Update barrel export for views (apps/web/src/components/views/index.ts) to include OverdueView exports
+
