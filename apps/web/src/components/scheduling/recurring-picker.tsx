@@ -6,6 +6,7 @@ import { useCallback, useMemo, useState } from "react";
 import type { RecurringPattern, RecurringPatternType } from "@/app/api/todo";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { formatTimeDisplay, TimePicker } from "./time-picker";
 
 // ============================================================================
 // Types
@@ -72,11 +73,12 @@ export interface RecurringPickerProps {
  */
 export function formatRecurringPattern(pattern: RecurringPattern): string {
 	const interval = pattern.interval ?? 1;
+	let base: string;
 
 	switch (pattern.type) {
 		case "daily":
-			if (interval === 1) return "Daily";
-			return `Every ${interval} days`;
+			base = interval === 1 ? "Daily" : `Every ${interval} days`;
+			break;
 
 		case "weekly":
 			if (pattern.daysOfWeek && pattern.daysOfWeek.length > 0) {
@@ -88,45 +90,59 @@ export function formatRecurringPattern(pattern: RecurringPattern): string {
 						sortedDays.length === 5 &&
 						sortedDays.every((d, i) => d === i + 1)
 					) {
-						return "Weekdays";
-					}
-					if (
+						base = "Weekdays";
+					} else if (
 						sortedDays.length === 2 &&
 						sortedDays[0] === 0 &&
 						sortedDays[1] === 6
 					) {
-						return "Weekends";
+						base = "Weekends";
+					} else {
+						base = `Weekly on ${days}`;
 					}
-					return `Weekly on ${days}`;
+				} else {
+					base = `Every ${interval} weeks on ${days}`;
 				}
-				return `Every ${interval} weeks on ${days}`;
+			} else {
+				base = interval === 1 ? "Weekly" : `Every ${interval} weeks`;
 			}
-			if (interval === 1) return "Weekly";
-			return `Every ${interval} weeks`;
+			break;
 
 		case "monthly":
 			if (pattern.dayOfMonth) {
 				const ordinal = formatOrdinal(pattern.dayOfMonth);
-				if (interval === 1) return `Monthly on the ${ordinal}`;
-				return `Every ${interval} months on the ${ordinal}`;
+				base =
+					interval === 1
+						? `Monthly on the ${ordinal}`
+						: `Every ${interval} months on the ${ordinal}`;
+			} else {
+				base = interval === 1 ? "Monthly" : `Every ${interval} months`;
 			}
-			if (interval === 1) return "Monthly";
-			return `Every ${interval} months`;
+			break;
 
 		case "yearly":
-			if (interval === 1) return "Yearly";
-			return `Every ${interval} years`;
+			base = interval === 1 ? "Yearly" : `Every ${interval} years`;
+			break;
 
 		case "custom":
 			if (pattern.daysOfWeek && pattern.daysOfWeek.length > 0) {
 				const days = pattern.daysOfWeek.map((d) => DAY_LABELS[d]).join(", ");
-				return `Custom: ${days}`;
+				base = `Custom: ${days}`;
+			} else {
+				base = "Custom";
 			}
-			return "Custom";
+			break;
 
 		default:
-			return "Recurring";
+			base = "Recurring";
 	}
+
+	// Append notification time if set
+	if (pattern.notifyAt) {
+		return `${base} at ${formatTimeDisplay(pattern.notifyAt)}`;
+	}
+
+	return base;
 }
 
 /**
@@ -463,8 +479,12 @@ export function RecurringPicker({
 
 	const handlePatternTypeChange = useCallback((type: RecurringPatternType) => {
 		setEditingPattern((prev) => {
-			// Preserve interval when switching types
-			const newPattern: RecurringPattern = { type, interval: prev.interval };
+			// Preserve interval and notifyAt when switching types
+			const newPattern: RecurringPattern = {
+				type,
+				interval: prev.interval,
+				notifyAt: prev.notifyAt,
+			};
 
 			// Clear type-specific fields
 			if (type === "weekly" || type === "custom") {
@@ -501,6 +521,13 @@ export function RecurringPicker({
 		setEditingPattern((prev) => ({
 			...prev,
 			dayOfMonth: day,
+		}));
+	}, []);
+
+	const handleNotifyAtChange = useCallback((time: string | null) => {
+		setEditingPattern((prev) => ({
+			...prev,
+			notifyAt: time ?? undefined,
 		}));
 	}, []);
 
@@ -620,6 +647,16 @@ export function RecurringPicker({
 										onChange={handleDayOfMonthChange}
 									/>
 								)}
+
+								{/* Notification Time */}
+								<div data-testid="recurring-picker-time">
+									<TimePicker
+										value={editingPattern.notifyAt ?? null}
+										onChange={handleNotifyAtChange}
+										placeholder="Notify at (HH:mm)"
+										className="w-full"
+									/>
+								</div>
 
 								{/* Apply Button */}
 								<div className="flex justify-end pt-1">

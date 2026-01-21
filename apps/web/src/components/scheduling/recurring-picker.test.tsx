@@ -933,6 +933,190 @@ describe("RecurringPicker", () => {
 
 			expect(screen.getByText("Every 2 years")).toBeInTheDocument();
 		});
+
+		it("displays time when notifyAt is set", () => {
+			render(
+				<RecurringPicker
+					{...defaultProps}
+					value={{ type: "daily", notifyAt: "09:00" }}
+				/>,
+			);
+
+			expect(screen.getByText("Daily at 9:00 AM")).toBeInTheDocument();
+		});
+	});
+
+	describe("TimePicker Integration", () => {
+		it("renders time picker in popover", async () => {
+			const user = userEvent.setup();
+			render(<RecurringPicker {...defaultProps} />);
+
+			await user.click(screen.getByTestId("recurring-picker-trigger"));
+
+			await waitFor(() => {
+				expect(screen.getByTestId("recurring-picker-time")).toBeInTheDocument();
+			});
+		});
+
+		it("renders time picker input", async () => {
+			const user = userEvent.setup();
+			render(<RecurringPicker {...defaultProps} />);
+
+			await user.click(screen.getByTestId("recurring-picker-trigger"));
+
+			await waitFor(() => {
+				expect(screen.getByTestId("time-picker-input")).toBeInTheDocument();
+			});
+		});
+
+		it("renders time presets", async () => {
+			const user = userEvent.setup();
+			render(<RecurringPicker {...defaultProps} />);
+
+			await user.click(screen.getByTestId("recurring-picker-trigger"));
+
+			await waitFor(() => {
+				expect(screen.getByTestId("time-picker-presets")).toBeInTheDocument();
+			});
+		});
+
+		it("sets notifyAt when time is selected from presets", async () => {
+			const onChange = vi.fn();
+			const user = userEvent.setup();
+			render(<RecurringPicker {...defaultProps} onChange={onChange} />);
+
+			await user.click(screen.getByTestId("recurring-picker-trigger"));
+
+			await waitFor(() => {
+				expect(
+					screen.getByTestId("time-picker-preset-morning"),
+				).toBeInTheDocument();
+			});
+
+			// Click morning preset (09:00)
+			await user.click(screen.getByTestId("time-picker-preset-morning"));
+
+			// Click Apply to save the pattern with the time
+			await user.click(screen.getByTestId("recurring-picker-apply"));
+
+			expect(onChange).toHaveBeenCalledWith({
+				type: "daily",
+				notifyAt: "09:00",
+			});
+		});
+
+		it("shows existing notifyAt value in time picker", async () => {
+			const user = userEvent.setup();
+			render(
+				<RecurringPicker
+					{...defaultProps}
+					value={{ type: "daily", notifyAt: "14:30" }}
+				/>,
+			);
+
+			await user.click(screen.getByTestId("recurring-picker-trigger"));
+
+			await waitFor(() => {
+				const input = screen.getByTestId("time-picker-input");
+				expect(input).toHaveValue("14:30");
+			});
+		});
+
+		it("allows changing notifyAt value", async () => {
+			const onChange = vi.fn();
+			const user = userEvent.setup();
+			render(
+				<RecurringPicker
+					{...defaultProps}
+					value={{ type: "daily", notifyAt: "09:00" }}
+					onChange={onChange}
+				/>,
+			);
+
+			await user.click(screen.getByTestId("recurring-picker-trigger"));
+
+			await waitFor(() => {
+				expect(screen.getByTestId("time-picker-input")).toBeInTheDocument();
+			});
+
+			// Click noon preset (12:00)
+			await user.click(screen.getByTestId("time-picker-preset-noon"));
+
+			// Click Apply
+			await user.click(screen.getByTestId("recurring-picker-apply"));
+
+			expect(onChange).toHaveBeenCalledWith({
+				type: "daily",
+				notifyAt: "12:00",
+			});
+		});
+
+		it("clears notifyAt when time is cleared", async () => {
+			const onChange = vi.fn();
+			const user = userEvent.setup();
+			render(
+				<RecurringPicker
+					{...defaultProps}
+					value={{ type: "daily", notifyAt: "09:00" }}
+					onChange={onChange}
+				/>,
+			);
+
+			await user.click(screen.getByTestId("recurring-picker-trigger"));
+
+			await waitFor(() => {
+				expect(screen.getByTestId("time-picker-clear")).toBeInTheDocument();
+			});
+
+			// Clear the time
+			await user.click(screen.getByTestId("time-picker-clear"));
+
+			// Click Apply
+			await user.click(screen.getByTestId("recurring-picker-apply"));
+
+			// notifyAt should be undefined (not in the pattern)
+			expect(onChange).toHaveBeenCalledWith({ type: "daily" });
+		});
+
+		it("preserves notifyAt when changing pattern type", async () => {
+			const onChange = vi.fn();
+			const user = userEvent.setup();
+			render(
+				<RecurringPicker
+					{...defaultProps}
+					value={{ type: "daily", notifyAt: "09:00" }}
+					onChange={onChange}
+				/>,
+			);
+
+			await user.click(screen.getByTestId("recurring-picker-trigger"));
+
+			// Change pattern type to weekly
+			await waitFor(() => {
+				expect(
+					screen.getByTestId("recurring-picker-type-trigger"),
+				).toBeInTheDocument();
+			});
+
+			await user.click(screen.getByTestId("recurring-picker-type-trigger"));
+
+			await waitFor(() => {
+				expect(
+					screen.getByTestId("recurring-picker-type-weekly"),
+				).toBeInTheDocument();
+			});
+
+			await user.click(screen.getByTestId("recurring-picker-type-weekly"));
+
+			// Click Apply
+			await user.click(screen.getByTestId("recurring-picker-apply"));
+
+			// notifyAt should be preserved
+			expect(onChange).toHaveBeenCalledWith({
+				type: "weekly",
+				notifyAt: "09:00",
+			});
+		});
 	});
 });
 
@@ -1026,6 +1210,48 @@ describe("Helper Functions", () => {
 
 		it("returns 'Custom' for custom pattern without days", () => {
 			expect(formatRecurringPattern({ type: "custom" })).toBe("Custom");
+		});
+
+		it("appends time when notifyAt is set for daily", () => {
+			expect(formatRecurringPattern({ type: "daily", notifyAt: "09:00" })).toBe(
+				"Daily at 9:00 AM",
+			);
+		});
+
+		it("appends time when notifyAt is set for weekly", () => {
+			expect(
+				formatRecurringPattern({ type: "weekly", notifyAt: "14:30" }),
+			).toBe("Weekly at 2:30 PM");
+		});
+
+		it("appends time when notifyAt is set for monthly with dayOfMonth", () => {
+			expect(
+				formatRecurringPattern({
+					type: "monthly",
+					dayOfMonth: 15,
+					notifyAt: "08:00",
+				}),
+			).toBe("Monthly on the 15th at 8:00 AM");
+		});
+
+		it("appends time when notifyAt is set for yearly with interval", () => {
+			expect(
+				formatRecurringPattern({
+					type: "yearly",
+					interval: 2,
+					notifyAt: "18:00",
+				}),
+			).toBe("Every 2 years at 6:00 PM");
+		});
+
+		it("appends time when notifyAt is set for custom pattern", () => {
+			expect(
+				formatRecurringPattern({
+					type: "custom",
+					daysOfWeek: [1, 3],
+					notifyAt: "12:00",
+				}),
+			).toBe("Custom: Mon, Wed at 12:00 PM");
 		});
 	});
 
