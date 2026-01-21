@@ -206,3 +206,24 @@
   - Accessibility: list item element, keyboard accessible button
   - Edge cases: empty text, long text, special characters, unicode
 - [✓] 2026-01-21 02:25 - Updated SubtaskList to import SubtaskItem from separate file for better code organization
+
+- [✓] 2026-01-21 02:44 - Create SubtaskAddInput component (apps/web/src/components/subtasks/subtask-add-input.tsx) with:
+  - Text input with placeholder for new subtask text
+  - Add button with Plus icon for submission
+  - Enter key submission support (with Shift+Enter passthrough)
+  - Loading/submitting state that disables input and button
+  - Auto-clear input after successful submission
+  - Whitespace trimming before submission
+  - Custom className and placeholder support
+  - AutoFocus option
+  - Accessible with proper ARIA labels (input: "New subtask text", button: "Add subtask")
+- [✓] 2026-01-21 02:44 - Add unit tests for SubtaskAddInput (34 tests) in apps/web/src/components/subtasks/subtask-add-input.test.tsx covering:
+  - Rendering: input, button, placeholders, className
+  - Input interaction: typing, clearing after submit, whitespace trimming
+  - Enter key submission: submit on Enter, no submit on Shift+Enter, preventDefault
+  - Button submission: click handler, disabled states (empty, whitespace)
+  - Disabled state: input and button disabled, no submission
+  - Async submission: promise handling, double submission prevention, disabled during async
+  - AutoFocus: default off, enabled when prop is true
+  - Accessibility: input label, button label, keyboard navigation
+  - Edge cases: long text, special characters, unicode, rapid submissions
