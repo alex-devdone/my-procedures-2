@@ -1,4 +1,15 @@
-import { and, db, eq, gte, lte } from "@my-procedures-2/db";
+import {
+	and,
+	count,
+	db,
+	eq,
+	gte,
+	isNotNull,
+	isNull,
+	lt,
+	lte,
+	sql,
+} from "@my-procedures-2/db";
 import type { RecurringPattern } from "@my-procedures-2/db/schema/todo";
 import { recurringTodoCompletion, todo } from "@my-procedures-2/db/schema/todo";
 import { TRPCError } from "@trpc/server";
@@ -358,5 +369,290 @@ export const todoRouter = router({
 				);
 
 			return completions;
+		}),
+
+	/**
+	 * Get analytics for todos within a date range.
+	 *
+	 * Calculates:
+	 * - Total regular (non-recurring) todos completed
+	 * - Total recurring occurrences completed
+	 * - Total recurring occurrences missed (scheduled before today with no completedAt)
+	 * - Completion rate % (completed / total expected * 100)
+	 * - Current streak (consecutive days with at least one completion)
+	 * - Daily breakdown (regular completed, recurring completed, recurring missed per day)
+	 *
+	 * @param startDate - Start of date range (inclusive)
+	 * @param endDate - End of date range (inclusive)
+	 * @returns Analytics data for the date range
+	 */
+	getAnalytics: protectedProcedure
+		.input(
+			z.object({
+				startDate: z.string().datetime(),
+				endDate: z.string().datetime(),
+			}),
+		)
+		.query(async ({ ctx, input }) => {
+			const startDate = new Date(input.startDate);
+			const endDate = new Date(input.endDate);
+			const today = new Date();
+			today.setHours(0, 0, 0, 0);
+
+			// Get regular (non-recurring) todos completed in the date range
+			// A regular todo is one without a recurringPattern that is completed
+			const regularTodosCompleted = await db
+				.select({ count: count() })
+				.from(todo)
+				.where(
+					and(
+						eq(todo.userId, ctx.session.user.id),
+						eq(todo.completed, true),
+						isNull(todo.recurringPattern),
+						gte(todo.dueDate, startDate),
+						lte(todo.dueDate, endDate),
+					),
+				);
+
+			const totalRegularCompleted = regularTodosCompleted[0]?.count ?? 0;
+
+			// Get recurring todo completion stats from recurringTodoCompletion table
+			const recurringCompleted = await db
+				.select({ count: count() })
+				.from(recurringTodoCompletion)
+				.where(
+					and(
+						eq(recurringTodoCompletion.userId, ctx.session.user.id),
+						gte(recurringTodoCompletion.scheduledDate, startDate),
+						lte(recurringTodoCompletion.scheduledDate, endDate),
+						isNotNull(recurringTodoCompletion.completedAt),
+					),
+				);
+
+			const totalRecurringCompleted = recurringCompleted[0]?.count ?? 0;
+
+			// Get recurring missed: scheduled date before today (and within range) with no completedAt
+			const recurringMissed = await db
+				.select({ count: count() })
+				.from(recurringTodoCompletion)
+				.where(
+					and(
+						eq(recurringTodoCompletion.userId, ctx.session.user.id),
+						gte(recurringTodoCompletion.scheduledDate, startDate),
+						lte(recurringTodoCompletion.scheduledDate, endDate),
+						lt(recurringTodoCompletion.scheduledDate, today),
+						isNull(recurringTodoCompletion.completedAt),
+					),
+				);
+
+			const totalRecurringMissed = recurringMissed[0]?.count ?? 0;
+
+			// Total expected recurring = completed + missed
+			const totalRecurringExpected =
+				totalRecurringCompleted + totalRecurringMissed;
+
+			// Calculate completion rate
+			const totalCompleted = totalRegularCompleted + totalRecurringCompleted;
+			const totalExpected = totalRegularCompleted + totalRecurringExpected;
+			const completionRate =
+				totalExpected > 0
+					? Math.round((totalCompleted / totalExpected) * 100)
+					: 100;
+
+			// Calculate current streak (consecutive days with at least one completion)
+			// Query all completion dates to calculate streak
+			const completionDates = await db
+				.select({
+					date: sql<string>`DATE(${recurringTodoCompletion.completedAt})`.as(
+						"date",
+					),
+				})
+				.from(recurringTodoCompletion)
+				.where(
+					and(
+						eq(recurringTodoCompletion.userId, ctx.session.user.id),
+						isNotNull(recurringTodoCompletion.completedAt),
+					),
+				)
+				.groupBy(sql`DATE(${recurringTodoCompletion.completedAt})`);
+
+			// Also get regular todo completion dates (using dueDate as proxy since we don't have completedAt)
+			const regularCompletionDates = await db
+				.select({
+					date: sql<string>`DATE(${todo.dueDate})`.as("date"),
+				})
+				.from(todo)
+				.where(
+					and(
+						eq(todo.userId, ctx.session.user.id),
+						eq(todo.completed, true),
+						isNotNull(todo.dueDate),
+					),
+				)
+				.groupBy(sql`DATE(${todo.dueDate})`);
+
+			// Combine all completion dates and calculate streak
+			const allCompletionDatesSet = new Set<string>();
+			for (const row of completionDates) {
+				if (row.date) allCompletionDatesSet.add(row.date);
+			}
+			for (const row of regularCompletionDates) {
+				if (row.date) allCompletionDatesSet.add(row.date);
+			}
+
+			const allCompletionDates = Array.from(allCompletionDatesSet).sort(
+				(a, b) => new Date(b).getTime() - new Date(a).getTime(),
+			);
+
+			let currentStreak = 0;
+			const todayStr = today.toISOString().split("T")[0] ?? "";
+			const yesterday = new Date(today);
+			yesterday.setDate(yesterday.getDate() - 1);
+			const yesterdayStr = yesterday.toISOString().split("T")[0] ?? "";
+
+			// Start checking from today or yesterday
+			let checkDate = todayStr;
+			if (
+				allCompletionDates.length > 0 &&
+				allCompletionDates[0] !== todayStr &&
+				allCompletionDates[0] === yesterdayStr
+			) {
+				// If no completion today but there's one yesterday, start from yesterday
+				checkDate = yesterdayStr;
+			}
+
+			for (const dateStr of allCompletionDates) {
+				if (dateStr === checkDate) {
+					currentStreak++;
+					const checkDateObj = new Date(checkDate);
+					checkDateObj.setDate(checkDateObj.getDate() - 1);
+					const newCheckDate = checkDateObj.toISOString().split("T")[0];
+					checkDate = newCheckDate ?? "";
+				} else if (new Date(dateStr) < new Date(checkDate)) {
+					// Gap in dates, streak broken
+					break;
+				}
+			}
+
+			// Get daily breakdown within the date range
+			// Group by date and count completions
+			const dailyRecurringCompleted = await db
+				.select({
+					date: sql<string>`DATE(${recurringTodoCompletion.scheduledDate})`.as(
+						"date",
+					),
+					count: count(),
+				})
+				.from(recurringTodoCompletion)
+				.where(
+					and(
+						eq(recurringTodoCompletion.userId, ctx.session.user.id),
+						gte(recurringTodoCompletion.scheduledDate, startDate),
+						lte(recurringTodoCompletion.scheduledDate, endDate),
+						isNotNull(recurringTodoCompletion.completedAt),
+					),
+				)
+				.groupBy(sql`DATE(${recurringTodoCompletion.scheduledDate})`);
+
+			const dailyRecurringMissed = await db
+				.select({
+					date: sql<string>`DATE(${recurringTodoCompletion.scheduledDate})`.as(
+						"date",
+					),
+					count: count(),
+				})
+				.from(recurringTodoCompletion)
+				.where(
+					and(
+						eq(recurringTodoCompletion.userId, ctx.session.user.id),
+						gte(recurringTodoCompletion.scheduledDate, startDate),
+						lte(recurringTodoCompletion.scheduledDate, endDate),
+						lt(recurringTodoCompletion.scheduledDate, today),
+						isNull(recurringTodoCompletion.completedAt),
+					),
+				)
+				.groupBy(sql`DATE(${recurringTodoCompletion.scheduledDate})`);
+
+			const dailyRegularCompleted = await db
+				.select({
+					date: sql<string>`DATE(${todo.dueDate})`.as("date"),
+					count: count(),
+				})
+				.from(todo)
+				.where(
+					and(
+						eq(todo.userId, ctx.session.user.id),
+						eq(todo.completed, true),
+						isNull(todo.recurringPattern),
+						gte(todo.dueDate, startDate),
+						lte(todo.dueDate, endDate),
+					),
+				)
+				.groupBy(sql`DATE(${todo.dueDate})`);
+
+			// Build daily breakdown map
+			const dailyBreakdownMap = new Map<
+				string,
+				{
+					date: string;
+					regularCompleted: number;
+					recurringCompleted: number;
+					recurringMissed: number;
+				}
+			>();
+
+			// Initialize all dates in range
+			const currentDate = new Date(startDate);
+			while (currentDate <= endDate) {
+				const dateStr = currentDate.toISOString().split("T")[0] ?? "";
+				dailyBreakdownMap.set(dateStr, {
+					date: dateStr,
+					regularCompleted: 0,
+					recurringCompleted: 0,
+					recurringMissed: 0,
+				});
+				currentDate.setDate(currentDate.getDate() + 1);
+			}
+
+			// Fill in the data
+			for (const row of dailyRegularCompleted) {
+				if (row.date) {
+					const entry = dailyBreakdownMap.get(row.date);
+					if (entry) {
+						entry.regularCompleted = row.count;
+					}
+				}
+			}
+
+			for (const row of dailyRecurringCompleted) {
+				if (row.date) {
+					const entry = dailyBreakdownMap.get(row.date);
+					if (entry) {
+						entry.recurringCompleted = row.count;
+					}
+				}
+			}
+
+			for (const row of dailyRecurringMissed) {
+				if (row.date) {
+					const entry = dailyBreakdownMap.get(row.date);
+					if (entry) {
+						entry.recurringMissed = row.count;
+					}
+				}
+			}
+
+			const dailyBreakdown = Array.from(dailyBreakdownMap.values()).sort(
+				(a, b) => a.date.localeCompare(b.date),
+			);
+
+			return {
+				totalRegularCompleted,
+				totalRecurringCompleted,
+				totalRecurringMissed,
+				completionRate,
+				currentStreak,
+				dailyBreakdown,
+			};
 		}),
 });

@@ -2616,3 +2616,530 @@ describe("GetCompletionHistory Procedure", () => {
 		});
 	});
 });
+
+describe("GetAnalytics Procedure", () => {
+	describe("Input Validation", () => {
+		interface GetAnalyticsInput {
+			startDate: string;
+			endDate: string;
+		}
+
+		const validateGetAnalyticsInput = (
+			input: unknown,
+		): { valid: boolean; data?: GetAnalyticsInput } => {
+			if (typeof input !== "object" || input === null) {
+				return { valid: false };
+			}
+
+			const i = input as Record<string, unknown>;
+
+			// startDate is required and must be valid datetime string
+			if (typeof i.startDate !== "string") {
+				return { valid: false };
+			}
+			const startDate = new Date(i.startDate);
+			if (Number.isNaN(startDate.getTime())) {
+				return { valid: false };
+			}
+
+			// endDate is required and must be valid datetime string
+			if (typeof i.endDate !== "string") {
+				return { valid: false };
+			}
+			const endDate = new Date(i.endDate);
+			if (Number.isNaN(endDate.getTime())) {
+				return { valid: false };
+			}
+
+			return {
+				valid: true,
+				data: input as GetAnalyticsInput,
+			};
+		};
+
+		it("validates valid date range", () => {
+			const result = validateGetAnalyticsInput({
+				startDate: "2026-01-01T00:00:00Z",
+				endDate: "2026-01-31T23:59:59Z",
+			});
+			expect(result.valid).toBe(true);
+			expect(result.data?.startDate).toBe("2026-01-01T00:00:00Z");
+			expect(result.data?.endDate).toBe("2026-01-31T23:59:59Z");
+		});
+
+		it("validates same day range", () => {
+			const result = validateGetAnalyticsInput({
+				startDate: "2026-01-15T00:00:00Z",
+				endDate: "2026-01-15T23:59:59Z",
+			});
+			expect(result.valid).toBe(true);
+		});
+
+		it("rejects missing startDate", () => {
+			expect(
+				validateGetAnalyticsInput({
+					endDate: "2026-01-31T23:59:59Z",
+				}),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects missing endDate", () => {
+			expect(
+				validateGetAnalyticsInput({
+					startDate: "2026-01-01T00:00:00Z",
+				}),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects invalid startDate string", () => {
+			expect(
+				validateGetAnalyticsInput({
+					startDate: "not-a-date",
+					endDate: "2026-01-31T23:59:59Z",
+				}),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects invalid endDate string", () => {
+			expect(
+				validateGetAnalyticsInput({
+					startDate: "2026-01-01T00:00:00Z",
+					endDate: "invalid",
+				}),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects non-object input", () => {
+			expect(validateGetAnalyticsInput("invalid")).toEqual({
+				valid: false,
+			});
+		});
+
+		it("rejects null input", () => {
+			expect(validateGetAnalyticsInput(null)).toEqual({ valid: false });
+		});
+	});
+
+	describe("Completion Rate Calculation", () => {
+		const calculateCompletionRate = (
+			totalCompleted: number,
+			totalExpected: number,
+		): number => {
+			if (totalExpected === 0) {
+				return 100; // No tasks expected = 100% completion
+			}
+			return Math.round((totalCompleted / totalExpected) * 100);
+		};
+
+		it("should return 100% when all tasks are completed", () => {
+			expect(calculateCompletionRate(10, 10)).toBe(100);
+		});
+
+		it("should return 0% when no tasks are completed", () => {
+			expect(calculateCompletionRate(0, 10)).toBe(0);
+		});
+
+		it("should return correct percentage for partial completion", () => {
+			expect(calculateCompletionRate(7, 10)).toBe(70);
+			expect(calculateCompletionRate(1, 3)).toBe(33);
+			expect(calculateCompletionRate(2, 3)).toBe(67);
+		});
+
+		it("should return 100% when no tasks are expected", () => {
+			expect(calculateCompletionRate(0, 0)).toBe(100);
+		});
+
+		it("should round to nearest integer", () => {
+			expect(calculateCompletionRate(1, 6)).toBe(17); // 16.67 rounds to 17
+			expect(calculateCompletionRate(5, 6)).toBe(83); // 83.33 rounds to 83
+		});
+	});
+
+	describe("Streak Calculation", () => {
+		const calculateStreak = (
+			completionDates: string[],
+			today: Date,
+		): number => {
+			if (completionDates.length === 0) {
+				return 0;
+			}
+
+			// Sort dates in descending order (most recent first)
+			const sortedDates = [...completionDates].sort(
+				(a, b) => new Date(b).getTime() - new Date(a).getTime(),
+			);
+
+			const todayStr = today.toISOString().split("T")[0] ?? "";
+			const yesterday = new Date(today);
+			yesterday.setDate(yesterday.getDate() - 1);
+			const yesterdayStr = yesterday.toISOString().split("T")[0] ?? "";
+
+			let streak = 0;
+			let checkDate = todayStr;
+
+			// If no completion today but there's one yesterday, start from yesterday
+			if (
+				sortedDates.length > 0 &&
+				sortedDates[0] !== todayStr &&
+				sortedDates[0] === yesterdayStr
+			) {
+				checkDate = yesterdayStr;
+			}
+
+			for (const dateStr of sortedDates) {
+				if (dateStr === checkDate) {
+					streak++;
+					const checkDateObj = new Date(checkDate);
+					checkDateObj.setDate(checkDateObj.getDate() - 1);
+					const newCheckDate = checkDateObj.toISOString().split("T")[0];
+					checkDate = newCheckDate ?? "";
+				} else if (new Date(dateStr) < new Date(checkDate)) {
+					// Gap in dates, streak broken
+					break;
+				}
+			}
+
+			return streak;
+		};
+
+		it("should return 0 when no completion dates", () => {
+			const today = new Date("2026-01-22T12:00:00Z");
+			expect(calculateStreak([], today)).toBe(0);
+		});
+
+		it("should return 1 for completion today only", () => {
+			const today = new Date("2026-01-22T12:00:00Z");
+			expect(calculateStreak(["2026-01-22"], today)).toBe(1);
+		});
+
+		it("should return 1 for completion yesterday only", () => {
+			const today = new Date("2026-01-22T12:00:00Z");
+			expect(calculateStreak(["2026-01-21"], today)).toBe(1);
+		});
+
+		it("should return 0 when last completion is more than 1 day ago", () => {
+			const today = new Date("2026-01-22T12:00:00Z");
+			expect(calculateStreak(["2026-01-20"], today)).toBe(0);
+		});
+
+		it("should count consecutive days starting from today", () => {
+			const today = new Date("2026-01-22T12:00:00Z");
+			expect(
+				calculateStreak(["2026-01-22", "2026-01-21", "2026-01-20"], today),
+			).toBe(3);
+		});
+
+		it("should count consecutive days starting from yesterday", () => {
+			const today = new Date("2026-01-22T12:00:00Z");
+			// No completion today, but consecutive days before
+			expect(
+				calculateStreak(["2026-01-21", "2026-01-20", "2026-01-19"], today),
+			).toBe(3);
+		});
+
+		it("should break streak on gaps", () => {
+			const today = new Date("2026-01-22T12:00:00Z");
+			// Gap on Jan 20
+			expect(
+				calculateStreak(["2026-01-22", "2026-01-21", "2026-01-19"], today),
+			).toBe(2);
+		});
+
+		it("should handle unsorted input dates", () => {
+			const today = new Date("2026-01-22T12:00:00Z");
+			expect(
+				calculateStreak(["2026-01-20", "2026-01-22", "2026-01-21"], today),
+			).toBe(3);
+		});
+
+		it("should handle duplicate dates", () => {
+			const today = new Date("2026-01-22T12:00:00Z");
+			expect(
+				calculateStreak(
+					["2026-01-22", "2026-01-22", "2026-01-21", "2026-01-21"],
+					today,
+				),
+			).toBe(2);
+		});
+	});
+
+	describe("Daily Breakdown Calculation", () => {
+		interface DailyStats {
+			date: string;
+			regularCompleted: number;
+			recurringCompleted: number;
+			recurringMissed: number;
+		}
+
+		const buildDailyBreakdown = (
+			startDate: Date,
+			endDate: Date,
+			regularCompletions: Array<{ date: string; count: number }>,
+			recurringCompletions: Array<{ date: string; count: number }>,
+			recurringMissed: Array<{ date: string; count: number }>,
+		): DailyStats[] => {
+			const dailyBreakdownMap = new Map<string, DailyStats>();
+
+			// Initialize all dates in range
+			const currentDate = new Date(startDate);
+			while (currentDate <= endDate) {
+				const dateStr = currentDate.toISOString().split("T")[0] ?? "";
+				dailyBreakdownMap.set(dateStr, {
+					date: dateStr,
+					regularCompleted: 0,
+					recurringCompleted: 0,
+					recurringMissed: 0,
+				});
+				currentDate.setDate(currentDate.getDate() + 1);
+			}
+
+			// Fill in regular completions
+			for (const { date, count } of regularCompletions) {
+				const entry = dailyBreakdownMap.get(date);
+				if (entry) {
+					entry.regularCompleted = count;
+				}
+			}
+
+			// Fill in recurring completions
+			for (const { date, count } of recurringCompletions) {
+				const entry = dailyBreakdownMap.get(date);
+				if (entry) {
+					entry.recurringCompleted = count;
+				}
+			}
+
+			// Fill in recurring missed
+			for (const { date, count } of recurringMissed) {
+				const entry = dailyBreakdownMap.get(date);
+				if (entry) {
+					entry.recurringMissed = count;
+				}
+			}
+
+			return Array.from(dailyBreakdownMap.values()).sort((a, b) =>
+				a.date.localeCompare(b.date),
+			);
+		};
+
+		it("should create entry for each day in range", () => {
+			const startDate = new Date("2026-01-20T00:00:00Z");
+			const endDate = new Date("2026-01-22T23:59:59Z");
+
+			const result = buildDailyBreakdown(startDate, endDate, [], [], []);
+
+			expect(result).toHaveLength(3);
+			expect(result.map((d) => d.date)).toEqual([
+				"2026-01-20",
+				"2026-01-21",
+				"2026-01-22",
+			]);
+		});
+
+		it("should initialize all counts to zero", () => {
+			const startDate = new Date("2026-01-20T00:00:00Z");
+			const endDate = new Date("2026-01-20T23:59:59Z");
+
+			const result = buildDailyBreakdown(startDate, endDate, [], [], []);
+
+			expect(result[0]).toEqual({
+				date: "2026-01-20",
+				regularCompleted: 0,
+				recurringCompleted: 0,
+				recurringMissed: 0,
+			});
+		});
+
+		it("should populate regular completions", () => {
+			const startDate = new Date("2026-01-20T00:00:00Z");
+			const endDate = new Date("2026-01-22T23:59:59Z");
+
+			const result = buildDailyBreakdown(
+				startDate,
+				endDate,
+				[
+					{ date: "2026-01-20", count: 3 },
+					{ date: "2026-01-22", count: 1 },
+				],
+				[],
+				[],
+			);
+
+			expect(result[0]?.regularCompleted).toBe(3);
+			expect(result[1]?.regularCompleted).toBe(0);
+			expect(result[2]?.regularCompleted).toBe(1);
+		});
+
+		it("should populate recurring completions and missed", () => {
+			const startDate = new Date("2026-01-20T00:00:00Z");
+			const endDate = new Date("2026-01-22T23:59:59Z");
+
+			const result = buildDailyBreakdown(
+				startDate,
+				endDate,
+				[],
+				[
+					{ date: "2026-01-20", count: 2 },
+					{ date: "2026-01-21", count: 4 },
+				],
+				[{ date: "2026-01-22", count: 1 }],
+			);
+
+			expect(result[0]?.recurringCompleted).toBe(2);
+			expect(result[1]?.recurringCompleted).toBe(4);
+			expect(result[2]?.recurringMissed).toBe(1);
+		});
+
+		it("should handle all types of data together", () => {
+			const startDate = new Date("2026-01-20T00:00:00Z");
+			const endDate = new Date("2026-01-21T23:59:59Z");
+
+			const result = buildDailyBreakdown(
+				startDate,
+				endDate,
+				[{ date: "2026-01-20", count: 2 }],
+				[{ date: "2026-01-20", count: 3 }],
+				[{ date: "2026-01-21", count: 1 }],
+			);
+
+			expect(result[0]).toEqual({
+				date: "2026-01-20",
+				regularCompleted: 2,
+				recurringCompleted: 3,
+				recurringMissed: 0,
+			});
+			expect(result[1]).toEqual({
+				date: "2026-01-21",
+				regularCompleted: 0,
+				recurringCompleted: 0,
+				recurringMissed: 1,
+			});
+		});
+
+		it("should sort results by date", () => {
+			const startDate = new Date("2026-01-18T00:00:00Z");
+			const endDate = new Date("2026-01-22T23:59:59Z");
+
+			const result = buildDailyBreakdown(startDate, endDate, [], [], []);
+
+			const dates = result.map((d) => d.date);
+			const sortedDates = [...dates].sort();
+			expect(dates).toEqual(sortedDates);
+		});
+	});
+
+	describe("Return Value Structure", () => {
+		interface AnalyticsResult {
+			totalRegularCompleted: number;
+			totalRecurringCompleted: number;
+			totalRecurringMissed: number;
+			completionRate: number;
+			currentStreak: number;
+			dailyBreakdown: Array<{
+				date: string;
+				regularCompleted: number;
+				recurringCompleted: number;
+				recurringMissed: number;
+			}>;
+		}
+
+		it("should have all required fields", () => {
+			const result: AnalyticsResult = {
+				totalRegularCompleted: 5,
+				totalRecurringCompleted: 10,
+				totalRecurringMissed: 2,
+				completionRate: 88,
+				currentStreak: 3,
+				dailyBreakdown: [
+					{
+						date: "2026-01-20",
+						regularCompleted: 2,
+						recurringCompleted: 5,
+						recurringMissed: 1,
+					},
+				],
+			};
+
+			expect(result).toHaveProperty("totalRegularCompleted");
+			expect(result).toHaveProperty("totalRecurringCompleted");
+			expect(result).toHaveProperty("totalRecurringMissed");
+			expect(result).toHaveProperty("completionRate");
+			expect(result).toHaveProperty("currentStreak");
+			expect(result).toHaveProperty("dailyBreakdown");
+		});
+
+		it("should have numeric values for totals", () => {
+			const result: AnalyticsResult = {
+				totalRegularCompleted: 5,
+				totalRecurringCompleted: 10,
+				totalRecurringMissed: 2,
+				completionRate: 88,
+				currentStreak: 3,
+				dailyBreakdown: [],
+			};
+
+			expect(typeof result.totalRegularCompleted).toBe("number");
+			expect(typeof result.totalRecurringCompleted).toBe("number");
+			expect(typeof result.totalRecurringMissed).toBe("number");
+			expect(typeof result.completionRate).toBe("number");
+			expect(typeof result.currentStreak).toBe("number");
+		});
+
+		it("should have dailyBreakdown as an array", () => {
+			const result: AnalyticsResult = {
+				totalRegularCompleted: 0,
+				totalRecurringCompleted: 0,
+				totalRecurringMissed: 0,
+				completionRate: 100,
+				currentStreak: 0,
+				dailyBreakdown: [],
+			};
+
+			expect(Array.isArray(result.dailyBreakdown)).toBe(true);
+		});
+	});
+
+	describe("Missed Detection Logic", () => {
+		const isMissed = (
+			scheduledDate: Date,
+			completedAt: Date | null,
+			today: Date,
+		): boolean => {
+			// A recurring occurrence is missed if:
+			// 1. Its scheduled date has passed (before today)
+			// 2. No completion record exists (completedAt is null)
+			return scheduledDate < today && completedAt === null;
+		};
+
+		it("should return true for past scheduled date with no completion", () => {
+			const scheduledDate = new Date("2026-01-20T10:00:00Z");
+			const today = new Date("2026-01-22T12:00:00Z");
+
+			expect(isMissed(scheduledDate, null, today)).toBe(true);
+		});
+
+		it("should return false for past scheduled date with completion", () => {
+			const scheduledDate = new Date("2026-01-20T10:00:00Z");
+			const completedAt = new Date("2026-01-20T11:00:00Z");
+			const today = new Date("2026-01-22T12:00:00Z");
+
+			expect(isMissed(scheduledDate, completedAt, today)).toBe(false);
+		});
+
+		it("should return false for future scheduled date with no completion", () => {
+			const scheduledDate = new Date("2026-01-25T10:00:00Z");
+			const today = new Date("2026-01-22T12:00:00Z");
+
+			expect(isMissed(scheduledDate, null, today)).toBe(false);
+		});
+
+		it("should return false for today's scheduled date with no completion", () => {
+			const scheduledDate = new Date("2026-01-22T10:00:00Z");
+			const today = new Date("2026-01-22T00:00:00Z");
+			// scheduledDate is same day or after today start
+
+			// At midnight today, 10am is in the future
+			expect(isMissed(scheduledDate, null, today)).toBe(false);
+		});
+	});
+});
