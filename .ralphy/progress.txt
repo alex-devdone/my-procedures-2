@@ -582,3 +582,21 @@
   - formatReminderNotificationBody: overdue, hours, days, tomorrow, generic messages
   - Constants: DEFAULT_CHECK_INTERVAL (30s), DEFAULT_TOLERANCE (1min), SHOWN_REMINDERS_STORAGE_KEY
   - Hook tests (skipped due to environment memory constraints): initial state, reminder detection, dismiss functions, callback support, function stability, interval management
+
+- [✓] 2026-01-21 07:18 - Create reminder-toast.tsx component (apps/web/src/components/notifications/reminder-toast.tsx) with:
+  - ReminderToastContent component for displaying reminder toast UI with icon, title, body, due date, and action buttons
+  - ReminderToastManager component for managing multiple reminder toasts using sonner toast library
+  - useReminderToast hook for programmatically showing/dismissing reminder toasts with duplicate prevention
+  - Pure functions for testability: formatReminderTime, isReminderOverdue, getReminderToastId
+  - Overdue styling with red colors and clock icon for past-due reminders
+  - Non-overdue styling with bell icon and accent colors
+  - Infinite duration for toasts (no auto-dismiss) with manual dismiss button
+  - View button to navigate to todo (optional onClick callback)
+  - Support for both local (string UUID) and remote (numeric) todo IDs
+- [✓] 2026-01-21 07:18 - Add unit tests for ReminderToast (57 tests) in apps/web/src/components/notifications/reminder-toast.test.tsx covering:
+  - Pure functions: isReminderOverdue, formatReminderTime, getReminderToastId
+  - ReminderToastContent: rendering, due date display, overdue styling, dismiss/view buttons, numeric IDs, edge cases
+  - useReminderToast: toast showing, duplicate prevention, dismiss functions, toast ID generation
+  - ReminderToastManager: multiple reminders, rerender handling, enabled/disabled state, empty arrays
+  - Accessibility: aria-labels on buttons, icons hidden from screen readers
+- [✓] 2026-01-21 07:18 - Create barrel export for notifications components (apps/web/src/components/notifications/index.ts)
