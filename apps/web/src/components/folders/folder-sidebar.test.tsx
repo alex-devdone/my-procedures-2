@@ -12,7 +12,7 @@ vi.mock("@/app/api/folder", () => ({
 }));
 
 // Import after mocks
-import { FolderSidebar } from "./folder-sidebar";
+import { FolderSidebar, type SmartViewType } from "./folder-sidebar";
 
 const createMockFolder = (overrides: Partial<Folder> = {}): Folder => ({
 	id: "folder-1",
@@ -40,10 +40,41 @@ describe("FolderSidebar", () => {
 	});
 
 	describe("Rendering", () => {
-		it("renders the sidebar with header", () => {
+		it("renders the sidebar with smart views", () => {
 			render(<FolderSidebar />);
 
 			expect(screen.getByTestId("folder-sidebar")).toBeInTheDocument();
+			expect(screen.getByTestId("smart-views")).toBeInTheDocument();
+		});
+
+		it("renders all smart views", () => {
+			render(<FolderSidebar />);
+
+			expect(screen.getByTestId("smart-view-today")).toBeInTheDocument();
+			expect(screen.getByTestId("smart-view-upcoming")).toBeInTheDocument();
+			expect(screen.getByTestId("smart-view-overdue")).toBeInTheDocument();
+		});
+
+		it("renders smart view labels", () => {
+			render(<FolderSidebar />);
+
+			expect(screen.getByText("Today")).toBeInTheDocument();
+			expect(screen.getByText("Upcoming")).toBeInTheDocument();
+			expect(screen.getByText("Overdue")).toBeInTheDocument();
+		});
+
+		it("renders divider between smart views and folders", () => {
+			render(<FolderSidebar />);
+
+			const nav = screen.getByRole("navigation");
+			const divider = nav.querySelector('div[class*="border-t"]');
+			expect(divider).toBeInTheDocument();
+			expect(divider).toHaveClass("border-t");
+		});
+
+		it("renders the folder header", () => {
+			render(<FolderSidebar />);
+
 			expect(screen.getByText("Folders")).toBeInTheDocument();
 		});
 
@@ -346,11 +377,147 @@ describe("FolderSidebar", () => {
 		});
 	});
 
+	describe("Smart Views", () => {
+		describe("Selection", () => {
+			const smartViewTypes: SmartViewType[] = ["today", "upcoming", "overdue"];
+
+			it.each(smartViewTypes)("highlights selected %s view", (viewType) => {
+				render(<FolderSidebar selectedFolderId={viewType} />);
+
+				const smartView = screen.getByTestId(`smart-view-${viewType}`);
+				expect(smartView).toHaveAttribute("aria-current", "page");
+			});
+
+			it.each(
+				smartViewTypes,
+			)("does not highlight other views when %s is selected", (viewType) => {
+				render(<FolderSidebar selectedFolderId={viewType} />);
+
+				const otherViews = smartViewTypes.filter((v) => v !== viewType);
+				otherViews.forEach((otherView) => {
+					const smartView = screen.getByTestId(`smart-view-${otherView}`);
+					expect(smartView).not.toHaveAttribute("aria-current");
+				});
+			});
+
+			it("deselects smart view when inbox is selected", () => {
+				render(<FolderSidebar selectedFolderId="inbox" />);
+
+				expect(screen.getByTestId("inbox-folder")).toHaveAttribute(
+					"aria-current",
+					"page",
+				);
+				expect(screen.getByTestId("smart-view-today")).not.toHaveAttribute(
+					"aria-current",
+				);
+			});
+
+			it("deselects smart view when folder is selected", () => {
+				const folders = [createMockFolder({ id: "folder-1" })];
+
+				mockUseFolderStorage.mockReturnValue({
+					...defaultMockReturn,
+					folders,
+				});
+
+				render(<FolderSidebar selectedFolderId="folder-1" />);
+
+				expect(screen.getByTestId("folder-item-folder-1")).toHaveAttribute(
+					"aria-current",
+					"page",
+				);
+				expect(screen.getByTestId("smart-view-today")).not.toHaveAttribute(
+					"aria-current",
+				);
+			});
+		});
+
+		describe("Interactions", () => {
+			const smartViewCases: Array<{ viewType: SmartViewType; label: string }> =
+				[
+					{ viewType: "today", label: "Today's todos" },
+					{ viewType: "upcoming", label: "Upcoming todos" },
+					{ viewType: "overdue", label: "Overdue todos" },
+				];
+
+			it.each(
+				smartViewCases,
+			)("calls onSelectFolder with '$viewType' when $label is clicked", ({
+				viewType,
+			}) => {
+				const onSelectFolder = vi.fn();
+
+				render(<FolderSidebar onSelectFolder={onSelectFolder} />);
+
+				fireEvent.click(screen.getByTestId(`smart-view-${viewType}`));
+				expect(onSelectFolder).toHaveBeenCalledWith(viewType);
+			});
+
+			it.each(smartViewCases)("has correct aria-label for $viewType view", ({
+				viewType,
+				label,
+			}) => {
+				render(<FolderSidebar />);
+
+				const smartView = screen.getByTestId(`smart-view-${viewType}`);
+				expect(smartView).toHaveAttribute("aria-label", label);
+			});
+		});
+
+		describe("Visual State", () => {
+			it("shows correct icon for each smart view", () => {
+				render(<FolderSidebar />);
+
+				// Each smart view should have an icon (svg element)
+				const todayView = screen.getByTestId("smart-view-today");
+				const upcomingView = screen.getByTestId("smart-view-upcoming");
+				const overdueView = screen.getByTestId("smart-view-overdue");
+
+				expect(todayView.querySelector("svg")).toBeInTheDocument();
+				expect(upcomingView.querySelector("svg")).toBeInTheDocument();
+				expect(overdueView.querySelector("svg")).toBeInTheDocument();
+			});
+
+			it("applies active styling when smart view is selected", () => {
+				render(<FolderSidebar selectedFolderId="today" />);
+
+				const todayView = screen.getByTestId("smart-view-today");
+				expect(todayView).toHaveClass("bg-sidebar-accent");
+			});
+
+			it("applies hover styling when smart view is not selected", () => {
+				render(<FolderSidebar selectedFolderId="inbox" />);
+
+				const todayView = screen.getByTestId("smart-view-today");
+				expect(todayView).toHaveClass("hover:bg-sidebar-accent/50");
+			});
+		});
+
+		describe("Positioning", () => {
+			it("renders smart views above folders", () => {
+				const folders = [createMockFolder({ id: "folder-1" })];
+
+				mockUseFolderStorage.mockReturnValue({
+					...defaultMockReturn,
+					folders,
+				});
+
+				render(<FolderSidebar />);
+
+				const nav = screen.getByRole("navigation");
+				const children = nav?.children;
+
+				// First child should be smart views container
+				expect(children?.[0]).toHaveAttribute("data-testid", "smart-views");
+			});
+		});
+	});
+
 	describe("Accessibility", () => {
 		it("has accessible navigation landmark", () => {
 			render(<FolderSidebar />);
 
-			expect(screen.getByRole("navigation")).toHaveAccessibleName("Folders");
+			expect(screen.getByRole("navigation")).toHaveAccessibleName("Navigation");
 		});
 
 		it("uses semantic list for folders", () => {

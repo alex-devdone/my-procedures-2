@@ -1,6 +1,14 @@
 "use client";
 
-import { FolderIcon, Inbox, MoreHorizontal, Plus } from "lucide-react";
+import {
+	AlertCircle,
+	CalendarDays,
+	FolderIcon,
+	Inbox,
+	MoreHorizontal,
+	Plus,
+	Sun,
+} from "lucide-react";
 import type { Folder, FolderColor } from "@/app/api/folder";
 import { useFolderStorage } from "@/app/api/folder";
 import { Button } from "@/components/ui/button";
@@ -12,6 +20,45 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+
+/**
+ * Smart view types for filtering todos.
+ */
+export type SmartViewType = "today" | "upcoming" | "overdue";
+
+/**
+ * Smart view metadata.
+ */
+export interface SmartView {
+	id: SmartViewType;
+	label: string;
+	icon: typeof Sun;
+	"aria-label": string;
+}
+
+/**
+ * Smart views available in the sidebar.
+ */
+const SMART_VIEWS: SmartView[] = [
+	{
+		id: "today",
+		label: "Today",
+		icon: Sun,
+		"aria-label": "Today's todos",
+	},
+	{
+		id: "upcoming",
+		label: "Upcoming",
+		icon: CalendarDays,
+		"aria-label": "Upcoming todos",
+	},
+	{
+		id: "overdue",
+		label: "Overdue",
+		icon: AlertCircle,
+		"aria-label": "Overdue todos",
+	},
+];
 
 /**
  * Maps folder colors to Tailwind CSS classes for the folder icon.
@@ -38,10 +85,12 @@ const folderColorClasses: Record<FolderColor, string> = {
 };
 
 export interface FolderSidebarProps {
-	/** Currently selected folder ID, or "inbox" for the default inbox view */
-	selectedFolderId?: string | number | "inbox";
-	/** Callback when a folder is selected */
-	onSelectFolder?: (folderId: string | number | "inbox") => void;
+	/** Currently selected folder ID, or "inbox" for the default inbox view, or a smart view type */
+	selectedFolderId?: string | number | "inbox" | SmartViewType;
+	/** Callback when a folder or smart view is selected */
+	onSelectFolder?: (
+		folderId: string | number | "inbox" | SmartViewType,
+	) => void;
 	/** Callback when the "Create Folder" button is clicked */
 	onCreateFolder?: () => void;
 	/** Callback when the "Edit" option is clicked for a folder */
@@ -53,9 +102,10 @@ export interface FolderSidebarProps {
 }
 
 /**
- * Sidebar component displaying folder list with quick actions.
+ * Sidebar component displaying smart views and folder list with quick actions.
  *
  * Features:
+ * - Smart views (Today, Upcoming, Overdue)
  * - Inbox (default view for todos without a folder)
  * - List of user folders with color indicators
  * - Create folder button
@@ -81,24 +131,55 @@ export function FolderSidebar({
 			)}
 			data-testid="folder-sidebar"
 		>
-			{/* Header */}
-			<div className="flex items-center justify-between border-border/50 border-b p-4">
-				<h2 className="font-semibold text-sidebar-foreground text-sm">
-					Folders
-				</h2>
-				<Button
-					variant="ghost"
-					size="icon-sm"
-					onClick={onCreateFolder}
-					aria-label="Create folder"
-					data-testid="create-folder-button"
-				>
-					<Plus className="h-4 w-4" />
-				</Button>
-			</div>
-
 			{/* Folder List */}
-			<nav className="flex-1 overflow-y-auto p-2" aria-label="Folders">
+			<nav className="flex-1 overflow-y-auto p-2" aria-label="Navigation">
+				{/* Smart Views */}
+				<div className="space-y-1" data-testid="smart-views">
+					{SMART_VIEWS.map((view) => {
+						const Icon = view.icon;
+						return (
+							<button
+								key={view.id}
+								type="button"
+								onClick={() => onSelectFolder?.(view.id)}
+								className={cn(
+									"flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left font-medium text-sm transition-colors",
+									selectedFolderId === view.id
+										? "bg-sidebar-accent text-sidebar-accent-foreground"
+										: "text-sidebar-foreground hover:bg-sidebar-accent/50",
+								)}
+								data-testid={`smart-view-${view.id}`}
+								aria-current={selectedFolderId === view.id ? "page" : undefined}
+								aria-label={view["aria-label"]}
+							>
+								<Icon className="h-4 w-4 text-muted-foreground" />
+								<span className="flex-1 truncate">{view.label}</span>
+							</button>
+						);
+					})}
+				</div>
+
+				{/* Divider */}
+				<div
+					className="mx-2 my-3 border-border/50 border-t"
+					aria-hidden="true"
+				/>
+
+				{/* Header for folders */}
+				<div className="flex items-center justify-between px-2 pb-2">
+					<h2 className="font-semibold text-sidebar-foreground text-sm">
+						Folders
+					</h2>
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						onClick={onCreateFolder}
+						aria-label="Create folder"
+						data-testid="create-folder-button"
+					>
+						<Plus className="h-4 w-4" />
+					</Button>
+				</div>
 				{/* Inbox - always visible */}
 				<button
 					type="button"

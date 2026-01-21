@@ -719,3 +719,21 @@
   - Accessibility: button types, search input placeholder, list structure
 - [✓] 2026-01-21 08:19 - Update barrel export for views (apps/web/src/components/views/index.ts) to include OverdueView exports
 
+- [✓] 2026-01-21 08:30 - Add smart view navigation to sidebar alongside folders (apps/web/src/components/folders/folder-sidebar.tsx):
+  - Added SmartViewType type ("today" | "upcoming" | "overdue")
+  - Added SmartView interface with id, label, icon, and aria-label
+  - Created SMART_VIEWS constant array with Today, Upcoming, and Overdue views
+  - Updated FolderSidebarProps to accept SmartViewType for selectedFolderId
+  - Updated component description to reflect smart views feature
+  - Added smart views section above folders with Sun, CalendarDays, and AlertCircle icons
+  - Added divider between smart views and folders
+  - Moved Folders header and create button inside nav section
+  - Updated navigation aria-label from "Folders" to "Navigation"
+- [✓] 2026-01-21 08:30 - Add unit tests for smart view navigation (20 new tests) in apps/web/src/components/folders/folder-sidebar.test.tsx:
+  - Smart Views Selection: highlights selected view, does not highlight other views, deselects when inbox/folder selected
+  - Smart Views Interactions: calls onSelectFolder with correct view type, has correct aria-label
+  - Smart Views Visual State: shows correct icon, applies active/hover styling
+  - Smart Views Positioning: renders above folders
+  - Updated accessibility test for navigation landmark
+- [✓] 2026-01-21 08:30 - Total tests for folder-sidebar: 67 (45 original + 22 new smart view tests)
+
