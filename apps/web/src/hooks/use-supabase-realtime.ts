@@ -116,20 +116,16 @@ export function useSupabaseRealtime<T = unknown>(
 		channelRef.current = channel;
 
 		// Build the subscription configuration
-		const subscriptionConfig: Parameters<
-			NonNullable<RealtimeChannel["on"]>
-		>[0] = {
-			event: "*",
+		const subscriptionConfig = {
+			event: "*" as const,
 			schema: "public",
 			table,
+			...(filter && { filter }),
 		};
 
-		if (filter) {
-			subscriptionConfig.filter = filter;
-		}
-
 		// Subscribe to changes
-		const subscription = channel.on(
+		// biome-ignore lint/suspicious/noExplicitAny: Supabase's typed overloads don't match runtime behavior
+		const subscription = (channel as any).on(
 			"postgres_changes",
 			subscriptionConfig,
 			(payload: RealtimePayload<T>) => {
@@ -141,7 +137,7 @@ export function useSupabaseRealtime<T = unknown>(
 		);
 
 		// Subscribe to the channel
-		subscription.subscribe((status) => {
+		subscription.subscribe((status: string) => {
 			if (status === "SUBSCRIBED") {
 				isSubscribedRef.current = true;
 				onSubscribeRef.current?.();
@@ -175,7 +171,9 @@ export function useSupabaseRealtime<T = unknown>(
  * @param key - The presence key to track (e.g., user ID)
  * @param onChange - Callback when presence state changes
  */
-export function useSupabasePresence<T = unknown>(
+export function useSupabasePresence<
+	T extends Record<string, unknown> = Record<string, unknown>,
+>(
 	channel: string,
 	// biome-ignore lint/correctness/noUnusedFunctionParameters: key reserved for future use
 	key: string,
@@ -188,7 +186,8 @@ export function useSupabasePresence<T = unknown>(
 
 		const presenceChannel = createSupabaseChannel(channel);
 
-		const subscription = presenceChannel.on(
+		// biome-ignore lint/suspicious/noExplicitAny: Supabase's typed overloads don't match runtime behavior
+		const subscription = (presenceChannel as any).on(
 			"presence",
 			{ event: "sync" },
 			() => {

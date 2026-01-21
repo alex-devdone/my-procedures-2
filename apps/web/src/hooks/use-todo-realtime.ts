@@ -70,12 +70,8 @@ export function useTodoRealtime(
 	// Handle UPDATE events - update todo in cache
 	const handleUpdate = useCallback(
 		(payload: RealtimePayload<RemoteTodo>) => {
-			queryClient.setQueryData<RemoteTodo[]>(
-				queryKey,
-				(old) =>
-					old?.map((todo) =>
-						todo.id === payload.new.id ? payload.new : todo,
-					) ?? null,
+			queryClient.setQueryData<RemoteTodo[]>(queryKey, (old) =>
+				old?.map((todo) => (todo.id === payload.new.id ? payload.new : todo)),
 			);
 		},
 		[queryClient, queryKey],
@@ -84,9 +80,8 @@ export function useTodoRealtime(
 	// Handle DELETE events - remove todo from cache
 	const handleDelete = useCallback(
 		(payload: RealtimePayload<RemoteTodo>) => {
-			queryClient.setQueryData<RemoteTodo[]>(
-				queryKey,
-				(old) => old?.filter((todo) => todo.id !== payload.old.id) ?? null,
+			queryClient.setQueryData<RemoteTodo[]>(queryKey, (old) =>
+				old?.filter((todo) => todo.id !== payload.old.id),
 			);
 		},
 		[queryClient, queryKey],
@@ -121,7 +116,8 @@ export function useTodoRealtime(
 		channelRef.current = channel;
 
 		// Subscribe to postgres changes
-		const subscription = channel.on(
+		// biome-ignore lint/suspicious/noExplicitAny: Supabase's typed overloads don't match runtime behavior
+		const subscription = (channel as any).on(
 			"postgres_changes",
 			{
 				event: "*",
@@ -133,7 +129,7 @@ export function useTodoRealtime(
 		);
 
 		// Subscribe to the channel
-		subscription.subscribe((status) => {
+		subscription.subscribe((status: string) => {
 			if (status === "SUBSCRIBED") {
 				isSubscribedRef.current = true;
 			} else if (status === "CHANNEL_ERROR") {
@@ -207,12 +203,8 @@ export function useTodoRealtimeWithAuth(): UseTodoRealtimeReturn {
 
 	const handleUpdate = useCallback(
 		(payload: RealtimePayload<RemoteTodo>) => {
-			queryClient.setQueryData<RemoteTodo[]>(
-				queryKey,
-				(old) =>
-					old?.map((todo) =>
-						todo.id === payload.new.id ? payload.new : todo,
-					) ?? null,
+			queryClient.setQueryData<RemoteTodo[]>(queryKey, (old) =>
+				old?.map((todo) => (todo.id === payload.new.id ? payload.new : todo)),
 			);
 		},
 		[queryClient, queryKey],
@@ -220,9 +212,8 @@ export function useTodoRealtimeWithAuth(): UseTodoRealtimeReturn {
 
 	const handleDelete = useCallback(
 		(payload: RealtimePayload<RemoteTodo>) => {
-			queryClient.setQueryData<RemoteTodo[]>(
-				queryKey,
-				(old) => old?.filter((todo) => todo.id !== payload.old.id) ?? null,
+			queryClient.setQueryData<RemoteTodo[]>(queryKey, (old) =>
+				old?.filter((todo) => todo.id !== payload.old.id),
 			);
 		},
 		[queryClient, queryKey],
@@ -256,7 +247,8 @@ export function useTodoRealtimeWithAuth(): UseTodoRealtimeReturn {
 		channelRef.current = channel;
 
 		// Subscribe to postgres changes
-		const subscription = channel.on(
+		// biome-ignore lint/suspicious/noExplicitAny: Supabase's typed overloads don't match runtime behavior
+		const subscription = (channel as any).on(
 			"postgres_changes",
 			{
 				event: "*",
@@ -268,7 +260,7 @@ export function useTodoRealtimeWithAuth(): UseTodoRealtimeReturn {
 		);
 
 		// Subscribe to the channel
-		subscription.subscribe((status) => {
+		subscription.subscribe((status: string) => {
 			if (status === "SUBSCRIBED") {
 				isSubscribedRef.current = true;
 			} else if (status === "CHANNEL_ERROR") {

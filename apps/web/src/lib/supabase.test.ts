@@ -61,9 +61,9 @@ describe("supabase", () => {
 
 			expect(channel1).toBeDefined();
 			expect(channel2).toBeDefined();
-			// Channels should have different names
-			expect(channel1.name).toBe("channel-1");
-			expect(channel2.name).toBe("channel-2");
+			// Channels should be different instances (mocked to include name property)
+			expect((channel1 as unknown as { name: string }).name).toBe("channel-1");
+			expect((channel2 as unknown as { name: string }).name).toBe("channel-2");
 		});
 	});
 

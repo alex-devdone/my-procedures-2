@@ -70,12 +70,10 @@ export function useFolderRealtime(
 	// Handle UPDATE events - update folder in cache
 	const handleUpdate = useCallback(
 		(payload: RealtimePayload<RemoteFolder>) => {
-			queryClient.setQueryData<RemoteFolder[]>(
-				queryKey,
-				(old) =>
-					old?.map((folder) =>
-						folder.id === payload.new.id ? payload.new : folder,
-					) ?? null,
+			queryClient.setQueryData<RemoteFolder[]>(queryKey, (old) =>
+				old?.map((folder) =>
+					folder.id === payload.new.id ? payload.new : folder,
+				),
 			);
 		},
 		[queryClient, queryKey],
@@ -84,9 +82,8 @@ export function useFolderRealtime(
 	// Handle DELETE events - remove folder from cache
 	const handleDelete = useCallback(
 		(payload: RealtimePayload<RemoteFolder>) => {
-			queryClient.setQueryData<RemoteFolder[]>(
-				queryKey,
-				(old) => old?.filter((folder) => folder.id !== payload.old.id) ?? null,
+			queryClient.setQueryData<RemoteFolder[]>(queryKey, (old) =>
+				old?.filter((folder) => folder.id !== payload.old.id),
 			);
 		},
 		[queryClient, queryKey],
@@ -121,7 +118,8 @@ export function useFolderRealtime(
 		channelRef.current = channel;
 
 		// Subscribe to postgres changes
-		const subscription = channel.on(
+		// biome-ignore lint/suspicious/noExplicitAny: Supabase's typed overloads don't match runtime behavior
+		const subscription = (channel as any).on(
 			"postgres_changes",
 			{
 				event: "*",
@@ -133,7 +131,7 @@ export function useFolderRealtime(
 		);
 
 		// Subscribe to the channel
-		subscription.subscribe((status) => {
+		subscription.subscribe((status: string) => {
 			if (status === "SUBSCRIBED") {
 				isSubscribedRef.current = true;
 			} else if (status === "CHANNEL_ERROR") {
@@ -207,12 +205,10 @@ export function useFolderRealtimeWithAuth(): UseFolderRealtimeReturn {
 
 	const handleUpdate = useCallback(
 		(payload: RealtimePayload<RemoteFolder>) => {
-			queryClient.setQueryData<RemoteFolder[]>(
-				queryKey,
-				(old) =>
-					old?.map((folder) =>
-						folder.id === payload.new.id ? payload.new : folder,
-					) ?? null,
+			queryClient.setQueryData<RemoteFolder[]>(queryKey, (old) =>
+				old?.map((folder) =>
+					folder.id === payload.new.id ? payload.new : folder,
+				),
 			);
 		},
 		[queryClient, queryKey],
@@ -220,9 +216,8 @@ export function useFolderRealtimeWithAuth(): UseFolderRealtimeReturn {
 
 	const handleDelete = useCallback(
 		(payload: RealtimePayload<RemoteFolder>) => {
-			queryClient.setQueryData<RemoteFolder[]>(
-				queryKey,
-				(old) => old?.filter((folder) => folder.id !== payload.old.id) ?? null,
+			queryClient.setQueryData<RemoteFolder[]>(queryKey, (old) =>
+				old?.filter((folder) => folder.id !== payload.old.id),
 			);
 		},
 		[queryClient, queryKey],
@@ -256,7 +251,8 @@ export function useFolderRealtimeWithAuth(): UseFolderRealtimeReturn {
 		channelRef.current = channel;
 
 		// Subscribe to postgres changes
-		const subscription = channel.on(
+		// biome-ignore lint/suspicious/noExplicitAny: Supabase's typed overloads don't match runtime behavior
+		const subscription = (channel as any).on(
 			"postgres_changes",
 			{
 				event: "*",
@@ -268,7 +264,7 @@ export function useFolderRealtimeWithAuth(): UseFolderRealtimeReturn {
 		);
 
 		// Subscribe to the channel
-		subscription.subscribe((status) => {
+		subscription.subscribe((status: string) => {
 			if (status === "SUBSCRIBED") {
 				isSubscribedRef.current = true;
 			} else if (status === "CHANNEL_ERROR") {

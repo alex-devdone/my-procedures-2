@@ -81,12 +81,10 @@ export function useSubtaskRealtime(
 		(payload: RealtimePayload<RemoteSubtask>) => {
 			const queryKey = getSubtaskQueryKeyForTodo(payload.new.todoId);
 
-			queryClient.setQueryData<RemoteSubtask[]>(
-				queryKey,
-				(old) =>
-					old?.map((subtask) =>
-						subtask.id === payload.new.id ? payload.new : subtask,
-					) ?? null,
+			queryClient.setQueryData<RemoteSubtask[]>(queryKey, (old) =>
+				old?.map((subtask) =>
+					subtask.id === payload.new.id ? payload.new : subtask,
+				),
 			);
 		},
 		[queryClient],
@@ -97,10 +95,8 @@ export function useSubtaskRealtime(
 		(payload: RealtimePayload<RemoteSubtask>) => {
 			const queryKey = getSubtaskQueryKeyForTodo(payload.old.todoId);
 
-			queryClient.setQueryData<RemoteSubtask[]>(
-				queryKey,
-				(old) =>
-					old?.filter((subtask) => subtask.id !== payload.old.id) ?? null,
+			queryClient.setQueryData<RemoteSubtask[]>(queryKey, (old) =>
+				old?.filter((subtask) => subtask.id !== payload.old.id),
 			);
 		},
 		[queryClient],
@@ -135,7 +131,8 @@ export function useSubtaskRealtime(
 		channelRef.current = channel;
 
 		// Subscribe to postgres changes
-		const subscription = channel.on(
+		// biome-ignore lint/suspicious/noExplicitAny: Supabase's typed overloads don't match runtime behavior
+		const subscription = (channel as any).on(
 			"postgres_changes",
 			{
 				event: "*",
@@ -146,7 +143,7 @@ export function useSubtaskRealtime(
 		);
 
 		// Subscribe to the channel
-		subscription.subscribe((status) => {
+		subscription.subscribe((status: string) => {
 			if (status === "SUBSCRIBED") {
 				isSubscribedRef.current = true;
 			} else if (status === "CHANNEL_ERROR") {
@@ -223,12 +220,10 @@ export function useSubtaskRealtimeWithAuth(): UseSubtaskRealtimeReturn {
 		(payload: RealtimePayload<RemoteSubtask>) => {
 			const queryKey = getSubtaskQueryKeyForTodo(payload.new.todoId);
 
-			queryClient.setQueryData<RemoteSubtask[]>(
-				queryKey,
-				(old) =>
-					old?.map((subtask) =>
-						subtask.id === payload.new.id ? payload.new : subtask,
-					) ?? null,
+			queryClient.setQueryData<RemoteSubtask[]>(queryKey, (old) =>
+				old?.map((subtask) =>
+					subtask.id === payload.new.id ? payload.new : subtask,
+				),
 			);
 		},
 		[queryClient],
@@ -238,10 +233,8 @@ export function useSubtaskRealtimeWithAuth(): UseSubtaskRealtimeReturn {
 		(payload: RealtimePayload<RemoteSubtask>) => {
 			const queryKey = getSubtaskQueryKeyForTodo(payload.old.todoId);
 
-			queryClient.setQueryData<RemoteSubtask[]>(
-				queryKey,
-				(old) =>
-					old?.filter((subtask) => subtask.id !== payload.old.id) ?? null,
+			queryClient.setQueryData<RemoteSubtask[]>(queryKey, (old) =>
+				old?.filter((subtask) => subtask.id !== payload.old.id),
 			);
 		},
 		[queryClient],
@@ -275,7 +268,8 @@ export function useSubtaskRealtimeWithAuth(): UseSubtaskRealtimeReturn {
 		channelRef.current = channel;
 
 		// Subscribe to postgres changes
-		const subscription = channel.on(
+		// biome-ignore lint/suspicious/noExplicitAny: Supabase's typed overloads don't match runtime behavior
+		const subscription = (channel as any).on(
 			"postgres_changes",
 			{
 				event: "*",
@@ -286,7 +280,7 @@ export function useSubtaskRealtimeWithAuth(): UseSubtaskRealtimeReturn {
 		);
 
 		// Subscribe to the channel
-		subscription.subscribe((status) => {
+		subscription.subscribe((status: string) => {
 			if (status === "SUBSCRIBED") {
 				isSubscribedRef.current = true;
 			} else if (status === "CHANNEL_ERROR") {

@@ -281,19 +281,15 @@ function FolderItem({
 
 			{/* Actions Dropdown */}
 			<DropdownMenu>
-				<DropdownMenuTrigger asChild>
-					<Button
-						variant="ghost"
-						size="icon-xs"
-						className={cn(
-							"absolute top-1/2 right-2 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100",
-							isSelected && "opacity-100",
-						)}
-						aria-label={`Actions for ${folder.name}`}
-						data-testid={`folder-actions-${folder.id}`}
-					>
-						<MoreHorizontal className="h-3 w-3" />
-					</Button>
+				<DropdownMenuTrigger
+					className={cn(
+						"absolute top-1/2 right-2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md bg-transparent opacity-0 transition-opacity hover:bg-accent focus:opacity-100 group-hover:opacity-100",
+						isSelected && "opacity-100",
+					)}
+					aria-label={`Actions for ${folder.name}`}
+					data-testid={`folder-actions-${folder.id}`}
+				>
+					<MoreHorizontal className="h-3 w-3" />
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align="end" className="w-32">
 					<DropdownMenuItem

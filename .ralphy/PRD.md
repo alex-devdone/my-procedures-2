@@ -310,7 +310,7 @@ Update localStorage sync mechanism to handle new fields. Can proceed after Phase
 
 Final polish and type checking. Depends on all previous phases.
 
-- [ ] Run `bun run check-types` and fix any TypeScript errors
+- [x] Run `bun run check-types` and fix any TypeScript errors
 - [ ] Run `bun run check` and fix any linting issues
 - [ ] Run `bun run test` and ensure all unit tests pass
 - [ ] Run `bun run test:e2e` and ensure all E2E tests pass

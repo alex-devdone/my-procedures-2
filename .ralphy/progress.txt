@@ -1025,3 +1025,14 @@
 - [✓] 2026-01-21 12:15 - Run full E2E suite: 123 passed, 7 failed (failures in smart-views.spec.ts pre-existing)
 - [✓] 2026-01-21 12:15 - Run linting check: passed (56 pre-existing warnings)
 
+- [✓] 2026-01-21 12:30 - Phase 17 (Polish & Cleanup): Fix TypeScript errors (bun run check-types):
+  - Fixed duplicate identifier 'ConnectionStatus' in components/realtime/index.ts by using type alias
+  - Fixed DropdownMenuTrigger asChild prop issue in folder-sidebar.tsx (@base-ui/react doesn't support asChild)
+  - Fixed setQueryData returning null instead of undefined in all realtime hooks (use-todo-realtime.ts, use-folder-realtime.ts, use-subtask-realtime.ts, use-supabase-realtime.ts)
+  - Added type assertions for Supabase channel.on() with biome-ignore comments in all realtime hooks
+  - Added explicit `: string` type annotation to subscription callback status parameters
+  - Fixed supabase.test.ts type assertion for mocked channel name property
+  - Fixed local-folder-storage.test.ts and local-todo-storage.test.ts by adding explicit `string | null` return type to getItem mock
+  - All 1859 unit tests pass
+  - Linting passes (56 pre-existing warnings)
+
