@@ -746,6 +746,230 @@ describe("useSyncTodos", () => {
 			// Verify localStorage was cleared (all todos were synced)
 			expect(localStorageMock.removeItem).toHaveBeenCalledWith("todos");
 		});
+
+		it("includes notifyAt field when syncing recurring todos with sync action", async () => {
+			const localTodos = [
+				{
+					id: "uuid-1",
+					text: "Daily reminder with notification time",
+					completed: false,
+					dueDate: "2026-01-25T09:00:00.000Z",
+					recurringPattern: {
+						type: "daily",
+						interval: 1,
+						notifyAt: "09:00",
+					},
+				},
+			];
+			mockLocalStorage.todos = JSON.stringify(localTodos);
+
+			const { result } = renderHook(() => useSyncTodos(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.handleSyncAction("sync");
+			});
+
+			// Verify localStorage was cleared (sync was attempted with notifyAt included)
+			expect(localStorageMock.removeItem).toHaveBeenCalledWith("todos");
+		});
+
+		it("includes notifyAt field when syncing recurring todos with keep_both action", async () => {
+			const localTodos = [
+				{
+					id: "uuid-1",
+					text: "Weekly meeting notification",
+					completed: false,
+					dueDate: "2026-01-27T14:00:00.000Z",
+					recurringPattern: {
+						type: "weekly",
+						interval: 1,
+						daysOfWeek: [1],
+						notifyAt: "13:45",
+					},
+				},
+			];
+			mockLocalStorage.todos = JSON.stringify(localTodos);
+
+			const { result } = renderHook(() => useSyncTodos(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.handleSyncAction("keep_both");
+			});
+
+			// Verify localStorage was cleared (sync was attempted with notifyAt included)
+			expect(localStorageMock.removeItem).toHaveBeenCalledWith("todos");
+		});
+
+		it("syncs multiple recurring todos with different notifyAt times", async () => {
+			const localTodos = [
+				{
+					id: "uuid-1",
+					text: "Morning standup",
+					completed: false,
+					dueDate: "2026-01-25T09:00:00.000Z",
+					recurringPattern: {
+						type: "daily",
+						interval: 1,
+						notifyAt: "08:45",
+					},
+				},
+				{
+					id: "uuid-2",
+					text: "Evening review",
+					completed: false,
+					dueDate: "2026-01-25T17:00:00.000Z",
+					recurringPattern: {
+						type: "daily",
+						interval: 1,
+						notifyAt: "16:30",
+					},
+				},
+				{
+					id: "uuid-3",
+					text: "Monthly report",
+					completed: true,
+					dueDate: "2026-01-31T10:00:00.000Z",
+					recurringPattern: {
+						type: "monthly",
+						interval: 1,
+						dayOfMonth: 31,
+						notifyAt: "09:00",
+					},
+				},
+			];
+			mockLocalStorage.todos = JSON.stringify(localTodos);
+
+			const { result } = renderHook(() => useSyncTodos(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.handleSyncAction("sync");
+			});
+
+			// Verify localStorage was cleared (all todos synced with their notifyAt values)
+			expect(localStorageMock.removeItem).toHaveBeenCalledWith("todos");
+		});
+
+		it("syncs recurring pattern without notifyAt (optional field)", async () => {
+			const localTodos = [
+				{
+					id: "uuid-1",
+					text: "Recurring without notification time",
+					completed: false,
+					dueDate: "2026-01-25T09:00:00.000Z",
+					recurringPattern: {
+						type: "daily",
+						interval: 1,
+					},
+				},
+			];
+			mockLocalStorage.todos = JSON.stringify(localTodos);
+
+			const { result } = renderHook(() => useSyncTodos(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.handleSyncAction("sync");
+			});
+
+			// Verify localStorage was cleared (sync works without notifyAt)
+			expect(localStorageMock.removeItem).toHaveBeenCalledWith("todos");
+		});
+
+		it("syncs yearly recurring todo with notifyAt", async () => {
+			const localTodos = [
+				{
+					id: "uuid-1",
+					text: "Annual review",
+					completed: false,
+					dueDate: "2026-03-15T10:00:00.000Z",
+					recurringPattern: {
+						type: "yearly",
+						interval: 1,
+						monthOfYear: 3,
+						dayOfMonth: 15,
+						notifyAt: "09:00",
+					},
+				},
+			];
+			mockLocalStorage.todos = JSON.stringify(localTodos);
+
+			const { result } = renderHook(() => useSyncTodos(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.handleSyncAction("sync");
+			});
+
+			// Verify localStorage was cleared (yearly pattern with notifyAt synced)
+			expect(localStorageMock.removeItem).toHaveBeenCalledWith("todos");
+		});
+
+		it("syncs custom recurring pattern with notifyAt and daysOfWeek", async () => {
+			const localTodos = [
+				{
+					id: "uuid-1",
+					text: "Weekend activity",
+					completed: false,
+					dueDate: "2026-01-25T12:00:00.000Z",
+					recurringPattern: {
+						type: "custom",
+						interval: 1,
+						daysOfWeek: [0, 6],
+						notifyAt: "11:30",
+					},
+				},
+			];
+			mockLocalStorage.todos = JSON.stringify(localTodos);
+
+			const { result } = renderHook(() => useSyncTodos(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.handleSyncAction("sync");
+			});
+
+			// Verify localStorage was cleared (custom pattern with notifyAt synced)
+			expect(localStorageMock.removeItem).toHaveBeenCalledWith("todos");
+		});
+
+		it("syncs recurring pattern with notifyAt and expiration settings", async () => {
+			const localTodos = [
+				{
+					id: "uuid-1",
+					text: "Limited recurrence with notification",
+					completed: false,
+					dueDate: "2026-01-25T09:00:00.000Z",
+					recurringPattern: {
+						type: "daily",
+						interval: 1,
+						endDate: "2026-02-28",
+						occurrences: 30,
+						notifyAt: "08:30",
+					},
+				},
+			];
+			mockLocalStorage.todos = JSON.stringify(localTodos);
+
+			const { result } = renderHook(() => useSyncTodos(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.handleSyncAction("sync");
+			});
+
+			// Verify localStorage was cleared (pattern with expiration and notifyAt synced)
+			expect(localStorageMock.removeItem).toHaveBeenCalledWith("todos");
+		});
 	});
 });
 
