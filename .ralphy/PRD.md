@@ -150,11 +150,11 @@ UI components for subtask management. Can proceed after Phase 6.
 
 Backend API updates for todo scheduling. Can proceed after Phase 1.
 
-- [ ] Update `packages/api/src/routers/todo.ts` to handle dueDate, reminderAt, recurringPattern fields
-- [ ] Add unit tests for scheduling fields in todo router `packages/api/src/routers/todo.test.ts`
+- [x] Update `packages/api/src/routers/todo.ts` to handle dueDate, reminderAt, recurringPattern fields
+- [x] Add unit tests for scheduling fields in todo router `packages/api/src/routers/todo.test.ts`
 - [ ] Create `packages/api/src/lib/recurring.ts` with cron-style pattern parsing and next occurrence calculation
 - [ ] Add unit tests for recurring pattern logic in `packages/api/src/lib/recurring.test.ts`
-- [ ] Add procedure to get todos due within a time range (for reminder checking)
+- [x] Add procedure to get todos due within a time range (for reminder checking)
 - [ ] Add procedure to complete recurring todo (creates next occurrence, marks current complete)
 
 ---

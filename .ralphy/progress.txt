@@ -291,3 +291,17 @@
   - Expand/collapse subtask sections
   - Keyboard navigation (Enter key submission)
   - Empty subtask input handling
+
+- [✓] 2026-01-21 03:55 - Update todo router (packages/api/src/routers/todo.ts) to handle scheduling fields:
+  - Added dueDate, reminderAt, recurringPattern fields to create procedure input schema
+  - Added dueDate, reminderAt, recurringPattern fields to bulkCreate procedure input schema
+  - Created recurringPatternSchema Zod validation for cron-style recurring patterns
+  - Created updateSchedule procedure to update scheduling fields on existing todos
+  - Created getDueInRange procedure to query todos due within a time range
+  - Scheduling fields converted from ISO datetime strings to Date objects for database storage
+- [✓] 2026-01-21 03:55 - Add unit tests for scheduling fields in todo router (85 total tests) covering:
+  - RecurringPattern schema validation (daily, weekly, monthly, yearly, custom patterns)
+  - Create todo with scheduling input validation
+  - UpdateSchedule input validation
+  - GetDueInRange input validation
+  - Scheduling business logic (date conversion, update data preparation, filtering by date range, bulk create with scheduling)

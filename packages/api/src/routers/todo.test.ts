@@ -29,11 +29,25 @@ vi.mock("@my-procedures-2/db/schema/todo", () => ({
 // Type Definitions for Tests
 // ============================================================================
 
+interface RecurringPattern {
+	type: "daily" | "weekly" | "monthly" | "yearly" | "custom";
+	interval?: number;
+	daysOfWeek?: number[];
+	dayOfMonth?: number;
+	monthOfYear?: number;
+	endDate?: string;
+	occurrences?: number;
+}
+
 interface MockTodo {
 	id: number;
 	text: string;
 	completed: boolean;
 	userId: string;
+	dueDate?: Date | null;
+	reminderAt?: Date | null;
+	recurringPattern?: RecurringPattern | null;
+	folderId?: number | null;
 }
 
 interface MockContext {
@@ -703,6 +717,807 @@ describe("Zod Schema Validation", () => {
 					todos: [{ text: "Task" }],
 				}),
 			).toEqual({ valid: false });
+		});
+	});
+});
+
+describe("Scheduling Fields Validation", () => {
+	describe("RecurringPattern Schema Validation", () => {
+		const validateRecurringPattern = (
+			pattern: unknown,
+		): { valid: boolean; pattern?: RecurringPattern } => {
+			if (typeof pattern !== "object" || pattern === null) {
+				return { valid: false };
+			}
+
+			const p = pattern as Record<string, unknown>;
+
+			// Validate type field (required)
+			const validTypes = ["daily", "weekly", "monthly", "yearly", "custom"];
+			if (!validTypes.includes(p.type as string)) {
+				return { valid: false };
+			}
+
+			// Validate interval (optional, must be positive integer)
+			if (
+				p.interval !== undefined &&
+				(typeof p.interval !== "number" ||
+					!Number.isInteger(p.interval) ||
+					p.interval <= 0)
+			) {
+				return { valid: false };
+			}
+
+			// Validate daysOfWeek (optional, array of integers 0-6)
+			if (p.daysOfWeek !== undefined) {
+				if (!Array.isArray(p.daysOfWeek)) {
+					return { valid: false };
+				}
+				for (const day of p.daysOfWeek) {
+					if (
+						typeof day !== "number" ||
+						!Number.isInteger(day) ||
+						day < 0 ||
+						day > 6
+					) {
+						return { valid: false };
+					}
+				}
+			}
+
+			// Validate dayOfMonth (optional, integer 1-31)
+			if (
+				p.dayOfMonth !== undefined &&
+				(typeof p.dayOfMonth !== "number" ||
+					!Number.isInteger(p.dayOfMonth) ||
+					p.dayOfMonth < 1 ||
+					p.dayOfMonth > 31)
+			) {
+				return { valid: false };
+			}
+
+			// Validate monthOfYear (optional, integer 1-12)
+			if (
+				p.monthOfYear !== undefined &&
+				(typeof p.monthOfYear !== "number" ||
+					!Number.isInteger(p.monthOfYear) ||
+					p.monthOfYear < 1 ||
+					p.monthOfYear > 12)
+			) {
+				return { valid: false };
+			}
+
+			// Validate endDate (optional, string)
+			if (p.endDate !== undefined && typeof p.endDate !== "string") {
+				return { valid: false };
+			}
+
+			// Validate occurrences (optional, positive integer)
+			if (
+				p.occurrences !== undefined &&
+				(typeof p.occurrences !== "number" ||
+					!Number.isInteger(p.occurrences) ||
+					p.occurrences <= 0)
+			) {
+				return { valid: false };
+			}
+
+			return { valid: true, pattern: pattern as RecurringPattern };
+		};
+
+		it("validates daily pattern", () => {
+			expect(validateRecurringPattern({ type: "daily" })).toEqual({
+				valid: true,
+				pattern: { type: "daily" },
+			});
+		});
+
+		it("validates daily pattern with interval", () => {
+			expect(validateRecurringPattern({ type: "daily", interval: 3 })).toEqual({
+				valid: true,
+				pattern: { type: "daily", interval: 3 },
+			});
+		});
+
+		it("validates weekly pattern with days of week", () => {
+			expect(
+				validateRecurringPattern({
+					type: "weekly",
+					daysOfWeek: [1, 3, 5],
+				}),
+			).toEqual({
+				valid: true,
+				pattern: { type: "weekly", daysOfWeek: [1, 3, 5] },
+			});
+		});
+
+		it("validates monthly pattern with day of month", () => {
+			expect(
+				validateRecurringPattern({
+					type: "monthly",
+					dayOfMonth: 15,
+				}),
+			).toEqual({
+				valid: true,
+				pattern: { type: "monthly", dayOfMonth: 15 },
+			});
+		});
+
+		it("validates yearly pattern with month and day", () => {
+			expect(
+				validateRecurringPattern({
+					type: "yearly",
+					monthOfYear: 1,
+					dayOfMonth: 1,
+				}),
+			).toEqual({
+				valid: true,
+				pattern: { type: "yearly", monthOfYear: 1, dayOfMonth: 1 },
+			});
+		});
+
+		it("validates custom pattern with all fields", () => {
+			expect(
+				validateRecurringPattern({
+					type: "custom",
+					interval: 2,
+					daysOfWeek: [2],
+					endDate: "2026-12-31",
+					occurrences: 10,
+				}),
+			).toEqual({
+				valid: true,
+				pattern: {
+					type: "custom",
+					interval: 2,
+					daysOfWeek: [2],
+					endDate: "2026-12-31",
+					occurrences: 10,
+				},
+			});
+		});
+
+		it("rejects invalid type", () => {
+			expect(validateRecurringPattern({ type: "invalid" })).toEqual({
+				valid: false,
+			});
+		});
+
+		it("rejects missing type", () => {
+			expect(validateRecurringPattern({ interval: 1 })).toEqual({
+				valid: false,
+			});
+		});
+
+		it("rejects negative interval", () => {
+			expect(validateRecurringPattern({ type: "daily", interval: -1 })).toEqual(
+				{ valid: false },
+			);
+		});
+
+		it("rejects zero interval", () => {
+			expect(validateRecurringPattern({ type: "daily", interval: 0 })).toEqual({
+				valid: false,
+			});
+		});
+
+		it("rejects non-integer interval", () => {
+			expect(
+				validateRecurringPattern({ type: "daily", interval: 1.5 }),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects invalid day of week (negative)", () => {
+			expect(
+				validateRecurringPattern({ type: "weekly", daysOfWeek: [-1] }),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects invalid day of week (> 6)", () => {
+			expect(
+				validateRecurringPattern({ type: "weekly", daysOfWeek: [7] }),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects invalid day of month (0)", () => {
+			expect(
+				validateRecurringPattern({ type: "monthly", dayOfMonth: 0 }),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects invalid day of month (> 31)", () => {
+			expect(
+				validateRecurringPattern({ type: "monthly", dayOfMonth: 32 }),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects invalid month of year (0)", () => {
+			expect(
+				validateRecurringPattern({ type: "yearly", monthOfYear: 0 }),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects invalid month of year (> 12)", () => {
+			expect(
+				validateRecurringPattern({ type: "yearly", monthOfYear: 13 }),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects zero occurrences", () => {
+			expect(
+				validateRecurringPattern({ type: "daily", occurrences: 0 }),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects negative occurrences", () => {
+			expect(
+				validateRecurringPattern({ type: "daily", occurrences: -5 }),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects non-object pattern", () => {
+			expect(validateRecurringPattern("daily")).toEqual({ valid: false });
+		});
+
+		it("rejects null pattern", () => {
+			expect(validateRecurringPattern(null)).toEqual({ valid: false });
+		});
+	});
+
+	describe("Create Todo with Scheduling Input Validation", () => {
+		interface CreateTodoWithSchedulingInput {
+			text: string;
+			folderId?: number | null;
+			dueDate?: string | null;
+			reminderAt?: string | null;
+			recurringPattern?: RecurringPattern | null;
+		}
+
+		const validateCreateWithScheduling = (
+			input: unknown,
+		): { valid: boolean; data?: CreateTodoWithSchedulingInput } => {
+			if (typeof input !== "object" || input === null) {
+				return { valid: false };
+			}
+
+			const i = input as Record<string, unknown>;
+
+			// text is required
+			if (typeof i.text !== "string" || i.text.length < 1) {
+				return { valid: false };
+			}
+
+			// folderId is optional, can be number or null
+			if (
+				i.folderId !== undefined &&
+				i.folderId !== null &&
+				typeof i.folderId !== "number"
+			) {
+				return { valid: false };
+			}
+
+			// dueDate is optional, must be valid ISO datetime string or null
+			if (i.dueDate !== undefined && i.dueDate !== null) {
+				if (typeof i.dueDate !== "string") {
+					return { valid: false };
+				}
+				const date = new Date(i.dueDate);
+				if (Number.isNaN(date.getTime())) {
+					return { valid: false };
+				}
+			}
+
+			// reminderAt is optional, must be valid ISO datetime string or null
+			if (i.reminderAt !== undefined && i.reminderAt !== null) {
+				if (typeof i.reminderAt !== "string") {
+					return { valid: false };
+				}
+				const date = new Date(i.reminderAt);
+				if (Number.isNaN(date.getTime())) {
+					return { valid: false };
+				}
+			}
+
+			return {
+				valid: true,
+				data: input as CreateTodoWithSchedulingInput,
+			};
+		};
+
+		it("validates create input with text only", () => {
+			const result = validateCreateWithScheduling({ text: "Buy groceries" });
+			expect(result.valid).toBe(true);
+			expect(result.data?.text).toBe("Buy groceries");
+		});
+
+		it("validates create input with all scheduling fields", () => {
+			const result = validateCreateWithScheduling({
+				text: "Meeting",
+				folderId: 1,
+				dueDate: "2026-01-25T10:00:00Z",
+				reminderAt: "2026-01-25T09:30:00Z",
+				recurringPattern: { type: "weekly", daysOfWeek: [1, 3, 5] },
+			});
+			expect(result.valid).toBe(true);
+		});
+
+		it("validates create input with null scheduling fields", () => {
+			const result = validateCreateWithScheduling({
+				text: "Task",
+				dueDate: null,
+				reminderAt: null,
+				recurringPattern: null,
+			});
+			expect(result.valid).toBe(true);
+		});
+
+		it("rejects empty text", () => {
+			expect(validateCreateWithScheduling({ text: "" })).toEqual({
+				valid: false,
+			});
+		});
+
+		it("rejects invalid dueDate string", () => {
+			expect(
+				validateCreateWithScheduling({
+					text: "Task",
+					dueDate: "not-a-date",
+				}),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects invalid reminderAt string", () => {
+			expect(
+				validateCreateWithScheduling({
+					text: "Task",
+					reminderAt: "invalid",
+				}),
+			).toEqual({ valid: false });
+		});
+	});
+
+	describe("UpdateSchedule Input Validation", () => {
+		interface UpdateScheduleInput {
+			id: number;
+			dueDate?: string | null;
+			reminderAt?: string | null;
+			recurringPattern?: RecurringPattern | null;
+		}
+
+		const validateUpdateSchedule = (
+			input: unknown,
+		): { valid: boolean; data?: UpdateScheduleInput } => {
+			if (typeof input !== "object" || input === null) {
+				return { valid: false };
+			}
+
+			const i = input as Record<string, unknown>;
+
+			// id is required and must be a number
+			if (typeof i.id !== "number") {
+				return { valid: false };
+			}
+
+			// dueDate is optional, must be valid ISO datetime string or null
+			if (i.dueDate !== undefined && i.dueDate !== null) {
+				if (typeof i.dueDate !== "string") {
+					return { valid: false };
+				}
+				const date = new Date(i.dueDate);
+				if (Number.isNaN(date.getTime())) {
+					return { valid: false };
+				}
+			}
+
+			// reminderAt is optional, must be valid ISO datetime string or null
+			if (i.reminderAt !== undefined && i.reminderAt !== null) {
+				if (typeof i.reminderAt !== "string") {
+					return { valid: false };
+				}
+				const date = new Date(i.reminderAt);
+				if (Number.isNaN(date.getTime())) {
+					return { valid: false };
+				}
+			}
+
+			return {
+				valid: true,
+				data: input as UpdateScheduleInput,
+			};
+		};
+
+		it("validates update schedule with id only", () => {
+			const result = validateUpdateSchedule({ id: 1 });
+			expect(result.valid).toBe(true);
+			expect(result.data?.id).toBe(1);
+		});
+
+		it("validates update schedule with dueDate", () => {
+			const result = validateUpdateSchedule({
+				id: 1,
+				dueDate: "2026-01-30T12:00:00Z",
+			});
+			expect(result.valid).toBe(true);
+		});
+
+		it("validates update schedule with reminderAt", () => {
+			const result = validateUpdateSchedule({
+				id: 1,
+				reminderAt: "2026-01-30T11:30:00Z",
+			});
+			expect(result.valid).toBe(true);
+		});
+
+		it("validates update schedule with recurringPattern", () => {
+			const result = validateUpdateSchedule({
+				id: 1,
+				recurringPattern: { type: "daily", interval: 2 },
+			});
+			expect(result.valid).toBe(true);
+		});
+
+		it("validates update schedule with all fields", () => {
+			const result = validateUpdateSchedule({
+				id: 1,
+				dueDate: "2026-01-30T12:00:00Z",
+				reminderAt: "2026-01-30T11:30:00Z",
+				recurringPattern: { type: "monthly", dayOfMonth: 15 },
+			});
+			expect(result.valid).toBe(true);
+		});
+
+		it("validates update schedule with null values to clear fields", () => {
+			const result = validateUpdateSchedule({
+				id: 1,
+				dueDate: null,
+				reminderAt: null,
+				recurringPattern: null,
+			});
+			expect(result.valid).toBe(true);
+		});
+
+		it("rejects missing id", () => {
+			expect(
+				validateUpdateSchedule({ dueDate: "2026-01-30T12:00:00Z" }),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects string id", () => {
+			expect(validateUpdateSchedule({ id: "1" })).toEqual({ valid: false });
+		});
+
+		it("rejects invalid dueDate string", () => {
+			expect(
+				validateUpdateSchedule({
+					id: 1,
+					dueDate: "not-a-date",
+				}),
+			).toEqual({ valid: false });
+		});
+	});
+
+	describe("GetDueInRange Input Validation", () => {
+		interface GetDueInRangeInput {
+			startDate: string;
+			endDate: string;
+		}
+
+		const validateGetDueInRange = (
+			input: unknown,
+		): { valid: boolean; data?: GetDueInRangeInput } => {
+			if (typeof input !== "object" || input === null) {
+				return { valid: false };
+			}
+
+			const i = input as Record<string, unknown>;
+
+			// startDate is required
+			if (typeof i.startDate !== "string") {
+				return { valid: false };
+			}
+			const startDate = new Date(i.startDate);
+			if (Number.isNaN(startDate.getTime())) {
+				return { valid: false };
+			}
+
+			// endDate is required
+			if (typeof i.endDate !== "string") {
+				return { valid: false };
+			}
+			const endDate = new Date(i.endDate);
+			if (Number.isNaN(endDate.getTime())) {
+				return { valid: false };
+			}
+
+			return {
+				valid: true,
+				data: input as GetDueInRangeInput,
+			};
+		};
+
+		it("validates valid date range", () => {
+			const result = validateGetDueInRange({
+				startDate: "2026-01-21T00:00:00Z",
+				endDate: "2026-01-28T23:59:59Z",
+			});
+			expect(result.valid).toBe(true);
+		});
+
+		it("validates same day range", () => {
+			const result = validateGetDueInRange({
+				startDate: "2026-01-21T00:00:00Z",
+				endDate: "2026-01-21T23:59:59Z",
+			});
+			expect(result.valid).toBe(true);
+		});
+
+		it("rejects missing startDate", () => {
+			expect(
+				validateGetDueInRange({ endDate: "2026-01-28T23:59:59Z" }),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects missing endDate", () => {
+			expect(
+				validateGetDueInRange({ startDate: "2026-01-21T00:00:00Z" }),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects invalid startDate", () => {
+			expect(
+				validateGetDueInRange({
+					startDate: "invalid",
+					endDate: "2026-01-28T23:59:59Z",
+				}),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects invalid endDate", () => {
+			expect(
+				validateGetDueInRange({
+					startDate: "2026-01-21T00:00:00Z",
+					endDate: "invalid",
+				}),
+			).toEqual({ valid: false });
+		});
+	});
+
+	describe("Scheduling Business Logic", () => {
+		describe("Date Conversion", () => {
+			it("should convert ISO string to Date object", () => {
+				const isoString = "2026-01-25T10:30:00.000Z";
+				const date = new Date(isoString);
+
+				expect(date instanceof Date).toBe(true);
+				expect(date.toISOString()).toBe(isoString);
+			});
+
+			it("should handle null dueDate", () => {
+				const processDate = (dateString: string | null | undefined) => {
+					if (dateString) {
+						return new Date(dateString);
+					}
+					return null;
+				};
+
+				expect(processDate(null)).toBeNull();
+				expect(processDate(undefined)).toBeNull();
+				expect(processDate("2026-01-25T10:30:00Z")).toBeInstanceOf(Date);
+			});
+		});
+
+		describe("Update Schedule Data Preparation", () => {
+			it("should only include fields that are explicitly set", () => {
+				interface UpdateInput {
+					dueDate?: string | null;
+					reminderAt?: string | null;
+					recurringPattern?: RecurringPattern | null;
+				}
+
+				const prepareUpdateData = (input: UpdateInput) => {
+					const updateData: Record<string, unknown> = {};
+
+					if (input.dueDate !== undefined) {
+						updateData.dueDate = input.dueDate ? new Date(input.dueDate) : null;
+					}
+
+					if (input.reminderAt !== undefined) {
+						updateData.reminderAt = input.reminderAt
+							? new Date(input.reminderAt)
+							: null;
+					}
+
+					if (input.recurringPattern !== undefined) {
+						updateData.recurringPattern = input.recurringPattern ?? null;
+					}
+
+					return updateData;
+				};
+
+				// Only dueDate specified
+				const result1 = prepareUpdateData({
+					dueDate: "2026-01-25T10:00:00Z",
+				});
+				expect(Object.keys(result1)).toEqual(["dueDate"]);
+				expect(result1.dueDate).toBeInstanceOf(Date);
+
+				// Clear dueDate (set to null)
+				const result2 = prepareUpdateData({ dueDate: null });
+				expect(Object.keys(result2)).toEqual(["dueDate"]);
+				expect(result2.dueDate).toBeNull();
+
+				// Multiple fields
+				const result3 = prepareUpdateData({
+					dueDate: "2026-01-25T10:00:00Z",
+					reminderAt: "2026-01-25T09:00:00Z",
+					recurringPattern: { type: "daily" },
+				});
+				expect(Object.keys(result3)).toHaveLength(3);
+				expect(result3.recurringPattern).toEqual({ type: "daily" });
+
+				// Empty input - no fields updated
+				const result4 = prepareUpdateData({});
+				expect(Object.keys(result4)).toHaveLength(0);
+			});
+		});
+
+		describe("Filtering Todos by Due Date Range", () => {
+			it("should filter todos within date range", () => {
+				const todos: MockTodo[] = [
+					{
+						id: 1,
+						text: "Todo 1",
+						completed: false,
+						userId: "user-123",
+						dueDate: new Date("2026-01-22T10:00:00Z"),
+					},
+					{
+						id: 2,
+						text: "Todo 2",
+						completed: false,
+						userId: "user-123",
+						dueDate: new Date("2026-01-25T10:00:00Z"),
+					},
+					{
+						id: 3,
+						text: "Todo 3",
+						completed: false,
+						userId: "user-123",
+						dueDate: new Date("2026-01-30T10:00:00Z"),
+					},
+					{
+						id: 4,
+						text: "Todo 4 (no due date)",
+						completed: false,
+						userId: "user-123",
+						dueDate: null,
+					},
+				];
+
+				const filterByDateRange = (
+					todoList: MockTodo[],
+					startDate: Date,
+					endDate: Date,
+				) => {
+					return todoList.filter((t) => {
+						if (!t.dueDate) return false;
+						return t.dueDate >= startDate && t.dueDate <= endDate;
+					});
+				};
+
+				const startDate = new Date("2026-01-21T00:00:00Z");
+				const endDate = new Date("2026-01-26T23:59:59Z");
+
+				const result = filterByDateRange(todos, startDate, endDate);
+
+				expect(result).toHaveLength(2);
+				expect(result.map((t) => t.id)).toEqual([1, 2]);
+			});
+
+			it("should return empty array when no todos in range", () => {
+				const todos: MockTodo[] = [
+					{
+						id: 1,
+						text: "Todo 1",
+						completed: false,
+						userId: "user-123",
+						dueDate: new Date("2026-02-01T10:00:00Z"),
+					},
+				];
+
+				const filterByDateRange = (
+					todoList: MockTodo[],
+					startDate: Date,
+					endDate: Date,
+				) => {
+					return todoList.filter((t) => {
+						if (!t.dueDate) return false;
+						return t.dueDate >= startDate && t.dueDate <= endDate;
+					});
+				};
+
+				const startDate = new Date("2026-01-21T00:00:00Z");
+				const endDate = new Date("2026-01-26T23:59:59Z");
+
+				const result = filterByDateRange(todos, startDate, endDate);
+
+				expect(result).toHaveLength(0);
+			});
+		});
+
+		describe("Bulk Create with Scheduling Fields", () => {
+			it("should map scheduling fields correctly", () => {
+				interface BulkCreateTodoInput {
+					text: string;
+					completed: boolean;
+					folderId?: number | null;
+					dueDate?: string | null;
+					reminderAt?: string | null;
+					recurringPattern?: RecurringPattern | null;
+				}
+
+				const prepareBulkCreateData = (
+					todos: BulkCreateTodoInput[],
+					userId: string,
+				) => {
+					return todos.map((t) => ({
+						text: t.text,
+						completed: t.completed,
+						userId,
+						folderId: t.folderId ?? null,
+						dueDate: t.dueDate ? new Date(t.dueDate) : null,
+						reminderAt: t.reminderAt ? new Date(t.reminderAt) : null,
+						recurringPattern: t.recurringPattern ?? null,
+					}));
+				};
+
+				const input: BulkCreateTodoInput[] = [
+					{
+						text: "Task 1",
+						completed: false,
+						dueDate: "2026-01-25T10:00:00Z",
+						reminderAt: "2026-01-25T09:00:00Z",
+						recurringPattern: { type: "daily" },
+					},
+					{
+						text: "Task 2",
+						completed: true,
+						dueDate: null,
+						reminderAt: null,
+						recurringPattern: null,
+					},
+					{
+						text: "Task 3",
+						completed: false,
+						// No scheduling fields
+					},
+				];
+
+				const result = prepareBulkCreateData(input, "user-123");
+
+				expect(result).toHaveLength(3);
+
+				const first = result[0];
+				const second = result[1];
+				const third = result[2];
+
+				// First todo with scheduling
+				expect(first?.text).toBe("Task 1");
+				expect(first?.dueDate).toBeInstanceOf(Date);
+				expect(first?.reminderAt).toBeInstanceOf(Date);
+				expect(first?.recurringPattern).toEqual({ type: "daily" });
+				expect(first?.userId).toBe("user-123");
+
+				// Second todo with explicit nulls
+				expect(second?.dueDate).toBeNull();
+				expect(second?.reminderAt).toBeNull();
+				expect(second?.recurringPattern).toBeNull();
+
+				// Third todo with implicit nulls
+				expect(third?.dueDate).toBeNull();
+				expect(third?.reminderAt).toBeNull();
+				expect(third?.recurringPattern).toBeNull();
+			});
 		});
 	});
 });
