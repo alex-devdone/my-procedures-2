@@ -265,8 +265,8 @@ Integrate Supabase Realtime with todo React Query cache. Can proceed after Phase
 - [x] Handle INSERT events - add new todo to cache when created on another device/tab
 - [x] Handle UPDATE events - update todo in cache when modified elsewhere
 - [x] Handle DELETE events - remove todo from cache when deleted elsewhere
-- [ ] Add connection status indicator component at `apps/web/src/components/realtime/connection-status.tsx`
-- [ ] Add unit tests for ConnectionStatus in `apps/web/src/components/realtime/connection-status.test.tsx`
+- [x] Add connection status indicator component at `apps/web/src/components/realtime/connection-status.tsx`
+- [x] Add unit tests for ConnectionStatus in `apps/web/src/components/realtime/connection-status.test.tsx`
 
 ---
 

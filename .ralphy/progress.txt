@@ -809,4 +809,23 @@
 - [✓] 2026-01-21 09:58 - Run all unit tests: 1662 tests passed (16 new realtime tests added)
 - [✓] 2026-01-21 09:58 - Run linting check: passed (auto-formatted imports and code)
 
+- [✓] 2026-01-21 10:25 - Create ConnectionStatus component (apps/web/src/components/realtime/connection-status.tsx) with:
+  - ConnectionStatus type for realtime synchronization states (connecting, connected, disconnected, not-configured)
+  - ConnectionStatusProps interface with status, className, showLabel, labels, and size props
+  - Icon display for each status: Loader2 spinner (connecting), Check (connected), XCircle (disconnected/not-configured)
+  - Color coding: emerald for connected, destructive for disconnected, muted for connecting/not-configured
+  - Size variants (sm, md, lg) for both icon and text
+  - Optional label display with custom label support
+  - Semantic HTML output element with aria-live="polite" for accessibility
+  - Pure helper functions: getStatusIcon, getDefaultLabel, getStatusClasses, getIconSize, getTextSize
+- [✓] 2026-01-21 10:25 - Add unit tests for ConnectionStatus (32 tests) in apps/web/src/components/realtime/connection-status.test.tsx covering:
+  - Rendering: all four status types, custom className, data-connection-status attribute
+  - Label Display: showLabel prop for all statuses, custom labels, fallback to default
+  - Icon Display: correct icon for each status, spinner animation for connecting
+  - Styling: color classes for each status (emerald, destructive, muted), dark mode support
+  - Size Variants: sm/md/lg icon and text sizes
+  - Accessibility: role status, aria-live polite, aria-hidden on icon container
+- [✓] 2026-01-21 10:25 - Create barrel export for realtime components (apps/web/src/components/realtime/index.ts)
+- [✓] 2026-01-21 10:25 - Run all unit tests: 1694 tests passed (32 new ConnectionStatus tests added)
+- [✓] 2026-01-21 10:25 - Run linting check: passed (auto-formatted, 45 pre-existing warnings)
 
