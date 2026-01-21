@@ -1,13 +1,11 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
 import { useCallback } from "react";
 import type { Subtask, UseSubtaskStorageReturn } from "@/app/api/subtask";
 import { useSubtaskStorage } from "@/app/api/subtask";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { SubtaskItem } from "./subtask-item";
 
 export interface SubtaskListProps {
 	/** The ID of the parent todo */
@@ -120,56 +118,6 @@ export function SubtaskList({
 				/>
 			))}
 		</ul>
-	);
-}
-
-interface SubtaskItemProps {
-	subtask: Subtask;
-	onToggle: () => void;
-	onDelete: () => void;
-	readOnly: boolean;
-}
-
-function SubtaskItem({
-	subtask,
-	onToggle,
-	onDelete,
-	readOnly,
-}: SubtaskItemProps) {
-	return (
-		<li
-			className="group flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-muted/50"
-			data-testid={`subtask-item-${subtask.id}`}
-		>
-			<Checkbox
-				checked={subtask.completed}
-				onCheckedChange={onToggle}
-				aria-label={`Mark "${subtask.text}" as ${subtask.completed ? "incomplete" : "complete"}`}
-				data-testid={`subtask-checkbox-${subtask.id}`}
-				disabled={readOnly}
-			/>
-			<span
-				className={cn(
-					"flex-1 text-sm transition-colors",
-					subtask.completed && "text-muted-foreground line-through",
-				)}
-				data-testid={`subtask-text-${subtask.id}`}
-			>
-				{subtask.text}
-			</span>
-			{!readOnly && (
-				<Button
-					variant="ghost"
-					size="icon-xs"
-					onClick={onDelete}
-					className="opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
-					aria-label={`Delete "${subtask.text}"`}
-					data-testid={`subtask-delete-${subtask.id}`}
-				>
-					<Trash2 className="h-3 w-3 text-muted-foreground" />
-				</Button>
-			)}
-		</li>
 	);
 }
 

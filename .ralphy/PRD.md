@@ -127,8 +127,8 @@ UI components for subtask management. Can proceed after Phase 6.
 
 - [x] Create `apps/web/src/components/subtasks/subtask-list.tsx` - renders list of subtasks within a todo
 - [x] Add unit tests for SubtaskList in `apps/web/src/components/subtasks/subtask-list.test.tsx`
-- [ ] Create `apps/web/src/components/subtasks/subtask-item.tsx` - single subtask with checkbox and delete
-- [ ] Add unit tests for SubtaskItem in `apps/web/src/components/subtasks/subtask-item.test.tsx`
+- [x] Create `apps/web/src/components/subtasks/subtask-item.tsx` - single subtask with checkbox and delete
+- [x] Add unit tests for SubtaskItem in `apps/web/src/components/subtasks/subtask-item.test.tsx`
 - [ ] Create `apps/web/src/components/subtasks/subtask-add-input.tsx` - inline input for adding subtasks
 - [ ] Add unit tests for SubtaskAddInput in `apps/web/src/components/subtasks/subtask-add-input.test.tsx`
 - [ ] Update todo item component to show subtask progress indicator (e.g., "2/5 done")
