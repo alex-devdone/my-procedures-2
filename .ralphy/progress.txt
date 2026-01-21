@@ -443,3 +443,32 @@
   - Display values: formatted offsets for various durations
   - Helper functions: calculateReminderDate, calculateOffsetMinutes, formatReminderOffset, formatReminderTime, findClosestOffset
   - DEFAULT_REMINDER_OFFSETS: offset labels and values
+
+- [✓] 2026-01-21 05:46 - Create RecurringPicker component (apps/web/src/components/scheduling/recurring-picker.tsx) with:
+  - Popover-based recurring pattern selector using @base-ui/react/popover
+  - Default presets: Daily, Weekly, Weekdays (Mon-Fri), Monthly, Yearly
+  - Custom presets support via presets prop
+  - Full custom pattern builder with pattern type selector dropdown
+  - Interval input (every N days/weeks/months/years)
+  - Day selector for weekly/custom patterns (Sun-Sat toggleable buttons)
+  - Day of month input for monthly patterns (1-31)
+  - Apply button to confirm custom pattern
+  - Selected preset highlighting with aria-pressed state
+  - Clearable value with separate clear button
+  - Helper functions: formatRecurringPattern, formatOrdinal, patternsEqual
+  - Accessible with proper aria-labels and keyboard navigation
+- [✓] 2026-01-21 05:46 - Add unit tests for RecurringPicker (119 tests) in apps/web/src/components/scheduling/recurring-picker.test.tsx covering:
+  - Rendering: trigger, placeholder, repeat icon, formatted pattern, clear button, className
+  - Disabled state: trigger disabled when disabled=true, hidden clear button
+  - Popover behavior: open/close, presets section, custom presets, custom builder section
+  - Preset selection: onChange callback, popover close, selected preset highlighting
+  - Pattern type selector: dropdown behavior, type switching, type-specific fields
+  - Interval input: default value, changing value, unit labels (singular/plural)
+  - Day selector (weekly/custom): showing/hiding, all 7 days, selected days highlighting, toggle behavior
+  - Day of month input (monthly): showing/hiding, entering value
+  - Apply button: onChange with custom pattern, popover close
+  - Clear functionality: clearing value, preventing popover open on clear
+  - Accessibility: trigger labels, clear button label, day buttons aria-pressed/aria-label, input labels
+  - Display values: formatted patterns for all types (daily, weekly, weekdays, weekends, monthly, yearly, custom)
+  - Helper functions: formatRecurringPattern, formatOrdinal, patternsEqual
+  - Constants: DEFAULT_RECURRING_PRESETS, PATTERN_TYPE_LABELS, DAY_LABELS, FULL_DAY_LABELS
