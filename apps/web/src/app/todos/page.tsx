@@ -12,7 +12,6 @@ import {
 	Plus,
 	Search,
 	Sparkles,
-	Trash2,
 	X,
 } from "lucide-react";
 import Link from "next/link";
@@ -30,7 +29,7 @@ import { useAllSubtasksProgress } from "@/app/api/subtask";
 import { FolderCreateDialog } from "@/components/folders/folder-create-dialog";
 import { FolderEditDialog } from "@/components/folders/folder-edit-dialog";
 import { FolderSidebar } from "@/components/folders/folder-sidebar";
-import { SubtaskProgressIndicator } from "@/components/subtasks";
+import { TodoExpandableItem } from "@/components/todos";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -447,74 +446,17 @@ export default function TodosPage() {
 									{filteredTodos.map((todo, index) => {
 										const todoFolder = getFolderForTodo(todo.folderId);
 										return (
-											<li
+											<TodoExpandableItem
 												key={todo.id}
-												className="group flex items-center gap-4 rounded-xl border border-border/50 bg-secondary/30 p-4 transition-all duration-200 hover:border-accent/30 hover:bg-secondary/50"
-												style={{
-													animationDelay: `${index * 0.03}s`,
-												}}
-												data-testid={`todo-item-${todo.id}`}
-											>
-												<button
-													type="button"
-													onClick={() =>
-														handleToggleTodo(todo.id, todo.completed)
-													}
-													className={cn(
-														"flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200",
-														todo.completed
-															? "border-accent bg-accent text-accent-foreground"
-															: "border-border hover:border-accent/50 hover:bg-accent/5",
-													)}
-													aria-label={
-														todo.completed
-															? "Mark as incomplete"
-															: "Mark as complete"
-													}
-												>
-													{todo.completed && (
-														<CheckCircle2 className="h-4 w-4" />
-													)}
-												</button>
-												<div className="flex flex-1 flex-col gap-1">
-													<span
-														className={cn(
-															"text-sm transition-all duration-200",
-															todo.completed
-																? "text-muted-foreground line-through"
-																: "text-foreground",
-														)}
-													>
-														{todo.text}
-													</span>
-													{/* Show folder badge and subtask progress */}
-													<div className="flex flex-wrap items-center gap-2">
-														{todoFolder && selectedFolderId === "inbox" && (
-															<span
-																className={cn(
-																	"inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-xs",
-																	folderColorBgClasses[todoFolder.color],
-																)}
-															>
-																<FolderIcon className="h-3 w-3" />
-																{todoFolder.name}
-															</span>
-														)}
-														<SubtaskProgressIndicator
-															progress={getProgress(todo.id)}
-														/>
-													</div>
-												</div>
-												<Button
-													variant="ghost"
-													size="icon"
-													onClick={() => handleDeleteTodo(todo.id)}
-													className="h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100"
-													aria-label="Delete task"
-												>
-													<Trash2 className="h-4 w-4 text-muted-foreground transition-colors hover:text-destructive" />
-												</Button>
-											</li>
+												todo={todo}
+												subtaskProgress={getProgress(todo.id)}
+												onToggle={handleToggleTodo}
+												onDelete={handleDeleteTodo}
+												folder={todoFolder}
+												showFolderBadge={selectedFolderId === "inbox"}
+												folderColorBgClasses={folderColorBgClasses}
+												animationDelay={`${index * 0.03}s`}
+											/>
 										);
 									})}
 								</ul>

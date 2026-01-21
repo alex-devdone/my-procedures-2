@@ -255,3 +255,27 @@
   - Display progress indicator on each todo item showing "X/Y" subtask completion
   - Created barrel export for subtasks components (apps/web/src/components/subtasks/index.ts)
   - Updated subtask.hooks.ts to notify all-subtasks listeners on local storage changes
+
+- [✓] 2026-01-21 03:20 - Create TodoExpandableItem component (apps/web/src/components/todos/todo-expandable-item.tsx) with:
+  - Expand/collapse toggle button with ChevronDown icon
+  - Subtask list and add input shown inline when expanded
+  - Auto-complete parent todo when all subtasks completed (onAllCompleted callback)
+  - Auto-uncomplete parent todo when subtask unchecked (onUncompleted callback)
+  - Folder badge display with color classes support
+  - Subtask progress indicator integration
+  - Accessible with aria-expanded and aria-label attributes
+  - Support for both local (string) and remote (numeric) todo IDs
+- [✓] 2026-01-21 03:20 - Add unit tests for TodoExpandableItem (41 tests) in apps/web/src/components/todos/todo-expandable-item.test.tsx covering:
+  - Rendering: todo text, data-testid, toggle/expand/delete buttons, className, animation delay
+  - Completed state: checked/unchecked styling, strikethrough text
+  - Toggle interaction: onToggle callback with id and completed state
+  - Delete interaction: onDelete callback with id
+  - Expand/collapse: default collapsed, expand on click, collapse on second click, aria-expanded
+  - Folder badge: conditional display based on showFolderBadge and folder props
+  - Subtask progress: conditional display based on subtaskProgress prop
+  - Adding subtasks: create callback when subtask added
+  - Auto-complete logic: callbacks passed to SubtaskList
+  - Accessibility: aria-labels for all buttons, list item element
+  - Edge cases: empty text, long text, special characters, unicode
+- [✓] 2026-01-21 03:20 - Create barrel export for todos components (apps/web/src/components/todos/index.ts)
+- [✓] 2026-01-21 03:20 - Update todos page to use TodoExpandableItem for inline subtask management
