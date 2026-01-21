@@ -472,3 +472,31 @@
   - Display values: formatted patterns for all types (daily, weekly, weekdays, weekends, monthly, yearly, custom)
   - Helper functions: formatRecurringPattern, formatOrdinal, patternsEqual
   - Constants: DEFAULT_RECURRING_PRESETS, PATTERN_TYPE_LABELS, DAY_LABELS, FULL_DAY_LABELS
+
+- [✓] 2026-01-21 06:00 - Create TodoSchedulePopover component (apps/web/src/components/scheduling/todo-schedule-popover.tsx) with:
+  - Popover-based combined scheduling selector using @base-ui/react/popover
+  - Integrates DatePicker, ReminderPicker, and RecurringPicker components
+  - ScheduleValue interface for unified schedule state (dueDate, reminderAt, recurringPattern)
+  - Section-based layout with Due date, Reminder, and Repeat sections
+  - Summary section showing current schedule configuration
+  - Clear all button to reset entire schedule
+  - Compact mode for icon-only trigger
+  - Auto-clears reminder when due date is cleared (since reminder is relative to due date)
+  - Reminder hint shown when no due date is set
+  - Custom presets support for all three pickers (datePresets, reminderOffsets, recurringPresets)
+  - Min/max date constraints passthrough to DatePicker
+  - Helper functions: formatScheduleValue, hasSchedule, emptyScheduleValue
+  - Accessible with proper aria-labels and keyboard navigation
+- [✓] 2026-01-21 06:00 - Add unit tests for TodoSchedulePopover (55 tests) in apps/web/src/components/scheduling/todo-schedule-popover.test.tsx covering:
+  - Rendering: trigger, placeholder, calendar icon, formatted schedule, clear button, className
+  - Combined display: due date only, recurring only, both combined with separator
+  - Compact mode: icon-only trigger, hidden clear button, aria-label preserved
+  - Disabled state: trigger disabled, hidden clear button
+  - Popover behavior: open/close, header, sections (due date, reminder, recurring), reminder hint
+  - Summary section: due date display, reminder display, recurring display
+  - Clear functionality: clear button, clear all button, no popover open on clear
+  - Due date changes: onChange callback, clears reminder when due date cleared
+  - Recurring pattern changes: onChange callback
+  - Accessibility: trigger labels, clear button label
+  - Helper functions: formatScheduleValue, hasSchedule, emptyScheduleValue
+  - Edge cases: reminder without due date, complex recurring patterns, weekdays pattern
