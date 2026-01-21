@@ -829,3 +829,24 @@
 - [✓] 2026-01-21 10:25 - Run all unit tests: 1694 tests passed (32 new ConnectionStatus tests added)
 - [✓] 2026-01-21 10:25 - Run linting check: passed (auto-formatted, 45 pre-existing warnings)
 
+- [✓] 2026-01-21 10:21 - Create use-folder-realtime.ts (apps/web/src/hooks/use-folder-realtime.ts) with:
+  - useFolderRealtime hook for subscribing to folder table changes by userId
+  - useFolderRealtimeWithAuth hook that integrates with useSession
+  - Event handlers for INSERT (add new folder to cache), UPDATE (update existing folder), DELETE (remove folder from cache)
+  - useEffect-based subscription lifecycle management with cleanup
+  - React Query cache integration for automatic updates
+  - Proper ref usage for subscription state tracking
+- [✓] 2026-01-21 10:21 - Add unit tests for useFolderRealtime (16 tests) in apps/web/src/hooks/use-folder-realtime.test.tsx:
+  - Initial state tests (isConfigured, isSubscribed, unsubscribe function)
+  - Subscription behavior tests (channel creation, no subscription when not configured, no subscription when no userId)
+  - Unsubscribe function tests
+  - INSERT/UPDATE/DELETE event handling tests
+  - React Query cache integration tests
+- [✓] 2026-01-21 10:21 - Update folder.hooks.ts (apps/web/src/app/api/folder/folder.hooks.ts) to integrate realtime:
+  - Added import for useFolderRealtimeWithAuth from @/hooks/use-folder-realtime
+  - Integrated useFolderRealtimeWithAuth() call in useFolderStorage hook
+  - Realtime sync now enabled automatically for authenticated users
+  - No additional configuration needed - works seamlessly with existing tRPC mutations
+- [✓] 2026-01-21 10:21 - Run all unit tests: 1710 tests passed (16 new realtime folder tests added)
+- [✓] 2026-01-21 10:21 - Run linting check: passed (auto-formatted new files, 49 pre-existing warnings)
+

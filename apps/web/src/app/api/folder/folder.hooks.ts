@@ -3,6 +3,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { notifyLocalTodosListeners } from "@/app/api/todo";
+import { useFolderRealtimeWithAuth } from "@/hooks/use-folder-realtime";
 import { useSession } from "@/lib/auth-client";
 import * as localFolderStorage from "@/lib/local-folder-storage";
 import * as localTodoStorage from "@/lib/local-todo-storage";
@@ -82,6 +83,9 @@ function getLocalFoldersServerSnapshot(): LocalFolder[] {
 export function useFolderStorage(): UseFolderStorageReturn {
 	const { data: session, isPending: isSessionPending } = useSession();
 	const isAuthenticated = !!session?.user;
+
+	// Integrate realtime sync for authenticated users
+	useFolderRealtimeWithAuth();
 
 	const localFolders = useSyncExternalStore(
 		subscribeToLocalFolders,
