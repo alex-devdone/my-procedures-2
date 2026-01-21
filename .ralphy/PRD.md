@@ -86,7 +86,7 @@ UI components for folder management. Can proceed after Phase 3.
   - [x] E2E: Create a new folder with name and color
   - [x] E2E: Edit folder name and color
   - [x] E2E: Delete folder (todos move to Inbox)
-  - [ ] E2E: Reorder folders via drag-and-drop (requires UI implementation)
+  - [x] E2E: Reorder folders via drag-and-drop
   - [x] E2E: Assign todo to folder
   - [x] E2E: Filter todos by folder
   - [x] E2E: Persist folders after page reload
@@ -248,7 +248,7 @@ Configure Supabase client and enable Realtime for automatic sync. Can proceed af
 - [x] Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` to `packages/env/` validation
 - [x] Create `apps/web/src/lib/supabase.ts` with Supabase client initialization
 - [x] Add unit tests for Supabase client setup in `apps/web/src/lib/supabase.test.ts`
-- [ ] Enable Realtime replication for `todo`, `folder`, and `subtask` tables in Supabase dashboard (document in README)
+- [x] Enable Realtime replication for `todo`, `folder`, and `subtask` tables in Supabase dashboard (document in README)
 - [x] Create `apps/web/src/hooks/use-supabase-realtime.ts` - generic hook for subscribing to table changes
 - [x] Add unit tests for useSupabaseRealtime in `apps/web/src/hooks/use-supabase-realtime.test.ts`
 

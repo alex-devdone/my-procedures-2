@@ -1059,6 +1059,47 @@
     - completeRecurring() to mark current todo complete and create next occurrence
     - Support for reminder offset preservation
     - Support for folder preservation
+    - Updated todo.hooks.ts toggle function to use completeRecurring for recurring todos in guest mode
+    - Created E2E tests (4 tests) in apps/web/e2e/scheduling.spec.ts covering:
+      - Complete daily recurring todo and verify next occurrence created with "Tomorrow" due date
+      - Complete weekly recurring todo and verify next occurrence created
+      - Non-recurring todo does not create next occurrence
+      - Folder and text preserved when creating next occurrence
+    - All 1859 unit tests pass
+    - All E2E tests pass (134 total including 4 new)
+    - Linting passes
+
+- [✓] 2026-01-21 13:20 - Phase 4: Implement drag-and-drop folder reordering UI:
+  - Added GripVertical icon import to folder-sidebar.tsx
+  - Added useState for drag-and-drop state tracking (draggedFolderId, dragOverFolderId)
+  - Implemented handleDragStart, handleDragOver, handleDragLeave, handleDrop, handleDragEnd callbacks
+  - Updated FolderSidebarProps to include onReorderFolders callback
+  - Updated FolderItem component with drag-and-drop props and handlers
+  - Added drag handle (GripVertical icon) display when isDraggable is true
+  - Added cursor-grab styling for draggable folders
+  - Added opacity-50 styling for dragging folder
+  - Added border-b-2 accent styling for drag-over target
+  - Reorder updates both UI and backend via reorder mutation
+  - Created unit tests (5 tests) in folder-sidebar.test.tsx covering:
+    - Shows drag handle when 2+ folders exist
+    - Does not show drag handle when only 1 folder exists
+    - Renders cursor-grab class when draggable
+    - Does not have cursor-grab class when not draggable
+    - Passes onReorderFolders callback prop
+  - Created E2E tests (4 tests) in folders.spec.ts covering:
+    - Shows drag handles when multiple folders exist
+    - Reorders folders via drag-and-drop
+    - Persists folder order after page reload
+    - Does not show draggable when only one folder exists
+  - All 1864 unit tests pass (72 folder-sidebar tests including 5 new drag-and-drop tests)
+  - All 138 E2E tests pass (29 folder tests including 4 new drag-and-drop tests)
+  - Linting passes
+  - Implemented completeRecurring function in local-todo-storage.ts with:
+    - isPatternExpired() to check if pattern has reached end conditions
+    - getNextOccurrence() to calculate next occurrence date for all pattern types (daily, weekly, monthly, yearly, custom)
+    - completeRecurring() to mark current todo complete and create next occurrence
+    - Support for reminder offset preservation
+    - Support for folder preservation
   - Updated todo.hooks.ts toggle function to use completeRecurring for recurring todos in guest mode
   - Created E2E tests (4 tests) in apps/web/e2e/scheduling.spec.ts covering:
     - Complete daily recurring todo and verify next occurrence created with "Tomorrow" due date
@@ -1068,4 +1109,15 @@
   - All 1859 unit tests pass
   - All E2E tests pass (134 total including 4 new)
   - Linting passes
+
+- [✓] 2026-01-21 16:00 - Phase 13: Document Supabase Realtime setup in README.md:
+  - Added Supabase credentials section to Database Setup with NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY
+  - Added Supabase Realtime Setup section with step-by-step instructions:
+    - Navigate to Database → Replication in Supabase dashboard
+    - Enable replication for todo, folder, and subtask tables
+    - Select INSERT, UPDATE, DELETE events
+    - Click Save
+  - Added explanation of hybrid architecture (tRPC for mutations, Realtime for cache updates)
+  - Updated PRD Phase 13 to mark Realtime replication documentation as complete
+  - All tasks in PRD are now complete
 
