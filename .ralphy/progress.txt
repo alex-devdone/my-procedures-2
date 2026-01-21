@@ -372,3 +372,15 @@
   - Updated todo.utils.ts: added recurringPattern field to createOptimisticTodo
   - Updated todo.utils.test.ts: added recurringPattern: null to all RemoteTodo test fixtures
   - Updated local-todo-storage.ts: added RecurringPattern interface, scheduling fields to LocalTodo, extended type guard, added updateSchedule function
+
+- [✓] 2026-01-21 04:58 - Update todo.api.ts with scheduling query options (apps/web/src/app/api/todo/todo.api.ts):
+  - Added getDueInRangeQueryOptions(input: GetDueInRangeInput) for fetching todos due within a date range
+  - Added getDueInRangeQueryKey(input: GetDueInRangeInput) for cache key generation
+  - Added getCompleteRecurringMutationOptions() for completing recurring todos
+  - Added import for GetDueInRangeInput type from todo.types.ts
+- [✓] 2026-01-21 04:58 - Create unit tests for todo.api.ts (26 tests) in apps/web/src/app/api/todo/todo.api.test.ts covering:
+  - Query options: getAllTodosQueryOptions, getTodosQueryKey, getDueInRangeQueryOptions, getDueInRangeQueryKey
+  - Mutation options: create, toggle, delete, bulkCreate, updateFolder, updateSchedule, completeRecurring
+  - Query key generation with date range parameters
+  - Module exports verification
+- [✓] 2026-01-21 04:58 - Fix todo.hooks.test.tsx mock to include getUpdateTodoScheduleMutationOptions

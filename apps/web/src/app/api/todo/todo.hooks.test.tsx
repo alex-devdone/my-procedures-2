@@ -55,6 +55,9 @@ vi.mock("./todo.api", () => ({
 	getUpdateTodoFolderMutationOptions: () => ({
 		mutationFn: vi.fn().mockResolvedValue({}),
 	}),
+	getUpdateTodoScheduleMutationOptions: () => ({
+		mutationFn: vi.fn().mockResolvedValue({}),
+	}),
 	getTodosQueryKey: () => ["todos"],
 }));
 

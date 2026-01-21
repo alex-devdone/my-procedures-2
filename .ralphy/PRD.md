@@ -165,7 +165,7 @@ Frontend API wrappers for scheduling. Can proceed after Phase 8.
 
 - [x] Update `apps/web/src/app/api/todo/todo.types.ts` with scheduling fields (dueDate, reminderAt, recurringPattern, folderId)
 - [x] Add unit tests for updated todo types in `apps/web/src/app/api/todo/todo.types.test.ts`
-- [ ] Update `apps/web/src/app/api/todo/todo.api.ts` with scheduling query options
+- [x] Update `apps/web/src/app/api/todo/todo.api.ts` with scheduling query options
 - [ ] Update `apps/web/src/app/api/todo/todo.hooks.ts` to handle scheduling in optimistic updates
 - [ ] Add unit tests for scheduling hooks in `apps/web/src/app/api/todo/todo.hooks.test.ts`
 - [ ] Update `apps/web/src/lib/local-todo-storage.ts` to store scheduling fields

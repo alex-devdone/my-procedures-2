@@ -1,4 +1,5 @@
 import { trpc } from "@/utils/trpc";
+import type { GetDueInRangeInput } from "./todo.types";
 
 // ============================================================================
 // Query Options
@@ -16,6 +17,20 @@ export function getAllTodosQueryOptions() {
  */
 export function getTodosQueryKey() {
 	return trpc.todo.getAll.queryKey();
+}
+
+/**
+ * Get query options for fetching todos due within a date range.
+ */
+export function getDueInRangeQueryOptions(input: GetDueInRangeInput) {
+	return trpc.todo.getDueInRange.queryOptions(input);
+}
+
+/**
+ * Get query key for todos due in range.
+ */
+export function getDueInRangeQueryKey(input: GetDueInRangeInput) {
+	return trpc.todo.getDueInRange.queryKey(input);
 }
 
 // ============================================================================
@@ -62,4 +77,12 @@ export function getUpdateTodoFolderMutationOptions() {
  */
 export function getUpdateTodoScheduleMutationOptions() {
 	return trpc.todo.updateSchedule.mutationOptions();
+}
+
+/**
+ * Get mutation options for completing a recurring todo.
+ * Marks the current occurrence as completed and creates the next occurrence if the pattern hasn't expired.
+ */
+export function getCompleteRecurringMutationOptions() {
+	return trpc.todo.completeRecurring.mutationOptions();
 }
