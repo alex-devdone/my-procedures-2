@@ -177,8 +177,8 @@ Frontend API wrappers for scheduling. Can proceed after Phase 8.
 
 UI for setting due dates, reminders, and recurring patterns. Can proceed after Phase 9.
 
-- [ ] Create `apps/web/src/components/scheduling/date-picker.tsx` - due date picker with presets (today, tomorrow, next week)
-- [ ] Add unit tests for DatePicker in `apps/web/src/components/scheduling/date-picker.test.tsx`
+- [x] Create `apps/web/src/components/scheduling/date-picker.tsx` - due date picker with presets (today, tomorrow, next week)
+- [x] Add unit tests for DatePicker in `apps/web/src/components/scheduling/date-picker.test.tsx`
 - [ ] Create `apps/web/src/components/scheduling/reminder-picker.tsx` - reminder time selector
 - [ ] Add unit tests for ReminderPicker in `apps/web/src/components/scheduling/reminder-picker.test.tsx`
 - [ ] Create `apps/web/src/components/scheduling/recurring-picker.tsx` - full cron-style recurring pattern selector

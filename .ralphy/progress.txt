@@ -399,3 +399,27 @@
   - Update Schedule (Guest Mode): dueDate, reminderAt, recurringPattern, multiple fields, clearing to null
   - Todos Include Scheduling Fields: from localStorage, normalize undefined to null, filteredTodos preserves fields
 - [✓] 2026-01-21 05:03 - Fix existing test "normalizes local todos to unified format" to include scheduling fields in expected output
+
+- [✓] 2026-01-21 05:25 - Create DatePicker component (apps/web/src/components/scheduling/date-picker.tsx) with:
+  - Popover-based calendar picker using @base-ui/react/popover
+  - Quick presets (Today, Tomorrow, Next week) with customizable presets support
+  - Full calendar grid with month navigation (previous/next month)
+  - Year boundary navigation support
+  - Selected date highlighting with aria-pressed state
+  - Today's date indicator with aria-current
+  - Min/max date constraints with disabled state
+  - Clearable value with separate clear button
+  - Accessible with proper aria-labels and keyboard navigation
+  - Helper functions exported: formatDate, isSameDay, getDaysInMonth, getFirstDayOfMonth
+- [✓] 2026-01-21 05:25 - Add unit tests for DatePicker (64 tests) in apps/web/src/components/scheduling/date-picker.test.tsx covering:
+  - Rendering: trigger, placeholder, calendar icon, formatted dates, clear button, className
+  - Disabled state: trigger disabled, hidden clear button
+  - Popover behavior: open/close, presets section, custom presets, calendar navigation, calendar grid
+  - Calendar navigation: previous/next month, year boundary crossing
+  - Date selection: onChange callback, popover close, selected date highlighting, today highlighting
+  - Preset selection: Today, Tomorrow, Next week presets with correct date calculation
+  - Clear functionality: clearing value, preventing popover open on clear
+  - Min/max constraints: disabling out-of-range dates, preventing onChange for disabled dates
+  - Accessibility: trigger labels, clear button label, navigation labels, calendar grid label
+  - Helper functions: formatDate, isSameDay, getDaysInMonth, getFirstDayOfMonth
+  - DEFAULT_DATE_PRESETS: preset labels and date calculations
