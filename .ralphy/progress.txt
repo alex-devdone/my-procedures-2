@@ -345,3 +345,30 @@
   - New todo creation data structure
   - Return value structure (completed, nextTodo, message)
   - Base date selection (use dueDate or current date)
+
+- [✓] 2026-01-21 04:45 - Update todo.types.ts with scheduling fields (apps/web/src/app/api/todo/todo.types.ts):
+  - Added RecurringPattern Zod schema and TypeScript type matching backend schema
+  - Added RECURRING_PATTERN_TYPES constant array with all pattern types (daily, weekly, monthly, yearly, custom)
+  - Updated Todo, RemoteTodo, and LocalTodo interfaces to include optional scheduling fields (dueDate, reminderAt, recurringPattern)
+  - Added scheduling fields to createTodoInputSchema (dueDate, reminderAt, recurringPattern with datetime validation)
+  - Added scheduling fields to bulkCreateTodosInputSchema for batch todo creation
+  - Created updateTodoScheduleInputSchema for updating scheduling fields on existing todos
+  - Created getDueInRangeInputSchema for querying todos by date range
+  - Created completeRecurringInputSchema for completing recurring todos with occurrence tracking
+  - Created local storage schemas: localCreateTodoInputSchema, localToggleTodoInputSchema, localDeleteTodoInputSchema, localUpdateTodoFolderInputSchema, localUpdateTodoScheduleInputSchema
+  - Added all new input types: UpdateTodoScheduleInput, GetDueInRangeInput, CompleteRecurringInput, and local variants
+  - Added CompleteRecurringOutput interface for recurring completion response
+  - Updated UseTodoStorageReturn interface to include updateSchedule function and scheduling parameter in create function
+- [✓] 2026-01-21 04:45 - Add unit tests for todo types (102 tests) in apps/web/src/app/api/todo/todo.types.test.ts covering:
+  - RecurringPattern schema validation (type, interval, daysOfWeek, dayOfMonth, monthOfYear, endDate, occurrences)
+  - RECURRING_PATTERN_TYPES constant validation
+  - Remote input schemas: createTodoInputSchema, toggleTodoInputSchema, deleteTodoInputSchema, bulkCreateTodosInputSchema, updateTodoFolderInputSchema, updateTodoScheduleInputSchema, getDueInRangeInputSchema, completeRecurringInputSchema
+  - Local input schemas: localCreateTodoInputSchema, localToggleTodoInputSchema, localDeleteTodoInputSchema, localUpdateTodoFolderInputSchema, localUpdateTodoScheduleInputSchema
+  - Datetime validation for scheduling fields
+  - Boundary validation (dayOfMonth 1-31, monthOfYear 1-12, daysOfWeek 0-6)
+- [✓] 2026-01-21 04:45 - Updated related files to support new scheduling types:
+  - Updated todo.api.ts: added getUpdateTodoScheduleMutationOptions function
+  - Updated todo.hooks.ts: added RecurringPattern import, scheduling fields to optimistic create, updateScheduleMutation with optimistic updates, updateSchedule callback function
+  - Updated todo.utils.ts: added recurringPattern field to createOptimisticTodo
+  - Updated todo.utils.test.ts: added recurringPattern: null to all RemoteTodo test fixtures
+  - Updated local-todo-storage.ts: added RecurringPattern interface, scheduling fields to LocalTodo, extended type guard, added updateSchedule function

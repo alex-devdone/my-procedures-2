@@ -172,6 +172,7 @@ describe("Todo Normalization", () => {
 				folderId: null,
 				dueDate: null,
 				reminderAt: null,
+				recurringPattern: null,
 			};
 
 			const result = normalizeRemoteTodo(remoteTodo);
@@ -196,6 +197,7 @@ describe("Todo Normalization", () => {
 					folderId: null,
 					dueDate: null,
 					reminderAt: null,
+					recurringPattern: null,
 				},
 				{
 					id: 2,
@@ -205,6 +207,7 @@ describe("Todo Normalization", () => {
 					folderId: null,
 					dueDate: null,
 					reminderAt: null,
+					recurringPattern: null,
 				},
 			];
 
@@ -293,6 +296,7 @@ describe("Optimistic Update Helpers", () => {
 			folderId: null,
 			dueDate: null,
 			reminderAt: null,
+			recurringPattern: null,
 		},
 		{
 			id: 2,
@@ -302,6 +306,7 @@ describe("Optimistic Update Helpers", () => {
 			folderId: null,
 			dueDate: null,
 			reminderAt: null,
+			recurringPattern: null,
 		},
 	];
 
@@ -326,6 +331,7 @@ describe("Optimistic Update Helpers", () => {
 				folderId: null,
 				dueDate: null,
 				reminderAt: null,
+				recurringPattern: null,
 			};
 
 			const result = applyOptimisticCreate(baseTodos, newTodo);
@@ -343,6 +349,7 @@ describe("Optimistic Update Helpers", () => {
 				folderId: null,
 				dueDate: null,
 				reminderAt: null,
+				recurringPattern: null,
 			};
 
 			applyOptimisticCreate(baseTodos, newTodo);

@@ -21,9 +21,11 @@ import {
 	getTodosQueryKey,
 	getToggleTodoMutationOptions,
 	getUpdateTodoFolderMutationOptions,
+	getUpdateTodoScheduleMutationOptions,
 } from "./todo.api";
 import type {
 	LocalTodo,
+	RecurringPattern,
 	RemoteTodo,
 	SelectedFolderId,
 	SyncAction,
@@ -114,7 +116,13 @@ export function useTodoStorage(): UseTodoStorageReturn {
 	// Create mutation with optimistic updates
 	const createMutation = useMutation({
 		mutationFn: getCreateTodoMutationOptions().mutationFn,
-		onMutate: async (newTodo: { text: string; folderId?: number | null }) => {
+		onMutate: async (newTodo: {
+			text: string;
+			folderId?: number | null;
+			dueDate?: string | null;
+			reminderAt?: string | null;
+			recurringPattern?: RecurringPattern | null;
+		}) => {
 			await queryClient.cancelQueries({ queryKey });
 
 			const previousTodos = queryClient.getQueryData<RemoteTodo[]>(queryKey);
@@ -127,6 +135,9 @@ export function useTodoStorage(): UseTodoStorageReturn {
 					completed: false,
 					userId: session?.user?.id ?? "",
 					folderId: newTodo.folderId ?? null,
+					dueDate: newTodo.dueDate ?? null,
+					reminderAt: newTodo.reminderAt ?? null,
+					recurringPattern: newTodo.recurringPattern ?? null,
 				},
 			]);
 
@@ -220,6 +231,49 @@ export function useTodoStorage(): UseTodoStorageReturn {
 		},
 	});
 
+	// Update schedule mutation with optimistic updates
+	const updateScheduleMutation = useMutation({
+		mutationFn: getUpdateTodoScheduleMutationOptions().mutationFn,
+		onMutate: async ({
+			id,
+			dueDate,
+			reminderAt,
+			recurringPattern,
+		}: {
+			id: number;
+			dueDate?: string | null;
+			reminderAt?: string | null;
+			recurringPattern?: RecurringPattern | null;
+		}) => {
+			await queryClient.cancelQueries({ queryKey });
+
+			const previousTodos = queryClient.getQueryData<RemoteTodo[]>(queryKey);
+
+			queryClient.setQueryData<RemoteTodo[]>(queryKey, (old) =>
+				old?.map((todo) =>
+					todo.id === id
+						? {
+								...todo,
+								...(dueDate !== undefined && { dueDate }),
+								...(reminderAt !== undefined && { reminderAt }),
+								...(recurringPattern !== undefined && { recurringPattern }),
+							}
+						: todo,
+				),
+			);
+
+			return { previousTodos };
+		},
+		onError: (_err, _variables, context) => {
+			if (context?.previousTodos) {
+				queryClient.setQueryData(queryKey, context.previousTodos);
+			}
+		},
+		onSettled: () => {
+			refetchRemoteTodos();
+		},
+	});
+
 	const create = useCallback(
 		async (text: string, folderId?: number | string | null) => {
 			// Convert folderId to appropriate type for storage
@@ -289,6 +343,28 @@ export function useTodoStorage(): UseTodoStorageReturn {
 		[isAuthenticated, updateFolderMutation],
 	);
 
+	const updateSchedule = useCallback(
+		async (
+			id: number | string,
+			scheduling: {
+				dueDate?: string | null;
+				reminderAt?: string | null;
+				recurringPattern?: RecurringPattern | null;
+			},
+		) => {
+			if (isAuthenticated) {
+				await updateScheduleMutation.mutateAsync({
+					id: id as number,
+					...scheduling,
+				});
+			} else {
+				localTodoStorage.updateSchedule(id as string, scheduling);
+				notifyLocalTodosListeners();
+			}
+		},
+		[isAuthenticated, updateScheduleMutation],
+	);
+
 	const todos: Todo[] = useMemo(() => {
 		if (isAuthenticated) {
 			return (remoteTodos ?? []).map((t) => ({
@@ -329,6 +405,7 @@ export function useTodoStorage(): UseTodoStorageReturn {
 		toggle,
 		deleteTodo,
 		updateFolder,
+		updateSchedule,
 		isLoading,
 		isAuthenticated,
 		selectedFolderId,

@@ -2,11 +2,24 @@ import * as localSubtaskStorage from "./local-subtask-storage";
 
 const STORAGE_KEY = "todos";
 
+export interface RecurringPattern {
+	type: "daily" | "weekly" | "monthly" | "yearly" | "custom";
+	interval?: number;
+	daysOfWeek?: number[];
+	dayOfMonth?: number;
+	monthOfYear?: number;
+	endDate?: string;
+	occurrences?: number;
+}
+
 export interface LocalTodo {
 	id: string;
 	text: string;
 	completed: boolean;
 	folderId?: string | null;
+	dueDate?: string | null;
+	reminderAt?: string | null;
+	recurringPattern?: RecurringPattern | null;
 }
 
 function isLocalTodoArray(data: unknown): data is LocalTodo[] {
@@ -20,7 +33,16 @@ function isLocalTodoArray(data: unknown): data is LocalTodo[] {
 			typeof item.completed === "boolean" &&
 			(item.folderId === undefined ||
 				item.folderId === null ||
-				typeof item.folderId === "string"),
+				typeof item.folderId === "string") &&
+			(item.dueDate === undefined ||
+				item.dueDate === null ||
+				typeof item.dueDate === "string") &&
+			(item.reminderAt === undefined ||
+				item.reminderAt === null ||
+				typeof item.reminderAt === "string") &&
+			(item.recurringPattern === undefined ||
+				item.recurringPattern === null ||
+				typeof item.recurringPattern === "object"),
 	);
 }
 
@@ -87,6 +109,32 @@ export function updateFolder(
 	if (!todo) return null;
 
 	todo.folderId = folderId;
+	localStorage.setItem(STORAGE_KEY, JSON.stringify(todos));
+	return todo;
+}
+
+export function updateSchedule(
+	id: string,
+	scheduling: {
+		dueDate?: string | null;
+		reminderAt?: string | null;
+		recurringPattern?: RecurringPattern | null;
+	},
+): LocalTodo | null {
+	const todos = getAll();
+	const todo = todos.find((t) => t.id === id);
+	if (!todo) return null;
+
+	if (scheduling.dueDate !== undefined) {
+		todo.dueDate = scheduling.dueDate;
+	}
+	if (scheduling.reminderAt !== undefined) {
+		todo.reminderAt = scheduling.reminderAt;
+	}
+	if (scheduling.recurringPattern !== undefined) {
+		todo.recurringPattern = scheduling.recurringPattern;
+	}
+
 	localStorage.setItem(STORAGE_KEY, JSON.stringify(todos));
 	return todo;
 }

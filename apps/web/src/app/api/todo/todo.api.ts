@@ -56,3 +56,10 @@ export function getBulkCreateTodosMutationOptions() {
 export function getUpdateTodoFolderMutationOptions() {
 	return trpc.todo.updateFolder.mutationOptions();
 }
+
+/**
+ * Get mutation options for updating a todo's schedule (dueDate, reminderAt, recurringPattern).
+ */
+export function getUpdateTodoScheduleMutationOptions() {
+	return trpc.todo.updateSchedule.mutationOptions();
+}
