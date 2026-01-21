@@ -8,7 +8,7 @@ export const env = createEnv({
 		DIRECT_URL: z.string().min(1).optional(),
 		BETTER_AUTH_SECRET: z.string().min(32),
 		BETTER_AUTH_URL: z.url(),
-		CORS_ORIGIN: z.url(),
+		CORS_ORIGIN: z.string().min(1),
 		SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
 		NODE_ENV: z
 			.enum(["development", "production", "test"])
