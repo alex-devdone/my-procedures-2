@@ -533,4 +533,139 @@ describe("local-todo-storage", () => {
 			);
 		});
 	});
+
+	describe("notifyAt field persistence", () => {
+		it("creates a todo with notifyAt in recurringPattern", () => {
+			const result = localTodoStorage.create("Daily reminder", null, {
+				dueDate: "2024-01-15T09:00:00.000Z",
+				recurringPattern: {
+					type: "daily",
+					interval: 1,
+					notifyAt: "09:00",
+				},
+			});
+
+			expect(result.recurringPattern).toBeDefined();
+			expect(result.recurringPattern?.notifyAt).toBe("09:00");
+		});
+
+		it("persists notifyAt to localStorage when creating a todo", () => {
+			localTodoStorage.create("Daily reminder", null, {
+				dueDate: "2024-01-15T09:00:00.000Z",
+				recurringPattern: {
+					type: "daily",
+					interval: 1,
+					notifyAt: "14:30",
+				},
+			});
+
+			const stored = JSON.parse(localStorageMock._store[STORAGE_KEY]);
+			expect(stored).toHaveLength(1);
+			expect(stored[0].recurringPattern.notifyAt).toBe("14:30");
+		});
+
+		it("retrieves notifyAt from localStorage via getAll", () => {
+			const todos = [
+				{
+					id: "todo-1",
+					text: "Daily task",
+					completed: false,
+					folderId: null,
+					dueDate: "2024-01-15T09:00:00.000Z",
+					recurringPattern: {
+						type: "daily",
+						interval: 1,
+						notifyAt: "08:00",
+					},
+				},
+			];
+			localStorageMock.setItem(STORAGE_KEY, JSON.stringify(todos));
+
+			const result = localTodoStorage.getAll();
+
+			expect(result).toHaveLength(1);
+			expect(result[0].recurringPattern?.notifyAt).toBe("08:00");
+		});
+
+		it("preserves notifyAt when updating schedule", () => {
+			const todos = [
+				{
+					id: "todo-1",
+					text: "Daily task",
+					completed: false,
+					folderId: null,
+					dueDate: "2024-01-15T09:00:00.000Z",
+					recurringPattern: {
+						type: "daily",
+						interval: 1,
+						notifyAt: "09:00",
+					},
+				},
+			];
+			localStorageMock.setItem(STORAGE_KEY, JSON.stringify(todos));
+
+			// Update dueDate but keep the same recurringPattern
+			localTodoStorage.updateSchedule("todo-1", {
+				dueDate: "2024-01-16T09:00:00.000Z",
+			});
+
+			const stored = JSON.parse(localStorageMock._store[STORAGE_KEY]);
+			expect(stored[0].recurringPattern.notifyAt).toBe("09:00");
+		});
+
+		it("updates notifyAt when updating recurringPattern", () => {
+			const todos = [
+				{
+					id: "todo-1",
+					text: "Daily task",
+					completed: false,
+					folderId: null,
+					dueDate: "2024-01-15T09:00:00.000Z",
+					recurringPattern: {
+						type: "daily",
+						interval: 1,
+						notifyAt: "09:00",
+					},
+				},
+			];
+			localStorageMock.setItem(STORAGE_KEY, JSON.stringify(todos));
+
+			localTodoStorage.updateSchedule("todo-1", {
+				recurringPattern: {
+					type: "weekly",
+					interval: 1,
+					daysOfWeek: [1, 3, 5],
+					notifyAt: "10:30",
+				},
+			});
+
+			const stored = JSON.parse(localStorageMock._store[STORAGE_KEY]);
+			expect(stored[0].recurringPattern.type).toBe("weekly");
+			expect(stored[0].recurringPattern.notifyAt).toBe("10:30");
+		});
+
+		it("preserves notifyAt through completeRecurring", () => {
+			const todos = [
+				{
+					id: "todo-1",
+					text: "Daily task",
+					completed: false,
+					folderId: null,
+					dueDate: "2024-01-15T09:00:00.000Z",
+					recurringPattern: {
+						type: "daily",
+						interval: 1,
+						notifyAt: "09:00",
+					},
+				},
+			];
+			localStorageMock.setItem(STORAGE_KEY, JSON.stringify(todos));
+
+			const result = localTodoStorage.completeRecurring("todo-1");
+
+			expect(result.completed).toBe(true);
+			expect(result.nextTodo).not.toBeNull();
+			expect(result.nextTodo?.recurringPattern?.notifyAt).toBe("09:00");
+		});
+	});
 });
