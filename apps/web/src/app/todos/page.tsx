@@ -26,9 +26,11 @@ import type {
 	UpdateFolderInput,
 } from "@/app/api/folder";
 import { useFolderStorage } from "@/app/api/folder";
+import { useAllSubtasksProgress } from "@/app/api/subtask";
 import { FolderCreateDialog } from "@/components/folders/folder-create-dialog";
 import { FolderEditDialog } from "@/components/folders/folder-edit-dialog";
 import { FolderSidebar } from "@/components/folders/folder-sidebar";
+import { SubtaskProgressIndicator } from "@/components/subtasks";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -112,6 +114,8 @@ export default function TodosPage() {
 		update: updateFolderData,
 		deleteFolder,
 	} = useFolderStorage();
+
+	const { getProgress } = useAllSubtasksProgress();
 
 	const [isCreating, setIsCreating] = useState(false);
 
@@ -483,18 +487,23 @@ export default function TodosPage() {
 													>
 														{todo.text}
 													</span>
-													{/* Show folder badge when viewing inbox and todo has a folder (shouldn't happen but for future) */}
-													{todoFolder && selectedFolderId === "inbox" && (
-														<span
-															className={cn(
-																"inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-xs",
-																folderColorBgClasses[todoFolder.color],
-															)}
-														>
-															<FolderIcon className="h-3 w-3" />
-															{todoFolder.name}
-														</span>
-													)}
+													{/* Show folder badge and subtask progress */}
+													<div className="flex flex-wrap items-center gap-2">
+														{todoFolder && selectedFolderId === "inbox" && (
+															<span
+																className={cn(
+																	"inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-xs",
+																	folderColorBgClasses[todoFolder.color],
+																)}
+															>
+																<FolderIcon className="h-3 w-3" />
+																{todoFolder.name}
+															</span>
+														)}
+														<SubtaskProgressIndicator
+															progress={getProgress(todo.id)}
+														/>
+													</div>
 												</div>
 												<Button
 													variant="ghost"

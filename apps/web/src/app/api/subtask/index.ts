@@ -50,3 +50,8 @@ export {
 	toggleSubtaskInputSchema,
 	updateSubtaskInputSchema,
 } from "./subtask.types";
+export type { UseAllSubtasksProgressReturn } from "./subtask-progress.hooks";
+export {
+	notifyAllSubtasksListeners,
+	useAllSubtasksProgress,
+} from "./subtask-progress.hooks";

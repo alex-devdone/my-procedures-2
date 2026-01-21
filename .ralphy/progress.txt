@@ -227,3 +227,31 @@
   - AutoFocus: default off, enabled when prop is true
   - Accessibility: input label, button label, keyboard navigation
   - Edge cases: long text, special characters, unicode, rapid submissions
+
+- [✓] 2026-01-21 03:02 - Create SubtaskProgressIndicator component (apps/web/src/components/subtasks/subtask-progress-indicator.tsx) with:
+  - Display of completed/total subtask count (e.g., "2/5")
+  - CheckSquare icon with optional display
+  - Green styling when all subtasks completed, muted otherwise
+  - Two size variants (sm, md) for different contexts
+  - Uses semantic <output> element for accessibility
+  - Proper aria-label describing progress
+  - Returns null when no subtasks exist (total === 0)
+- [✓] 2026-01-21 03:02 - Add unit tests for SubtaskProgressIndicator (26 tests) in apps/web/src/components/subtasks/subtask-progress-indicator.test.tsx covering:
+  - Rendering: progress text, data-testid, icon visibility, className
+  - Empty state: returns null when total is 0
+  - Completion styling: green when all completed, muted otherwise
+  - Size variants: sm (text-xs, h-3 icon), md (text-sm, h-4 icon)
+  - Accessibility: aria-label, aria-hidden on icon
+  - Progress values: various counts including edge cases
+  - Icon styling: color based on completion state
+- [✓] 2026-01-21 03:02 - Add getAllGroupedByTodoId function to local-subtask-storage.ts for efficient subtask progress tracking across multiple todos
+- [✓] 2026-01-21 03:02 - Create useAllSubtasksProgress hook (apps/web/src/app/api/subtask/subtask-progress.hooks.ts) with:
+  - useSyncExternalStore pattern for reactive localStorage updates
+  - Map<string, SubtaskProgress> for efficient lookup by todoId
+  - getProgress(todoId) helper function
+  - Notifies listeners when subtasks change via notifyAllSubtasksListeners
+- [✓] 2026-01-21 03:02 - Integrate SubtaskProgressIndicator into todos page:
+  - Added useAllSubtasksProgress hook to get progress for all todos
+  - Display progress indicator on each todo item showing "X/Y" subtask completion
+  - Created barrel export for subtasks components (apps/web/src/components/subtasks/index.ts)
+  - Updated subtask.hooks.ts to notify all-subtasks listeners on local storage changes

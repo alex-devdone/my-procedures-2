@@ -21,6 +21,7 @@ import type {
 	Subtask,
 	UseSubtaskStorageReturn,
 } from "./subtask.types";
+import { notifyAllSubtasksListeners } from "./subtask-progress.hooks";
 
 // ============================================================================
 // Local Storage Sync (for useSyncExternalStore)
@@ -57,6 +58,8 @@ export function notifyLocalSubtasksListeners(todoId: string) {
 	for (const listener of listeners) {
 		listener();
 	}
+	// Also notify the global listeners for subtask progress tracking
+	notifyAllSubtasksListeners();
 }
 
 function getLocalSubtasksSnapshot(todoId: string) {

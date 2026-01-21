@@ -131,8 +131,8 @@ UI components for subtask management. Can proceed after Phase 6.
 - [x] Add unit tests for SubtaskItem in `apps/web/src/components/subtasks/subtask-item.test.tsx`
 - [x] Create `apps/web/src/components/subtasks/subtask-add-input.tsx` - inline input for adding subtasks
 - [x] Add unit tests for SubtaskAddInput in `apps/web/src/components/subtasks/subtask-add-input.test.tsx`
-- [ ] Update todo item component to show subtask progress indicator (e.g., "2/5 done")
-- [ ] Add unit tests for subtask progress display
+- [x] Update todo item component to show subtask progress indicator (e.g., "2/5 done")
+- [x] Add unit tests for subtask progress display
 - [ ] Create expandable todo detail view that shows subtasks inline
 - [ ] Create E2E tests for subtask CRUD in localStorage mode at `apps/web/e2e/subtasks.spec.ts`:
   - [ ] E2E: Add subtasks to a todo

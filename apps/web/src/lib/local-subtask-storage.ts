@@ -54,6 +54,34 @@ export function getAll(todoId: string): LocalSubtask[] {
 }
 
 /**
+ * Get all subtasks grouped by todoId.
+ * Useful for efficiently displaying subtask progress across multiple todos.
+ */
+export function getAllGroupedByTodoId(): Map<string, LocalSubtask[]> {
+	const allSubtasks = getAllSubtasks();
+	const grouped = new Map<string, LocalSubtask[]>();
+
+	for (const subtask of allSubtasks) {
+		const existing = grouped.get(subtask.todoId);
+		if (existing) {
+			existing.push(subtask);
+		} else {
+			grouped.set(subtask.todoId, [subtask]);
+		}
+	}
+
+	// Sort each group by order
+	for (const [todoId, subtasks] of grouped) {
+		grouped.set(
+			todoId,
+			subtasks.sort((a, b) => a.order - b.order),
+		);
+	}
+
+	return grouped;
+}
+
+/**
  * Create a new subtask for a todo.
  */
 export function create(todoId: string, text: string): LocalSubtask {
