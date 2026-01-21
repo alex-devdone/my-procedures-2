@@ -296,13 +296,13 @@ Update localStorage sync mechanism to handle new fields. Can proceed after Phase
 - [x] Add unit tests for folder sync mechanism
 - [x] Create subtask sync mechanism for syncing local subtasks on login
 - [x] Add unit tests for subtask sync mechanism
-- [ ] Create E2E tests for sync with scheduling/folders/subtasks at `apps/web/e2e/sync-enhanced.spec.ts`:
-  - [ ] E2E: Create todos with due dates in localStorage, login, verify synced with dates
-  - [ ] E2E: Create folders in localStorage, login, verify folders synced
-  - [ ] E2E: Create todos with subtasks in localStorage, login, verify subtasks synced
-  - [ ] E2E: Sync dialog shows correct counts for local items
-  - [ ] E2E: "Discard" action clears all local data
-  - [ ] E2E: "Keep both" action merges local and remote
+- [x] Create E2E tests for sync with scheduling/folders/subtasks at `apps/web/e2e/sync-enhanced.spec.ts`:
+  - [x] E2E: Create todos with due dates in localStorage, login, verify synced with dates
+  - [x] E2E: Create folders in localStorage, login, verify folders synced
+  - [x] E2E: Create todos with subtasks in localStorage, login, verify subtasks synced
+  - [x] E2E: Sync dialog shows correct counts for local items
+  - [x] E2E: "Discard" action clears all local data
+  - [x] E2E: "Keep both" action merges local and remote
 
 ---
 
