@@ -423,3 +423,23 @@
   - Accessibility: trigger labels, clear button label, navigation labels, calendar grid label
   - Helper functions: formatDate, isSameDay, getDaysInMonth, getFirstDayOfMonth
   - DEFAULT_DATE_PRESETS: preset labels and date calculations
+
+- [✓] 2026-01-21 05:30 - Create ReminderPicker component (apps/web/src/components/scheduling/reminder-picker.tsx) with:
+  - Popover-based reminder offset selector using @base-ui/react/popover
+  - Default offsets: At time, 15 min before, 30 min before, 1 hour before, 2 hours before, 1 day before
+  - Custom offsets support via offsets prop
+  - Disabled when no due date is set (requires due date to calculate reminder)
+  - Selected offset highlighting with aria-pressed state
+  - Clearable value with separate clear button
+  - Helper functions: calculateReminderDate, calculateOffsetMinutes, formatReminderOffset, formatReminderTime, findClosestOffset
+  - Accessible with proper aria-labels and keyboard navigation
+- [✓] 2026-01-21 05:30 - Add unit tests for ReminderPicker (73 tests) in apps/web/src/components/scheduling/reminder-picker.test.tsx covering:
+  - Rendering: trigger, placeholder, bell icon, formatted reminder, clear button, className
+  - Disabled state: trigger disabled when disabled=true, trigger disabled when no due date
+  - Popover behavior: open/close, offset options, custom offsets, no due date message, no offsets message
+  - Offset selection: onChange callback, popover close, selected offset highlighting
+  - Clear functionality: clearing value, preventing popover open on clear
+  - Accessibility: trigger labels, clear button label, offset aria-pressed, hidden icons
+  - Display values: formatted offsets for various durations
+  - Helper functions: calculateReminderDate, calculateOffsetMinutes, formatReminderOffset, formatReminderTime, findClosestOffset
+  - DEFAULT_REMINDER_OFFSETS: offset labels and values
