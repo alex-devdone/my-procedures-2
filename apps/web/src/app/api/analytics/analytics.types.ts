@@ -20,6 +20,15 @@ export const getCompletionHistoryInputSchema = z.object({
 	endDate: z.string().datetime(),
 });
 
+/**
+ * Schema for updating past completion status
+ */
+export const updatePastCompletionInputSchema = z.object({
+	todoId: z.number(),
+	scheduledDate: z.string().datetime(),
+	completed: z.boolean(),
+});
+
 // ============================================================================
 // Input Types (inferred from Zod schemas)
 // ============================================================================
@@ -27,6 +36,9 @@ export const getCompletionHistoryInputSchema = z.object({
 export type GetAnalyticsInput = z.infer<typeof getAnalyticsInputSchema>;
 export type GetCompletionHistoryInput = z.infer<
 	typeof getCompletionHistoryInputSchema
+>;
+export type UpdatePastCompletionInput = z.infer<
+	typeof updatePastCompletionInputSchema
 >;
 
 // ============================================================================
