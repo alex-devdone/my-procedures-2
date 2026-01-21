@@ -146,3 +146,10 @@
   - TodoId filtering
   - Error handling for non-existent subtasks
   - External store pattern stability
+
+- [✓] 2026-01-21 01:48 - Create subtask barrel export (apps/web/src/app/api/subtask/index.ts) with:
+  - API exports: query options and mutation options for subtask CRUD operations
+  - Hook exports: useSubtaskStorage and notifyLocalSubtasksListeners
+  - Type exports: all subtask types (Subtask, RemoteSubtask, LocalSubtask, etc.)
+  - Schema exports: all Zod validation schemas for remote and local operations
+  - Helper exports: calculateSubtaskProgress and areAllSubtasksCompleted utilities
