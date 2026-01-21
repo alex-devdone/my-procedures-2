@@ -1117,6 +1117,269 @@ describe("RecurringPicker", () => {
 				notifyAt: "09:00",
 			});
 		});
+
+		it("allows typing time directly into input", async () => {
+			const onChange = vi.fn();
+			const user = userEvent.setup();
+			render(<RecurringPicker {...defaultProps} onChange={onChange} />);
+
+			await user.click(screen.getByTestId("recurring-picker-trigger"));
+
+			await waitFor(() => {
+				expect(screen.getByTestId("time-picker-input")).toBeInTheDocument();
+			});
+
+			const input = screen.getByTestId("time-picker-input");
+			await user.type(input, "14:30");
+
+			// Click Apply
+			await user.click(screen.getByTestId("recurring-picker-apply"));
+
+			expect(onChange).toHaveBeenCalledWith({
+				type: "daily",
+				notifyAt: "14:30",
+			});
+		});
+
+		it("selects evening preset correctly", async () => {
+			const onChange = vi.fn();
+			const user = userEvent.setup();
+			render(<RecurringPicker {...defaultProps} onChange={onChange} />);
+
+			await user.click(screen.getByTestId("recurring-picker-trigger"));
+
+			await waitFor(() => {
+				expect(
+					screen.getByTestId("time-picker-preset-evening"),
+				).toBeInTheDocument();
+			});
+
+			// Click evening preset (18:00)
+			await user.click(screen.getByTestId("time-picker-preset-evening"));
+
+			// Click Apply
+			await user.click(screen.getByTestId("recurring-picker-apply"));
+
+			expect(onChange).toHaveBeenCalledWith({
+				type: "daily",
+				notifyAt: "18:00",
+			});
+		});
+
+		it("preserves notifyAt when changing interval", async () => {
+			const onChange = vi.fn();
+			const user = userEvent.setup();
+			render(
+				<RecurringPicker
+					{...defaultProps}
+					value={{ type: "daily", notifyAt: "09:00" }}
+					onChange={onChange}
+				/>,
+			);
+
+			await user.click(screen.getByTestId("recurring-picker-trigger"));
+
+			await waitFor(() => {
+				expect(
+					screen.getByTestId("recurring-picker-interval-input"),
+				).toBeInTheDocument();
+			});
+
+			// Change interval to 2
+			const input = screen.getByTestId("recurring-picker-interval-input");
+			await user.click(input);
+			await user.keyboard("{Control>}a{/Control}");
+			await user.keyboard("2");
+
+			// Click Apply
+			await user.click(screen.getByTestId("recurring-picker-apply"));
+
+			// notifyAt and interval should both be set
+			expect(onChange).toHaveBeenCalledWith({
+				type: "daily",
+				interval: 2,
+				notifyAt: "09:00",
+			});
+		});
+
+		it("preserves notifyAt when selecting days of week", async () => {
+			const onChange = vi.fn();
+			const user = userEvent.setup();
+			render(
+				<RecurringPicker
+					{...defaultProps}
+					value={{ type: "weekly", notifyAt: "10:00" }}
+					onChange={onChange}
+				/>,
+			);
+
+			await user.click(screen.getByTestId("recurring-picker-trigger"));
+
+			await waitFor(() => {
+				expect(
+					screen.getByTestId("recurring-picker-day-selector"),
+				).toBeInTheDocument();
+			});
+
+			// Select Monday (day 1)
+			await user.click(screen.getByTestId("recurring-picker-day-1"));
+
+			// Click Apply
+			await user.click(screen.getByTestId("recurring-picker-apply"));
+
+			expect(onChange).toHaveBeenCalledWith({
+				type: "weekly",
+				daysOfWeek: [1],
+				notifyAt: "10:00",
+			});
+		});
+
+		it("preserves notifyAt when setting day of month", async () => {
+			const onChange = vi.fn();
+			const user = userEvent.setup();
+			render(
+				<RecurringPicker
+					{...defaultProps}
+					value={{ type: "monthly", notifyAt: "08:00" }}
+					onChange={onChange}
+				/>,
+			);
+
+			await user.click(screen.getByTestId("recurring-picker-trigger"));
+
+			await waitFor(() => {
+				expect(
+					screen.getByTestId("recurring-picker-day-of-month-input"),
+				).toBeInTheDocument();
+			});
+
+			// Set day of month to 15
+			const input = screen.getByTestId("recurring-picker-day-of-month-input");
+			await user.type(input, "15");
+
+			// Click Apply
+			await user.click(screen.getByTestId("recurring-picker-apply"));
+
+			expect(onChange).toHaveBeenCalledWith({
+				type: "monthly",
+				dayOfMonth: 15,
+				notifyAt: "08:00",
+			});
+		});
+
+		it("shows clear button only when time is set", async () => {
+			const user = userEvent.setup();
+			render(<RecurringPicker {...defaultProps} />);
+
+			await user.click(screen.getByTestId("recurring-picker-trigger"));
+
+			await waitFor(() => {
+				expect(screen.getByTestId("time-picker-input")).toBeInTheDocument();
+			});
+
+			// Clear button should not be visible initially
+			expect(screen.queryByTestId("time-picker-clear")).not.toBeInTheDocument();
+
+			// Set a time via preset
+			await user.click(screen.getByTestId("time-picker-preset-morning"));
+
+			// Clear button should now be visible
+			await waitFor(() => {
+				expect(screen.getByTestId("time-picker-clear")).toBeInTheDocument();
+			});
+		});
+
+		it("resets time when popover is reopened after clearing", async () => {
+			const onChange = vi.fn();
+			const user = userEvent.setup();
+			render(
+				<RecurringPicker
+					{...defaultProps}
+					value={{ type: "daily", notifyAt: "09:00" }}
+					onChange={onChange}
+				/>,
+			);
+
+			await user.click(screen.getByTestId("recurring-picker-trigger"));
+
+			await waitFor(() => {
+				expect(screen.getByTestId("time-picker-input")).toHaveValue("09:00");
+			});
+
+			// Clear the time
+			await user.click(screen.getByTestId("time-picker-clear"));
+
+			// Input should be empty
+			expect(screen.getByTestId("time-picker-input")).toHaveValue("");
+
+			// Click Apply
+			await user.click(screen.getByTestId("recurring-picker-apply"));
+
+			// notifyAt should not be in the pattern
+			expect(onChange).toHaveBeenCalledWith({ type: "daily" });
+		});
+
+		it("combines pattern type, interval, and time correctly", async () => {
+			const onChange = vi.fn();
+			const user = userEvent.setup();
+			render(<RecurringPicker {...defaultProps} onChange={onChange} />);
+
+			await user.click(screen.getByTestId("recurring-picker-trigger"));
+
+			// Change to weekly
+			await waitFor(() => {
+				expect(
+					screen.getByTestId("recurring-picker-type-trigger"),
+				).toBeInTheDocument();
+			});
+
+			await user.click(screen.getByTestId("recurring-picker-type-trigger"));
+
+			await waitFor(() => {
+				expect(
+					screen.getByTestId("recurring-picker-type-weekly"),
+				).toBeInTheDocument();
+			});
+
+			await user.click(screen.getByTestId("recurring-picker-type-weekly"));
+
+			// Set interval to 2
+			await waitFor(() => {
+				expect(
+					screen.getByTestId("recurring-picker-interval-input"),
+				).toBeInTheDocument();
+			});
+
+			const intervalInput = screen.getByTestId(
+				"recurring-picker-interval-input",
+			);
+			await user.click(intervalInput);
+			await user.keyboard("{Control>}a{/Control}");
+			await user.keyboard("2");
+
+			// Select Monday and Friday
+			await waitFor(() => {
+				expect(
+					screen.getByTestId("recurring-picker-day-1"),
+				).toBeInTheDocument();
+			});
+
+			await user.click(screen.getByTestId("recurring-picker-day-1"));
+			await user.click(screen.getByTestId("recurring-picker-day-5"));
+
+			// Set time
+			await user.click(screen.getByTestId("time-picker-preset-noon"));
+
+			// Click Apply
+			await user.click(screen.getByTestId("recurring-picker-apply"));
+
+			expect(onChange).toHaveBeenCalledWith({
+				type: "weekly",
+				interval: 2,
+				daysOfWeek: [1, 5],
+				notifyAt: "12:00",
+			});
+		});
 	});
 });
 
