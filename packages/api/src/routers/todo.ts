@@ -23,7 +23,7 @@ export const recurringPatternSchema = z.object({
 			/^([01]\d|2[0-3]):([0-5]\d)$/,
 			"Must be in HH:mm format (00:00-23:59)",
 		)
-		.optional(),
+		.default("09:00"),
 });
 
 export const todoRouter = router({

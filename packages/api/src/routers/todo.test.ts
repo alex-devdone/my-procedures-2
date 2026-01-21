@@ -964,6 +964,92 @@ describe("Scheduling Fields Validation", () => {
 		});
 	});
 
+	describe("recurringPatternSchema notifyAt default", () => {
+		// Import the actual schema to test Zod defaults
+		// We need to test this separately as the schema has .default() behavior
+		it("should default notifyAt to '09:00' when not provided", async () => {
+			const { recurringPatternSchema } = await import("./todo");
+
+			const result = recurringPatternSchema.parse({ type: "daily" });
+
+			expect(result.notifyAt).toBe("09:00");
+		});
+
+		it("should default notifyAt to '09:00' for weekly pattern", async () => {
+			const { recurringPatternSchema } = await import("./todo");
+
+			const result = recurringPatternSchema.parse({
+				type: "weekly",
+				daysOfWeek: [1, 3, 5],
+			});
+
+			expect(result.notifyAt).toBe("09:00");
+		});
+
+		it("should use provided notifyAt value when specified", async () => {
+			const { recurringPatternSchema } = await import("./todo");
+
+			const result = recurringPatternSchema.parse({
+				type: "daily",
+				notifyAt: "14:30",
+			});
+
+			expect(result.notifyAt).toBe("14:30");
+		});
+
+		it("should accept valid HH:mm format for notifyAt", async () => {
+			const { recurringPatternSchema } = await import("./todo");
+
+			// Test various valid times
+			expect(
+				recurringPatternSchema.parse({ type: "daily", notifyAt: "00:00" })
+					.notifyAt,
+			).toBe("00:00");
+			expect(
+				recurringPatternSchema.parse({ type: "daily", notifyAt: "23:59" })
+					.notifyAt,
+			).toBe("23:59");
+			expect(
+				recurringPatternSchema.parse({ type: "daily", notifyAt: "12:00" })
+					.notifyAt,
+			).toBe("12:00");
+		});
+
+		it("should reject invalid notifyAt format", async () => {
+			const { recurringPatternSchema } = await import("./todo");
+
+			expect(() =>
+				recurringPatternSchema.parse({ type: "daily", notifyAt: "9:00" }),
+			).toThrow();
+			expect(() =>
+				recurringPatternSchema.parse({ type: "daily", notifyAt: "24:00" }),
+			).toThrow();
+			expect(() =>
+				recurringPatternSchema.parse({ type: "daily", notifyAt: "12:60" }),
+			).toThrow();
+			expect(() =>
+				recurringPatternSchema.parse({ type: "daily", notifyAt: "invalid" }),
+			).toThrow();
+		});
+
+		it("should default notifyAt for all pattern types", async () => {
+			const { recurringPatternSchema } = await import("./todo");
+
+			const patternTypes = [
+				{ type: "daily" as const },
+				{ type: "weekly" as const, daysOfWeek: [1] },
+				{ type: "monthly" as const, dayOfMonth: 15 },
+				{ type: "yearly" as const, monthOfYear: 1, dayOfMonth: 1 },
+				{ type: "custom" as const, interval: 2 },
+			];
+
+			for (const pattern of patternTypes) {
+				const result = recurringPatternSchema.parse(pattern);
+				expect(result.notifyAt).toBe("09:00");
+			}
+		});
+	});
+
 	describe("Create Todo with Scheduling Input Validation", () => {
 		interface CreateTodoWithSchedulingInput {
 			text: string;
