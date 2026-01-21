@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Circle, ListTodo, Search, Sun, X } from "lucide-react";
+import { CheckCircle2, Circle, Search, Sun, X } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import type { FolderColor } from "@/app/api/folder";
@@ -9,7 +9,6 @@ import { useAllSubtasksProgress } from "@/app/api/subtask";
 import type { RecurringPattern, Todo } from "@/app/api/todo/todo.types";
 import { isToday } from "@/components/scheduling/due-date-badge";
 import { TodoExpandableItem } from "@/components/todos";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";

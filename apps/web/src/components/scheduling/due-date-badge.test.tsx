@@ -23,7 +23,6 @@ vi.mock("./recurring-picker", () => ({
 
 describe("DueDateBadge", () => {
 	// Use a fixed date for testing
-	const realDate = Date;
 	const fixedDate = new Date("2026-01-21T10:00:00.000Z");
 
 	beforeEach(() => {

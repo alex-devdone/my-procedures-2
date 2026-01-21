@@ -538,15 +538,11 @@ describe("useSyncTodos", () => {
 	});
 
 	describe("Sync with Scheduling Fields", () => {
-		let mockBulkCreateFn: ReturnType<typeof vi.fn>;
-
 		beforeEach(() => {
 			mockUseSession.mockReturnValue({
 				data: { user: { id: "user-123" } },
 				isPending: false,
 			});
-			// Create a new mock function for tracking calls
-			mockBulkCreateFn = vi.fn().mockResolvedValue({ count: 0 });
 		});
 
 		it("includes scheduling fields when syncing todos with dueDate", async () => {

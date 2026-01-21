@@ -206,9 +206,9 @@ describe("getNextOccurrence", () => {
 			const result = getNextOccurrence(pattern, fromDate);
 
 			expect(result).not.toBeNull();
-			expect(result!.getFullYear()).toBe(2026);
-			expect(result!.getMonth()).toBe(0); // January
-			expect(result!.getDate()).toBe(16);
+			expect(result?.getFullYear()).toBe(2026);
+			expect(result?.getMonth()).toBe(0); // January
+			expect(result?.getDate()).toBe(16);
 		});
 
 		it("returns correct date for daily with interval 3", () => {
@@ -217,7 +217,7 @@ describe("getNextOccurrence", () => {
 			const result = getNextOccurrence(pattern, fromDate);
 
 			expect(result).not.toBeNull();
-			expect(result!.getDate()).toBe(18);
+			expect(result?.getDate()).toBe(18);
 		});
 
 		it("handles month boundary correctly", () => {
@@ -226,8 +226,8 @@ describe("getNextOccurrence", () => {
 			const result = getNextOccurrence(pattern, fromDate);
 
 			expect(result).not.toBeNull();
-			expect(result!.getMonth()).toBe(1); // February
-			expect(result!.getDate()).toBe(1);
+			expect(result?.getMonth()).toBe(1); // February
+			expect(result?.getDate()).toBe(1);
 		});
 
 		it("handles year boundary correctly", () => {
@@ -236,9 +236,9 @@ describe("getNextOccurrence", () => {
 			const result = getNextOccurrence(pattern, fromDate);
 
 			expect(result).not.toBeNull();
-			expect(result!.getFullYear()).toBe(2027);
-			expect(result!.getMonth()).toBe(0);
-			expect(result!.getDate()).toBe(1);
+			expect(result?.getFullYear()).toBe(2027);
+			expect(result?.getMonth()).toBe(0);
+			expect(result?.getDate()).toBe(1);
 		});
 
 		it("returns null when pattern is expired by occurrences", () => {
@@ -264,7 +264,7 @@ describe("getNextOccurrence", () => {
 			const result = getNextOccurrence(pattern, fromDate);
 
 			expect(result).not.toBeNull();
-			expect(result!.getDate()).toBe(22);
+			expect(result?.getDate()).toBe(22);
 		});
 
 		it("returns correct date for weekly with interval 2", () => {
@@ -273,7 +273,7 @@ describe("getNextOccurrence", () => {
 			const result = getNextOccurrence(pattern, fromDate);
 
 			expect(result).not.toBeNull();
-			expect(result!.getDate()).toBe(29);
+			expect(result?.getDate()).toBe(29);
 		});
 
 		it("finds next matching day in current week", () => {
@@ -285,8 +285,8 @@ describe("getNextOccurrence", () => {
 			const result = getNextOccurrence(pattern, fromDate);
 
 			expect(result).not.toBeNull();
-			expect(result!.getDay()).toBe(5); // Friday
-			expect(result!.getDate()).toBe(16); // Jan 16, 2026 is Friday
+			expect(result?.getDay()).toBe(5); // Friday
+			expect(result?.getDate()).toBe(16); // Jan 16, 2026 is Friday
 		});
 
 		it("finds next matching day in next week when no days left in current week", () => {
@@ -298,8 +298,8 @@ describe("getNextOccurrence", () => {
 			const result = getNextOccurrence(pattern, fromDate);
 
 			expect(result).not.toBeNull();
-			expect(result!.getDay()).toBe(1); // Monday
-			expect(result!.getDate()).toBe(19); // Next Monday
+			expect(result?.getDay()).toBe(1); // Monday
+			expect(result?.getDate()).toBe(19); // Next Monday
 		});
 
 		it("handles multiple days of week", () => {
@@ -311,7 +311,7 @@ describe("getNextOccurrence", () => {
 			const result = getNextOccurrence(pattern, fromDate);
 
 			expect(result).not.toBeNull();
-			expect(result!.getDay()).toBe(5); // Friday (next matching day)
+			expect(result?.getDay()).toBe(5); // Friday (next matching day)
 		});
 
 		it("skips weeks with interval when moving to next week", () => {
@@ -325,7 +325,7 @@ describe("getNextOccurrence", () => {
 
 			expect(result).not.toBeNull();
 			// Should skip to Monday 2 weeks later (accounting for current week)
-			expect(result!.getDay()).toBe(1);
+			expect(result?.getDay()).toBe(1);
 		});
 	});
 
@@ -336,8 +336,8 @@ describe("getNextOccurrence", () => {
 			const result = getNextOccurrence(pattern, fromDate);
 
 			expect(result).not.toBeNull();
-			expect(result!.getMonth()).toBe(1); // February
-			expect(result!.getDate()).toBe(15);
+			expect(result?.getMonth()).toBe(1); // February
+			expect(result?.getDate()).toBe(15);
 		});
 
 		it("returns correct date for monthly with interval 3", () => {
@@ -346,7 +346,7 @@ describe("getNextOccurrence", () => {
 			const result = getNextOccurrence(pattern, fromDate);
 
 			expect(result).not.toBeNull();
-			expect(result!.getMonth()).toBe(3); // April
+			expect(result?.getMonth()).toBe(3); // April
 		});
 
 		it("uses specified dayOfMonth", () => {
@@ -355,8 +355,8 @@ describe("getNextOccurrence", () => {
 			const result = getNextOccurrence(pattern, fromDate);
 
 			expect(result).not.toBeNull();
-			expect(result!.getMonth()).toBe(1); // February
-			expect(result!.getDate()).toBe(1);
+			expect(result?.getMonth()).toBe(1); // February
+			expect(result?.getDate()).toBe(1);
 		});
 
 		it("handles months with fewer days", () => {
@@ -365,8 +365,8 @@ describe("getNextOccurrence", () => {
 			const result = getNextOccurrence(pattern, fromDate);
 
 			expect(result).not.toBeNull();
-			expect(result!.getMonth()).toBe(1); // February
-			expect(result!.getDate()).toBe(28); // Last day of Feb 2026
+			expect(result?.getMonth()).toBe(1); // February
+			expect(result?.getDate()).toBe(28); // Last day of Feb 2026
 		});
 
 		it("handles year boundary", () => {
@@ -375,8 +375,8 @@ describe("getNextOccurrence", () => {
 			const result = getNextOccurrence(pattern, fromDate);
 
 			expect(result).not.toBeNull();
-			expect(result!.getFullYear()).toBe(2027);
-			expect(result!.getMonth()).toBe(0); // January
+			expect(result?.getFullYear()).toBe(2027);
+			expect(result?.getMonth()).toBe(0); // January
 		});
 	});
 
@@ -387,9 +387,9 @@ describe("getNextOccurrence", () => {
 			const result = getNextOccurrence(pattern, fromDate);
 
 			expect(result).not.toBeNull();
-			expect(result!.getFullYear()).toBe(2027);
-			expect(result!.getMonth()).toBe(0);
-			expect(result!.getDate()).toBe(15);
+			expect(result?.getFullYear()).toBe(2027);
+			expect(result?.getMonth()).toBe(0);
+			expect(result?.getDate()).toBe(15);
 		});
 
 		it("returns correct date for yearly with interval 2", () => {
@@ -398,7 +398,7 @@ describe("getNextOccurrence", () => {
 			const result = getNextOccurrence(pattern, fromDate);
 
 			expect(result).not.toBeNull();
-			expect(result!.getFullYear()).toBe(2028);
+			expect(result?.getFullYear()).toBe(2028);
 		});
 
 		it("uses specified monthOfYear and dayOfMonth", () => {
@@ -411,9 +411,9 @@ describe("getNextOccurrence", () => {
 			const result = getNextOccurrence(pattern, fromDate);
 
 			expect(result).not.toBeNull();
-			expect(result!.getFullYear()).toBe(2027);
-			expect(result!.getMonth()).toBe(6); // July (0-indexed)
-			expect(result!.getDate()).toBe(4);
+			expect(result?.getFullYear()).toBe(2027);
+			expect(result?.getMonth()).toBe(6); // July (0-indexed)
+			expect(result?.getDate()).toBe(4);
 		});
 
 		it("handles Feb 29 in non-leap year", () => {
@@ -426,9 +426,9 @@ describe("getNextOccurrence", () => {
 			const result = getNextOccurrence(pattern, fromDate);
 
 			expect(result).not.toBeNull();
-			expect(result!.getMonth()).toBe(1); // February
+			expect(result?.getMonth()).toBe(1); // February
 			// Should be 28 in 2027 (non-leap year)
-			expect(result!.getDate()).toBe(28);
+			expect(result?.getDate()).toBe(28);
 		});
 	});
 
@@ -442,7 +442,7 @@ describe("getNextOccurrence", () => {
 			const result = getNextOccurrence(pattern, fromDate);
 
 			expect(result).not.toBeNull();
-			expect(result!.getDay()).toBe(5); // Friday (next matching day after Thursday)
+			expect(result?.getDay()).toBe(5); // Friday (next matching day after Thursday)
 		});
 
 		it("respects interval for custom patterns", () => {
@@ -455,7 +455,7 @@ describe("getNextOccurrence", () => {
 			const result = getNextOccurrence(pattern, fromDate);
 
 			expect(result).not.toBeNull();
-			expect(result!.getDay()).toBe(1); // Monday
+			expect(result?.getDay()).toBe(1); // Monday
 		});
 	});
 

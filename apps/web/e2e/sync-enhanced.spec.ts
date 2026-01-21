@@ -340,7 +340,7 @@ test.describe("Enhanced Sync - localStorage with scheduling/folders/subtasks", (
 			);
 			expect(todosJson).not.toBeNull();
 
-			const todos = JSON.parse(todosJson!);
+			const todos = JSON.parse(todosJson as string);
 			expect(Array.isArray(todos)).toBe(true);
 			expect(todos.length).toBeGreaterThan(0);
 
@@ -370,7 +370,7 @@ test.describe("Enhanced Sync - localStorage with scheduling/folders/subtasks", (
 			);
 			expect(foldersJson).not.toBeNull();
 
-			const folders = JSON.parse(foldersJson!);
+			const folders = JSON.parse(foldersJson as string);
 			expect(Array.isArray(folders)).toBe(true);
 			expect(folders.length).toBeGreaterThan(0);
 
@@ -414,7 +414,7 @@ test.describe("Enhanced Sync - localStorage with scheduling/folders/subtasks", (
 			);
 			expect(subtasksJson).not.toBeNull();
 
-			const subtasks = JSON.parse(subtasksJson!);
+			const subtasks = JSON.parse(subtasksJson as string);
 			expect(Array.isArray(subtasks)).toBe(true);
 			expect(subtasks.length).toBeGreaterThan(0);
 
@@ -438,7 +438,7 @@ test.describe("Enhanced Sync - localStorage with scheduling/folders/subtasks", (
 			const todosBeforeJson = await page.evaluate(() =>
 				localStorage.getItem("todos"),
 			);
-			const todosBefore = JSON.parse(todosBeforeJson!);
+			const todosBefore = JSON.parse(todosBeforeJson as string);
 			expect(todosBefore.length).toBe(2);
 
 			// Clear localStorage directly (simulating discard action)

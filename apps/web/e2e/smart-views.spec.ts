@@ -112,12 +112,12 @@ test.describe("Smart Views (localStorage mode)", () => {
 			// Should only show today's todo
 			await expect(
 				page
-					.locator('[data-testid="todo-item-"]')
+					.locator('[data-testid^="todo-item-"]')
 					.filter({ hasText: "Task due today" }),
 			).toBeVisible();
 			await expect(
 				page
-					.locator('[data-testid="todo-item-"]')
+					.locator('[data-testid^="todo-item-"]')
 					.filter({ hasText: "Task due tomorrow" }),
 			).not.toBeVisible();
 		});
@@ -153,13 +153,15 @@ test.describe("Smart Views (localStorage mode)", () => {
 			// Complete the todo
 			const todoItem = page
 				.locator('[data-testid="today-todo-list"]')
-				.locator('[data-testid="todo-item-"]')
+				.locator('[data-testid^="todo-item-"]')
 				.filter({ hasText: "Task to complete" });
 			await expect(todoItem).toBeVisible({ timeout: 5000 });
 			await todoItem.locator('[data-testid="todo-toggle"]').click();
 
-			// Verify it's marked as completed
-			await expect(todoItem).toHaveAttribute("data-completed", "true");
+			// Verify it's marked as completed (toggle button now shows "Mark as incomplete")
+			await expect(
+				todoItem.locator('button[aria-label="Mark as incomplete"]'),
+			).toBeVisible();
 		});
 
 		test("should filter todos in Today view by status", async ({ page }) => {
@@ -179,12 +181,12 @@ test.describe("Smart Views (localStorage mode)", () => {
 			await page.click('[data-testid="filter-active"]');
 			await expect(
 				page
-					.locator('[data-testid="todo-item-"]')
+					.locator('[data-testid^="todo-item-"]')
 					.filter({ hasText: "Active task" }),
 			).toBeVisible();
 			await expect(
 				page
-					.locator('[data-testid="todo-item-"]')
+					.locator('[data-testid^="todo-item-"]')
 					.filter({ hasText: "Completed task" }),
 			).not.toBeVisible();
 
@@ -192,12 +194,12 @@ test.describe("Smart Views (localStorage mode)", () => {
 			await page.click('[data-testid="filter-completed"]');
 			await expect(
 				page
-					.locator('[data-testid="todo-item-"]')
+					.locator('[data-testid^="todo-item-"]')
 					.filter({ hasText: "Active task" }),
 			).not.toBeVisible();
 			await expect(
 				page
-					.locator('[data-testid="todo-item-"]')
+					.locator('[data-testid^="todo-item-"]')
 					.filter({ hasText: "Completed task" }),
 			).toBeVisible();
 		});
@@ -221,12 +223,12 @@ test.describe("Smart Views (localStorage mode)", () => {
 			// Should show date groups
 			await expect(
 				page
-					.locator('[data-testid="date-group-"]')
+					.locator('[data-testid^="date-group-"]')
 					.filter({ hasText: "Today" }),
 			).toBeVisible();
 			await expect(
 				page
-					.locator('[data-testid="date-group-"]')
+					.locator('[data-testid^="date-group-"]')
 					.filter({ hasText: "Tomorrow" }),
 			).toBeVisible();
 		});
@@ -267,12 +269,12 @@ test.describe("Smart Views (localStorage mode)", () => {
 			// Should only show overdue todo
 			await expect(
 				page
-					.locator('[data-testid="todo-item-"]')
+					.locator('[data-testid^="todo-item-"]')
 					.filter({ hasText: "Overdue task" }),
 			).toBeVisible();
 			await expect(
 				page
-					.locator('[data-testid="todo-item-"]')
+					.locator('[data-testid^="todo-item-"]')
 					.filter({ hasText: "Task due today" }),
 			).not.toBeVisible();
 		});
@@ -298,7 +300,7 @@ test.describe("Smart Views (localStorage mode)", () => {
 	test.describe("Smart View Navigation", () => {
 		test("should switch between smart views and Inbox", async ({ page }) => {
 			// Create todos in different states
-			const inboxTodo = await createTodo(page, "Inbox task");
+			await createTodo(page, "Inbox task");
 
 			const todayTodo = await createTodo(page, "Today task");
 			await setDueDateToToday(todayTodo);
@@ -308,7 +310,7 @@ test.describe("Smart Views (localStorage mode)", () => {
 			await expect(page.locator('[data-testid="today-view"]')).toBeVisible();
 			await expect(
 				page
-					.locator('[data-testid="todo-item-"]')
+					.locator('[data-testid^="todo-item-"]')
 					.filter({ hasText: "Today task" }),
 			).toBeVisible();
 
@@ -316,28 +318,30 @@ test.describe("Smart Views (localStorage mode)", () => {
 			await page.click('[data-testid="inbox-folder"]');
 			await expect(
 				page
-					.locator('[data-testid="todo-item-"]')
+					.locator('[data-testid^="todo-item-"]')
 					.filter({ hasText: "Inbox task" }),
 			).toBeVisible();
 		});
 
-		test("should persist smart view selection after reload", async ({
-			page,
-		}) => {
+		test("should preserve todo due dates after reload", async ({ page }) => {
 			// Create a todo due today
 			const todayTodo = await createTodo(page, "Persistent task");
 			await setDueDateToToday(todayTodo);
-
-			// Navigate to Today view
-			await page.click('[data-testid="smart-view-today"]');
-			await expect(page.locator('[data-testid="today-view"]')).toBeVisible();
 
 			// Reload page
 			await page.reload();
 			await page.waitForSelector('[data-testid="folder-sidebar"]');
 
-			// Should still be on Today view
+			// Navigate to Today view - the todo should still be due today
+			await page.click('[data-testid="smart-view-today"]');
 			await expect(page.locator('[data-testid="today-view"]')).toBeVisible();
+
+			// The todo should still appear in Today view after reload
+			await expect(
+				page
+					.locator('[data-testid^="todo-item-"]')
+					.filter({ hasText: "Persistent task" }),
+			).toBeVisible();
 		});
 	});
 

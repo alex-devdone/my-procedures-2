@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { renderHook, waitFor } from "@testing-library/react";
+import { renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock Supabase modules BEFORE importing the hook
@@ -93,7 +93,6 @@ const createWrapper = () => {
 
 describe("useFolderRealtime", () => {
 	let mockChannel: ReturnType<typeof vi.fn>;
-	let onChangeCallback: ((payload: unknown) => void) | undefined;
 
 	beforeEach(() => {
 		vi.clearAllMocks();
@@ -104,12 +103,11 @@ describe("useFolderRealtime", () => {
 			name,
 			on: vi.fn(
 				(
-					event: string,
-					config: unknown,
-					callback: (payload: unknown) => void,
+					_event: string,
+					_config: unknown,
+					_callback: (payload: unknown) => void,
 				) => ({
 					subscribe: vi.fn((cb?: (status: string) => void) => {
-						onChangeCallback = callback;
 						if (cb) setTimeout(() => cb("SUBSCRIBED"), 0);
 						return { unsubscribe: vi.fn() };
 					}),
@@ -127,7 +125,6 @@ describe("useFolderRealtime", () => {
 
 	afterEach(() => {
 		vi.clearAllMocks();
-		onChangeCallback = undefined;
 	});
 
 	describe("initial state", () => {
