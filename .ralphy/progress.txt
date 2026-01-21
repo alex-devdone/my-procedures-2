@@ -94,3 +94,16 @@
   - Authorization and ownership verification logic
   - CRUD operations business logic
   - Auto-complete parent todo logic when all subtasks completed
+
+- [✓] 2026-01-21 01:16 - Create subtask.types.ts (apps/web/src/app/api/subtask/subtask.types.ts) with:
+  - Unified Subtask type supporting both local (string UUID) and remote (numeric) IDs
+  - RemoteSubtask and LocalSubtask interfaces for storage-specific types
+  - Zod schemas for remote operations: createSubtaskInputSchema, updateSubtaskInputSchema, deleteSubtaskInputSchema, toggleSubtaskInputSchema, reorderSubtaskInputSchema, listSubtasksInputSchema
+  - Zod schemas for local operations: localCreateSubtaskInputSchema, localUpdateSubtaskInputSchema, localDeleteSubtaskInputSchema, localToggleSubtaskInputSchema, localReorderSubtaskInputSchema, localListSubtasksInputSchema
+  - UseSubtaskStorageReturn hook return type
+  - SubtaskProgress interface and helper functions (calculateSubtaskProgress, areAllSubtasksCompleted)
+- [✓] 2026-01-21 01:16 - Add unit tests for subtask types/schemas (69 tests) in apps/web/src/app/api/subtask/subtask.types.test.ts covering:
+  - All remote Zod schemas validation (create, update, delete, toggle, reorder, list)
+  - All local Zod schemas validation with string IDs
+  - SubtaskProgress helper function tests
+  - areAllSubtasksCompleted helper function tests
