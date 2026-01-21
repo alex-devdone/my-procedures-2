@@ -7,6 +7,7 @@ import {
 	DEFAULT_TOLERANCE,
 	formatReminderNotificationBody,
 	getDueReminders,
+	getEffectiveReminderTime,
 	getShownRemindersFromStorage,
 	isReminderDue,
 	markReminderAsShown,
@@ -140,6 +141,8 @@ describe("Reminder Checker Pure Functions", () => {
 				todoText: "Test reminder",
 				reminderAt: "2026-01-21T10:00:00.000Z",
 				dueDate: "2026-01-21T12:00:00.000Z",
+				isRecurring: false,
+				recurringType: undefined,
 			});
 		});
 
@@ -217,6 +220,65 @@ describe("Reminder Checker Pure Functions", () => {
 			];
 			const result = getDueReminders(todos, currentTime, new Set(), 60000);
 			expect(result[0].dueDate).toBeNull();
+		});
+
+		it("returns due reminder for todo with recurring pattern and notifyAt", () => {
+			// Create a time that's 30 seconds past the notification time in local timezone
+			const now = new Date();
+			now.setSeconds(30, 0);
+			const notifyHour = now.getHours();
+			const notifyMinute = now.getMinutes();
+			const notifyAtStr = `${String(notifyHour).padStart(2, "0")}:${String(notifyMinute).padStart(2, "0")}`;
+
+			const todos: Todo[] = [
+				createTodo({
+					id: "1",
+					text: "Daily reminder",
+					reminderAt: null,
+					recurringPattern: {
+						type: "daily",
+						notifyAt: notifyAtStr,
+					},
+				}),
+			];
+			const result = getDueReminders(todos, now, new Set(), 60000);
+			expect(result).toHaveLength(1);
+			expect(result[0].isRecurring).toBe(true);
+			expect(result[0].recurringType).toBe("daily");
+			expect(result[0].todoText).toBe("Daily reminder");
+		});
+
+		it("marks explicit reminderAt as not recurring even with recurringPattern", () => {
+			const todos: Todo[] = [
+				createTodo({
+					id: "1",
+					text: "Has both",
+					reminderAt: "2026-01-21T10:00:00.000Z",
+					recurringPattern: {
+						type: "weekly",
+						notifyAt: "09:00",
+					},
+				}),
+			];
+			const result = getDueReminders(todos, currentTime, new Set(), 60000);
+			expect(result).toHaveLength(1);
+			expect(result[0].isRecurring).toBe(false);
+			expect(result[0].recurringType).toBeUndefined();
+		});
+
+		it("does not return reminder for recurring pattern without notifyAt", () => {
+			const todos: Todo[] = [
+				createTodo({
+					id: "1",
+					text: "No notifyAt",
+					reminderAt: null,
+					recurringPattern: {
+						type: "daily",
+					},
+				}),
+			];
+			const result = getDueReminders(todos, currentTime, new Set(), 60000);
+			expect(result).toEqual([]);
 		});
 	});
 
@@ -353,6 +415,100 @@ describe("Reminder Checker Pure Functions", () => {
 		});
 	});
 
+	describe("getEffectiveReminderTime", () => {
+		it("returns reminderAt when explicitly set", () => {
+			const todo = createTodo({
+				id: "1",
+				reminderAt: "2026-01-21T10:00:00.000Z",
+			});
+			const result = getEffectiveReminderTime(todo);
+			expect(result).toBe("2026-01-21T10:00:00.000Z");
+		});
+
+		it("returns reminderAt even when recurringPattern.notifyAt is set", () => {
+			const todo = createTodo({
+				id: "1",
+				reminderAt: "2026-01-21T10:00:00.000Z",
+				recurringPattern: {
+					type: "daily",
+					notifyAt: "09:00",
+				},
+			});
+			const result = getEffectiveReminderTime(todo);
+			expect(result).toBe("2026-01-21T10:00:00.000Z");
+		});
+
+		it("returns calculated time from recurring pattern when no reminderAt", () => {
+			const todo = createTodo({
+				id: "1",
+				reminderAt: null,
+				recurringPattern: {
+					type: "daily",
+					notifyAt: "15:00",
+				},
+			});
+			const currentTime = new Date("2026-01-21T10:00:00.000Z");
+			const result = getEffectiveReminderTime(todo, currentTime);
+			// Should return today at 15:00 (next occurrence of daily at 15:00)
+			expect(result).not.toBeNull();
+			const resultDate = new Date(result as string);
+			expect(resultDate.getHours()).toBe(15);
+			expect(resultDate.getMinutes()).toBe(0);
+		});
+
+		it("returns null when no reminderAt and no recurringPattern", () => {
+			const todo = createTodo({
+				id: "1",
+				reminderAt: null,
+				recurringPattern: null,
+			});
+			const result = getEffectiveReminderTime(todo);
+			expect(result).toBeNull();
+		});
+
+		it("returns null when recurringPattern exists but no notifyAt", () => {
+			const todo = createTodo({
+				id: "1",
+				reminderAt: null,
+				recurringPattern: {
+					type: "daily",
+				},
+			});
+			const result = getEffectiveReminderTime(todo);
+			expect(result).toBeNull();
+		});
+
+		it("handles weekly recurring pattern with notifyAt", () => {
+			const todo = createTodo({
+				id: "1",
+				reminderAt: null,
+				recurringPattern: {
+					type: "weekly",
+					daysOfWeek: [1, 3, 5], // Mon, Wed, Fri
+					notifyAt: "09:00",
+				},
+			});
+			const currentTime = new Date("2026-01-21T10:00:00.000Z"); // Tuesday
+			const result = getEffectiveReminderTime(todo, currentTime);
+			expect(result).not.toBeNull();
+		});
+
+		it("handles monthly recurring pattern with notifyAt", () => {
+			const todo = createTodo({
+				id: "1",
+				reminderAt: null,
+				recurringPattern: {
+					type: "monthly",
+					dayOfMonth: 15,
+					notifyAt: "08:00",
+				},
+			});
+			const currentTime = new Date("2026-01-21T10:00:00.000Z");
+			const result = getEffectiveReminderTime(todo, currentTime);
+			expect(result).not.toBeNull();
+		});
+	});
+
 	describe("formatReminderNotificationBody", () => {
 		beforeEach(() => {
 			vi.useFakeTimers();
@@ -368,6 +524,7 @@ describe("Reminder Checker Pure Functions", () => {
 				todoText: "Test",
 				reminderAt: "2026-01-20T10:00:00.000Z",
 				dueDate: "2026-01-20T12:00:00.000Z", // Past
+				isRecurring: false,
 			};
 			vi.setSystemTime(new Date("2026-01-21T10:00:00.000Z"));
 			const result = formatReminderNotificationBody(reminder);
@@ -380,6 +537,7 @@ describe("Reminder Checker Pure Functions", () => {
 				todoText: "Test",
 				reminderAt: "2026-01-21T10:00:00.000Z",
 				dueDate: "2026-01-21T10:20:00.000Z", // 20 min from now
+				isRecurring: false,
 			};
 			vi.setSystemTime(new Date("2026-01-21T10:00:00.000Z"));
 			const result = formatReminderNotificationBody(reminder);
@@ -392,6 +550,7 @@ describe("Reminder Checker Pure Functions", () => {
 				todoText: "Test",
 				reminderAt: "2026-01-21T10:00:00.000Z",
 				dueDate: "2026-01-21T11:00:00.000Z", // 1 hour from now
+				isRecurring: false,
 			};
 			vi.setSystemTime(new Date("2026-01-21T10:00:00.000Z"));
 			const result = formatReminderNotificationBody(reminder);
@@ -404,6 +563,7 @@ describe("Reminder Checker Pure Functions", () => {
 				todoText: "Test",
 				reminderAt: "2026-01-21T10:00:00.000Z",
 				dueDate: "2026-01-21T15:00:00.000Z", // 5 hours from now
+				isRecurring: false,
 			};
 			vi.setSystemTime(new Date("2026-01-21T10:00:00.000Z"));
 			const result = formatReminderNotificationBody(reminder);
@@ -416,6 +576,7 @@ describe("Reminder Checker Pure Functions", () => {
 				todoText: "Test",
 				reminderAt: "2026-01-21T10:00:00.000Z",
 				dueDate: "2026-01-22T10:00:00.000Z", // 1 day from now
+				isRecurring: false,
 			};
 			vi.setSystemTime(new Date("2026-01-21T10:00:00.000Z"));
 			const result = formatReminderNotificationBody(reminder);
@@ -428,6 +589,7 @@ describe("Reminder Checker Pure Functions", () => {
 				todoText: "Test",
 				reminderAt: "2026-01-21T10:00:00.000Z",
 				dueDate: "2026-01-24T10:00:00.000Z", // 3 days from now
+				isRecurring: false,
 			};
 			vi.setSystemTime(new Date("2026-01-21T10:00:00.000Z"));
 			const result = formatReminderNotificationBody(reminder);
@@ -440,6 +602,85 @@ describe("Reminder Checker Pure Functions", () => {
 				todoText: "Test",
 				reminderAt: "2026-01-21T10:00:00.000Z",
 				dueDate: null,
+				isRecurring: false,
+			};
+			const result = formatReminderNotificationBody(reminder);
+			expect(result).toBe("Reminder for your task");
+		});
+
+		it("returns daily reminder message for daily recurring", () => {
+			const reminder = {
+				todoId: "1",
+				todoText: "Test",
+				reminderAt: "2026-01-21T10:00:00.000Z",
+				dueDate: null,
+				isRecurring: true,
+				recurringType: "daily" as const,
+			};
+			const result = formatReminderNotificationBody(reminder);
+			expect(result).toBe("Daily reminder");
+		});
+
+		it("returns weekly reminder message for weekly recurring", () => {
+			const reminder = {
+				todoId: "1",
+				todoText: "Test",
+				reminderAt: "2026-01-21T10:00:00.000Z",
+				dueDate: null,
+				isRecurring: true,
+				recurringType: "weekly" as const,
+			};
+			const result = formatReminderNotificationBody(reminder);
+			expect(result).toBe("Weekly reminder");
+		});
+
+		it("returns monthly reminder message for monthly recurring", () => {
+			const reminder = {
+				todoId: "1",
+				todoText: "Test",
+				reminderAt: "2026-01-21T10:00:00.000Z",
+				dueDate: null,
+				isRecurring: true,
+				recurringType: "monthly" as const,
+			};
+			const result = formatReminderNotificationBody(reminder);
+			expect(result).toBe("Monthly reminder");
+		});
+
+		it("returns yearly reminder message for yearly recurring", () => {
+			const reminder = {
+				todoId: "1",
+				todoText: "Test",
+				reminderAt: "2026-01-21T10:00:00.000Z",
+				dueDate: null,
+				isRecurring: true,
+				recurringType: "yearly" as const,
+			};
+			const result = formatReminderNotificationBody(reminder);
+			expect(result).toBe("Yearly reminder");
+		});
+
+		it("returns recurring reminder message for custom recurring", () => {
+			const reminder = {
+				todoId: "1",
+				todoText: "Test",
+				reminderAt: "2026-01-21T10:00:00.000Z",
+				dueDate: null,
+				isRecurring: true,
+				recurringType: "custom" as const,
+			};
+			const result = formatReminderNotificationBody(reminder);
+			expect(result).toBe("Recurring reminder");
+		});
+
+		it("returns generic message for recurring without type", () => {
+			const reminder = {
+				todoId: "1",
+				todoText: "Test",
+				reminderAt: "2026-01-21T10:00:00.000Z",
+				dueDate: null,
+				isRecurring: true,
+				recurringType: undefined,
 			};
 			const result = formatReminderNotificationBody(reminder);
 			expect(result).toBe("Reminder for your task");

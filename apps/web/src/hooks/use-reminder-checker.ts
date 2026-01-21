@@ -1,5 +1,6 @@
 "use client";
 
+import { getNextNotificationTime } from "@my-procedures-2/api/lib/recurring";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Todo } from "@/app/api/todo";
 import { useNotifications } from "./use-notifications";
@@ -16,6 +17,10 @@ export interface DueReminder {
 	todoText: string;
 	reminderAt: string;
 	dueDate: string | null;
+	/** Whether this reminder is from a recurring pattern */
+	isRecurring: boolean;
+	/** Type of recurring pattern if applicable */
+	recurringType?: "daily" | "weekly" | "monthly" | "yearly" | "custom";
 }
 
 /**
@@ -108,9 +113,6 @@ export function getDueReminders(
 ): DueReminder[] {
 	return todos
 		.filter((todo) => {
-			// Must have a reminder set
-			if (!todo.reminderAt) return false;
-
 			// Must not be completed
 			if (todo.completed) return false;
 
@@ -118,15 +120,28 @@ export function getDueReminders(
 			const todoIdStr = String(todo.id);
 			if (shownIds.has(todoIdStr)) return false;
 
+			// Must have an effective reminder time (explicit or from recurring)
+			const effectiveReminderTime = getEffectiveReminderTime(todo, currentTime);
+			if (!effectiveReminderTime) return false;
+
 			// Must be due
-			return isReminderDue(todo.reminderAt, currentTime, tolerance);
+			return isReminderDue(effectiveReminderTime, currentTime, tolerance);
 		})
-		.map((todo) => ({
-			todoId: todo.id,
-			todoText: todo.text,
-			reminderAt: todo.reminderAt as string,
-			dueDate: todo.dueDate ?? null,
-		}));
+		.map((todo) => {
+			const effectiveReminderTime = getEffectiveReminderTime(
+				todo,
+				currentTime,
+			) as string;
+			const isRecurring = !todo.reminderAt && !!todo.recurringPattern?.notifyAt;
+			return {
+				todoId: todo.id,
+				todoText: todo.text,
+				reminderAt: effectiveReminderTime,
+				dueDate: todo.dueDate ?? null,
+				isRecurring,
+				recurringType: isRecurring ? todo.recurringPattern?.type : undefined,
+			};
+		});
 }
 
 /**
@@ -196,12 +211,114 @@ export function markReminderAsShown(
 }
 
 /**
+ * Get the notification time for today based on a recurring pattern's notifyAt.
+ * This calculates when the notification should have fired today, regardless of
+ * whether that time has passed.
+ *
+ * @param pattern - The recurring pattern with notifyAt
+ * @param currentTime - The current time to calculate from
+ * @returns The notification datetime for today, or null if not applicable
+ */
+function getTodayNotificationTime(
+	pattern: { notifyAt?: string; type?: string },
+	currentTime: Date,
+): Date | null {
+	if (!pattern.notifyAt) return null;
+
+	const [hours = 0, minutes = 0] = pattern.notifyAt.split(":").map(Number);
+	const todayNotification = new Date(currentTime);
+	todayNotification.setHours(hours, minutes, 0, 0);
+
+	return todayNotification;
+}
+
+/**
+ * Get the effective reminder time for a todo.
+ * Returns the explicit reminderAt if set, or calculates from recurringPattern.notifyAt.
+ *
+ * For recurring patterns, this returns the notification time for today if it's
+ * within the tolerance window, or the next scheduled notification time.
+ *
+ * @param todo - The todo to get reminder time for
+ * @param currentTime - Current time to calculate from (defaults to now)
+ * @returns ISO datetime string of when the reminder should trigger, or null
+ */
+export function getEffectiveReminderTime(
+	todo: Todo,
+	currentTime: Date = new Date(),
+): string | null {
+	// Explicit reminderAt takes priority
+	if (todo.reminderAt) {
+		return todo.reminderAt;
+	}
+
+	// Check for recurring pattern with notifyAt
+	if (todo.recurringPattern?.notifyAt) {
+		// First, check if today's notification time is recent (within tolerance)
+		const todayTime = getTodayNotificationTime(
+			todo.recurringPattern,
+			currentTime,
+		);
+
+		if (todayTime) {
+			const timeDiff = currentTime.getTime() - todayTime.getTime();
+			// If today's notification time has passed but is within tolerance,
+			// return it so it can be detected as due
+			if (timeDiff >= 0 && timeDiff <= DEFAULT_TOLERANCE) {
+				return todayTime.toISOString();
+			}
+		}
+
+		// Otherwise, return the next scheduled notification time
+		const nextNotificationTime = getNextNotificationTime(
+			todo.recurringPattern,
+			currentTime,
+		);
+		if (nextNotificationTime) {
+			return nextNotificationTime.toISOString();
+		}
+	}
+
+	return null;
+}
+
+/**
+ * Format a recurring type as a human-readable prefix.
+ *
+ * @param type - The recurring pattern type
+ * @returns Human-readable prefix (e.g., "Daily reminder", "Weekly reminder")
+ */
+function formatRecurringPrefix(
+	type?: "daily" | "weekly" | "monthly" | "yearly" | "custom",
+): string {
+	switch (type) {
+		case "daily":
+			return "Daily reminder";
+		case "weekly":
+			return "Weekly reminder";
+		case "monthly":
+			return "Monthly reminder";
+		case "yearly":
+			return "Yearly reminder";
+		case "custom":
+			return "Recurring reminder";
+		default:
+			return "Reminder for your task";
+	}
+}
+
+/**
  * Format a reminder notification body.
  *
  * @param reminder - The due reminder
  * @returns Formatted notification body string
  */
 export function formatReminderNotificationBody(reminder: DueReminder): string {
+	// For recurring reminders, show the pattern type
+	if (reminder.isRecurring) {
+		return formatRecurringPrefix(reminder.recurringType);
+	}
+
 	if (reminder.dueDate) {
 		const dueDate = new Date(reminder.dueDate);
 		const now = new Date();
