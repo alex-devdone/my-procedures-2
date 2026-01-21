@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	bulkCreateFoldersInputSchema,
 	createFolderInputSchema,
 	deleteFolderInputSchema,
 	FOLDER_COLORS,
@@ -368,5 +369,127 @@ describe("FOLDER_COLORS constant", () => {
 
 	it("starts with slate as default color", () => {
 		expect(FOLDER_COLORS[0]).toBe("slate");
+	});
+});
+
+describe("Bulk Create Folders Input Schema", () => {
+	describe("bulkCreateFoldersInputSchema", () => {
+		it("accepts empty folders array", () => {
+			const result = bulkCreateFoldersInputSchema.safeParse({ folders: [] });
+			expect(result.success).toBe(true);
+			if (result.success) {
+				expect(result.data.folders).toEqual([]);
+			}
+		});
+
+		it("accepts single folder with name only", () => {
+			const result = bulkCreateFoldersInputSchema.safeParse({
+				folders: [{ name: "Work" }],
+			});
+			expect(result.success).toBe(true);
+			if (result.success) {
+				expect(result.data.folders[0].name).toBe("Work");
+				expect(result.data.folders[0].color).toBe("slate"); // default
+			}
+		});
+
+		it("accepts single folder with name and color", () => {
+			const result = bulkCreateFoldersInputSchema.safeParse({
+				folders: [{ name: "Personal", color: "blue" }],
+			});
+			expect(result.success).toBe(true);
+			if (result.success) {
+				expect(result.data.folders[0].name).toBe("Personal");
+				expect(result.data.folders[0].color).toBe("blue");
+			}
+		});
+
+		it("accepts single folder with name, color, and order", () => {
+			const result = bulkCreateFoldersInputSchema.safeParse({
+				folders: [{ name: "Work", color: "green", order: 5 }],
+			});
+			expect(result.success).toBe(true);
+			if (result.success) {
+				expect(result.data.folders[0].order).toBe(5);
+			}
+		});
+
+		it("accepts multiple folders", () => {
+			const result = bulkCreateFoldersInputSchema.safeParse({
+				folders: [
+					{ name: "Work", color: "blue" },
+					{ name: "Personal", color: "green", order: 1 },
+					{ name: "Archive" },
+				],
+			});
+			expect(result.success).toBe(true);
+			if (result.success) {
+				expect(result.data.folders).toHaveLength(3);
+			}
+		});
+
+		it("rejects folder with empty name", () => {
+			const result = bulkCreateFoldersInputSchema.safeParse({
+				folders: [{ name: "" }],
+			});
+			expect(result.success).toBe(false);
+		});
+
+		it("rejects folder with name exceeding 100 characters", () => {
+			const result = bulkCreateFoldersInputSchema.safeParse({
+				folders: [{ name: "a".repeat(101) }],
+			});
+			expect(result.success).toBe(false);
+		});
+
+		it("accepts folder with exactly 100 character name", () => {
+			const result = bulkCreateFoldersInputSchema.safeParse({
+				folders: [{ name: "a".repeat(100) }],
+			});
+			expect(result.success).toBe(true);
+		});
+
+		it("rejects folder with invalid color", () => {
+			const result = bulkCreateFoldersInputSchema.safeParse({
+				folders: [{ name: "Work", color: "rainbow" }],
+			});
+			expect(result.success).toBe(false);
+		});
+
+		it("rejects folder with negative order", () => {
+			const result = bulkCreateFoldersInputSchema.safeParse({
+				folders: [{ name: "Work", order: -1 }],
+			});
+			expect(result.success).toBe(false);
+		});
+
+		it("accepts folder with order of 0", () => {
+			const result = bulkCreateFoldersInputSchema.safeParse({
+				folders: [{ name: "Work", order: 0 }],
+			});
+			expect(result.success).toBe(true);
+			if (result.success) {
+				expect(result.data.folders[0].order).toBe(0);
+			}
+		});
+
+		it("rejects missing folders field", () => {
+			const result = bulkCreateFoldersInputSchema.safeParse({});
+			expect(result.success).toBe(false);
+		});
+
+		it("rejects non-array folders field", () => {
+			const result = bulkCreateFoldersInputSchema.safeParse({
+				folders: "not-an-array",
+			});
+			expect(result.success).toBe(false);
+		});
+
+		it("rejects when one folder is invalid in array", () => {
+			const result = bulkCreateFoldersInputSchema.safeParse({
+				folders: [{ name: "Valid" }, { name: "" }],
+			});
+			expect(result.success).toBe(false);
+		});
 	});
 });

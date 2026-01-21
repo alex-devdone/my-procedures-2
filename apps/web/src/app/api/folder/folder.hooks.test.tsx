@@ -45,6 +45,11 @@ vi.stubGlobal("crypto", {
 	randomUUID: () => `uuid-${Date.now()}-${Math.random()}`,
 });
 
+// Mock bulk create mutation
+const mockBulkCreateMutationFn = vi
+	.fn()
+	.mockResolvedValue({ count: 0, folders: [] });
+
 // Mock the folder.api module
 vi.mock("./folder.api", () => ({
 	getAllFoldersQueryOptions: () => ({
@@ -63,6 +68,9 @@ vi.mock("./folder.api", () => ({
 	getReorderFolderMutationOptions: () => ({
 		mutationFn: vi.fn().mockResolvedValue({}),
 	}),
+	getBulkCreateFoldersMutationOptions: () => ({
+		mutationFn: mockBulkCreateMutationFn,
+	}),
 	getFoldersQueryKey: () => ["folders"],
 }));
 
@@ -77,7 +85,7 @@ vi.mock("@/utils/trpc", () => ({
 }));
 
 // Import after mocks are set up
-import { useFolderStorage } from "./folder.hooks";
+import { useFolderStorage, useSyncFolders } from "./folder.hooks";
 
 // Test wrapper with QueryClientProvider
 function createWrapper() {
@@ -609,5 +617,381 @@ describe("External Store Pattern", () => {
 
 		// The hook should work without errors in test environment
 		expect(Array.isArray(result.current.folders)).toBe(true);
+	});
+});
+
+// ============================================================================
+// useSyncFolders Tests
+// ============================================================================
+
+describe("useSyncFolders", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		localStorageMock.clear();
+		mockBulkCreateMutationFn.mockResolvedValue({ count: 0, folders: [] });
+
+		// Default: unauthenticated user
+		mockUseSession.mockReturnValue({
+			data: null,
+			isPending: false,
+		});
+	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	describe("Initial State", () => {
+		it("returns closed sync prompt by default", () => {
+			const { result } = renderHook(() => useSyncFolders(), {
+				wrapper: createWrapper(),
+			});
+
+			expect(result.current.syncPrompt.isOpen).toBe(false);
+			expect(result.current.syncPrompt.localFoldersCount).toBe(0);
+			expect(result.current.syncPrompt.remoteFoldersCount).toBe(0);
+		});
+
+		it("returns isSyncing false initially", () => {
+			const { result } = renderHook(() => useSyncFolders(), {
+				wrapper: createWrapper(),
+			});
+
+			expect(result.current.isSyncing).toBe(false);
+		});
+
+		it("provides handleSyncAction function", () => {
+			const { result } = renderHook(() => useSyncFolders(), {
+				wrapper: createWrapper(),
+			});
+
+			expect(typeof result.current.handleSyncAction).toBe("function");
+		});
+	});
+
+	describe("Sync Action: sync", () => {
+		it("uploads local folders to server on sync action", async () => {
+			const localFolders = [
+				{
+					id: "uuid-1",
+					name: "Work",
+					color: "blue",
+					order: 0,
+					createdAt: "2024-01-01T00:00:00.000Z",
+				},
+				{
+					id: "uuid-2",
+					name: "Personal",
+					color: "green",
+					order: 1,
+					createdAt: "2024-01-02T00:00:00.000Z",
+				},
+			];
+			mockLocalStorage.folders = JSON.stringify(localFolders);
+
+			mockUseSession.mockReturnValue({
+				data: { user: { id: "user-123", email: "test@test.com" } },
+				isPending: false,
+			});
+
+			const { result } = renderHook(() => useSyncFolders(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.handleSyncAction("sync");
+			});
+
+			expect(mockBulkCreateMutationFn).toHaveBeenCalled();
+			const call = mockBulkCreateMutationFn.mock.calls[0][0];
+			expect(call.folders).toEqual([
+				{ name: "Work", color: "blue", order: 0 },
+				{ name: "Personal", color: "green", order: 1 },
+			]);
+		});
+
+		it("clears local storage after sync action", async () => {
+			const localFolders = [
+				{
+					id: "uuid-1",
+					name: "Work",
+					color: "blue",
+					order: 0,
+					createdAt: "2024-01-01T00:00:00.000Z",
+				},
+			];
+			mockLocalStorage.folders = JSON.stringify(localFolders);
+
+			mockUseSession.mockReturnValue({
+				data: { user: { id: "user-123", email: "test@test.com" } },
+				isPending: false,
+			});
+
+			const { result } = renderHook(() => useSyncFolders(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.handleSyncAction("sync");
+			});
+
+			expect(localStorageMock.removeItem).toHaveBeenCalledWith("folders");
+		});
+
+		it("closes sync prompt after sync action", async () => {
+			mockUseSession.mockReturnValue({
+				data: { user: { id: "user-123", email: "test@test.com" } },
+				isPending: false,
+			});
+
+			const { result } = renderHook(() => useSyncFolders(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.handleSyncAction("sync");
+			});
+
+			expect(result.current.syncPrompt.isOpen).toBe(false);
+		});
+	});
+
+	describe("Sync Action: discard", () => {
+		it("clears local storage without uploading on discard action", async () => {
+			const localFolders = [
+				{
+					id: "uuid-1",
+					name: "Work",
+					color: "blue",
+					order: 0,
+					createdAt: "2024-01-01T00:00:00.000Z",
+				},
+			];
+			mockLocalStorage.folders = JSON.stringify(localFolders);
+
+			mockUseSession.mockReturnValue({
+				data: { user: { id: "user-123", email: "test@test.com" } },
+				isPending: false,
+			});
+
+			const { result } = renderHook(() => useSyncFolders(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.handleSyncAction("discard");
+			});
+
+			expect(mockBulkCreateMutationFn).not.toHaveBeenCalled();
+			expect(localStorageMock.removeItem).toHaveBeenCalledWith("folders");
+		});
+
+		it("closes sync prompt after discard action", async () => {
+			mockUseSession.mockReturnValue({
+				data: { user: { id: "user-123", email: "test@test.com" } },
+				isPending: false,
+			});
+
+			const { result } = renderHook(() => useSyncFolders(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.handleSyncAction("discard");
+			});
+
+			expect(result.current.syncPrompt.isOpen).toBe(false);
+		});
+	});
+
+	describe("Sync Action: keep_both", () => {
+		it("uploads local folders without explicit order on keep_both action", async () => {
+			const localFolders = [
+				{
+					id: "uuid-1",
+					name: "Work",
+					color: "blue",
+					order: 0,
+					createdAt: "2024-01-01T00:00:00.000Z",
+				},
+			];
+			mockLocalStorage.folders = JSON.stringify(localFolders);
+
+			mockUseSession.mockReturnValue({
+				data: { user: { id: "user-123", email: "test@test.com" } },
+				isPending: false,
+			});
+
+			const { result } = renderHook(() => useSyncFolders(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.handleSyncAction("keep_both");
+			});
+
+			// Should not include order to let server assign new orders
+			expect(mockBulkCreateMutationFn).toHaveBeenCalled();
+			const call = mockBulkCreateMutationFn.mock.calls[0][0];
+			expect(call.folders).toEqual([{ name: "Work", color: "blue" }]);
+		});
+
+		it("clears local storage after keep_both action", async () => {
+			const localFolders = [
+				{
+					id: "uuid-1",
+					name: "Work",
+					color: "blue",
+					order: 0,
+					createdAt: "2024-01-01T00:00:00.000Z",
+				},
+			];
+			mockLocalStorage.folders = JSON.stringify(localFolders);
+
+			mockUseSession.mockReturnValue({
+				data: { user: { id: "user-123", email: "test@test.com" } },
+				isPending: false,
+			});
+
+			const { result } = renderHook(() => useSyncFolders(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.handleSyncAction("keep_both");
+			});
+
+			expect(localStorageMock.removeItem).toHaveBeenCalledWith("folders");
+		});
+	});
+
+	describe("Empty Local Folders", () => {
+		it("does not call bulkCreate when no local folders exist on sync", async () => {
+			// No local folders
+			mockUseSession.mockReturnValue({
+				data: { user: { id: "user-123", email: "test@test.com" } },
+				isPending: false,
+			});
+
+			const { result } = renderHook(() => useSyncFolders(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.handleSyncAction("sync");
+			});
+
+			expect(mockBulkCreateMutationFn).not.toHaveBeenCalled();
+		});
+
+		it("does not call bulkCreate when no local folders exist on keep_both", async () => {
+			// No local folders
+			mockUseSession.mockReturnValue({
+				data: { user: { id: "user-123", email: "test@test.com" } },
+				isPending: false,
+			});
+
+			const { result } = renderHook(() => useSyncFolders(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.handleSyncAction("keep_both");
+			});
+
+			expect(mockBulkCreateMutationFn).not.toHaveBeenCalled();
+		});
+	});
+
+	describe("Function Stability", () => {
+		it("provides handleSyncAction as a function across rerenders", () => {
+			mockUseSession.mockReturnValue({
+				data: null,
+				isPending: false,
+			});
+
+			const { result, rerender } = renderHook(() => useSyncFolders(), {
+				wrapper: createWrapper(),
+			});
+
+			expect(typeof result.current.handleSyncAction).toBe("function");
+
+			rerender();
+
+			// Function should still be available after rerender
+			expect(typeof result.current.handleSyncAction).toBe("function");
+		});
+	});
+
+	describe("Folder Data Preservation", () => {
+		it("preserves folder color when syncing", async () => {
+			const localFolders = [
+				{
+					id: "uuid-1",
+					name: "Work",
+					color: "purple",
+					order: 0,
+					createdAt: "2024-01-01T00:00:00.000Z",
+				},
+			];
+			mockLocalStorage.folders = JSON.stringify(localFolders);
+
+			mockUseSession.mockReturnValue({
+				data: { user: { id: "user-123", email: "test@test.com" } },
+				isPending: false,
+			});
+
+			const { result } = renderHook(() => useSyncFolders(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.handleSyncAction("sync");
+			});
+
+			expect(mockBulkCreateMutationFn).toHaveBeenCalled();
+			const call = mockBulkCreateMutationFn.mock.calls[0][0];
+			expect(call.folders[0].color).toBe("purple");
+		});
+
+		it("preserves folder order when syncing with sync action", async () => {
+			const localFolders = [
+				{
+					id: "uuid-1",
+					name: "First",
+					color: "blue",
+					order: 0,
+					createdAt: "2024-01-01T00:00:00.000Z",
+				},
+				{
+					id: "uuid-2",
+					name: "Second",
+					color: "green",
+					order: 5,
+					createdAt: "2024-01-02T00:00:00.000Z",
+				},
+			];
+			mockLocalStorage.folders = JSON.stringify(localFolders);
+
+			mockUseSession.mockReturnValue({
+				data: { user: { id: "user-123", email: "test@test.com" } },
+				isPending: false,
+			});
+
+			const { result } = renderHook(() => useSyncFolders(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.handleSyncAction("sync");
+			});
+
+			expect(mockBulkCreateMutationFn).toHaveBeenCalled();
+			const call = mockBulkCreateMutationFn.mock.calls[0][0];
+			expect(call.folders).toEqual([
+				{ name: "First", color: "blue", order: 0 },
+				{ name: "Second", color: "green", order: 5 },
+			]);
+		});
 	});
 });

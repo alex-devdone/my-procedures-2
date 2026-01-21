@@ -292,8 +292,8 @@ Update localStorage sync mechanism to handle new fields. Can proceed after Phase
 - [x] Update `apps/web/src/app/api/todo/todo.hooks.ts` useSyncTodos to include scheduling fields and subtasks
 - [x] Add unit tests for sync with scheduling fields
 - [x] Update bulk create mutation to include folderId, scheduling fields, and subtasks
-- [ ] Create folder sync mechanism in useSyncTodos for syncing local folders on login
-- [ ] Add unit tests for folder sync mechanism
+- [x] Create folder sync mechanism in useSyncTodos for syncing local folders on login
+- [x] Add unit tests for folder sync mechanism
 - [ ] Create subtask sync mechanism for syncing local subtasks on login
 - [ ] Add unit tests for subtask sync mechanism
 - [ ] Create E2E tests for sync with scheduling/folders/subtasks at `apps/web/e2e/sync-enhanced.spec.ts`:

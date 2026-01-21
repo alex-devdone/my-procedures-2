@@ -48,6 +48,16 @@ export const reorderFolderInputSchema = z.object({
 	newOrder: z.number().min(0),
 });
 
+export const bulkCreateFoldersInputSchema = z.object({
+	folders: z.array(
+		z.object({
+			name: z.string().min(1).max(100),
+			color: folderColorSchema.optional().default("slate"),
+			order: z.number().min(0).optional(),
+		}),
+	),
+});
+
 export const folderRouter = router({
 	list: protectedProcedure.query(async ({ ctx }) => {
 		return await db
@@ -220,5 +230,37 @@ export const folderRouter = router({
 				.returning();
 
 			return updated;
+		}),
+
+	bulkCreate: protectedProcedure
+		.input(bulkCreateFoldersInputSchema)
+		.mutation(async ({ ctx, input }) => {
+			if (input.folders.length === 0) {
+				return { count: 0, folders: [] };
+			}
+
+			// Get the current max order for the user's folders
+			const [maxOrderResult] = await db
+				.select({ maxOrder: sql<number>`COALESCE(MAX(${folder.order}), -1)` })
+				.from(folder)
+				.where(eq(folder.userId, ctx.session.user.id));
+
+			let nextOrder = (maxOrderResult?.maxOrder ?? -1) + 1;
+
+			// Prepare folders for insertion, assigning orders
+			const foldersToCreate = input.folders.map((f) => ({
+				name: f.name,
+				color: f.color,
+				userId: ctx.session.user.id,
+				order: f.order !== undefined ? f.order : nextOrder++,
+			}));
+
+			// Insert all folders
+			const createdFolders = await db
+				.insert(folder)
+				.values(foldersToCreate)
+				.returning();
+
+			return { count: createdFolders.length, folders: createdFolders };
 		}),
 });

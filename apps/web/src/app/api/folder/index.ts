@@ -1,6 +1,7 @@
 // API
 export {
 	getAllFoldersQueryOptions,
+	getBulkCreateFoldersMutationOptions,
 	getCreateFolderMutationOptions,
 	getDeleteFolderMutationOptions,
 	getFoldersQueryKey,
@@ -8,14 +9,22 @@ export {
 	getUpdateFolderMutationOptions,
 } from "./folder.api";
 // Hooks
-export { notifyLocalFoldersListeners, useFolderStorage } from "./folder.hooks";
+export {
+	notifyLocalFoldersListeners,
+	useFolderStorage,
+	useSyncFolders,
+} from "./folder.hooks";
 // Types
 export type {
+	BulkCreateFoldersInput,
+	BulkCreateFoldersOutput,
 	CreateFolderInput,
 	DeleteFolderInput,
 	DeleteFolderOutput,
 	Folder,
 	FolderColor,
+	FolderSyncAction,
+	FolderSyncPromptState,
 	LocalCreateFolderInput,
 	LocalDeleteFolderInput,
 	LocalFolder,
@@ -25,8 +34,10 @@ export type {
 	ReorderFolderInput,
 	UpdateFolderInput,
 	UseFolderStorageReturn,
+	UseSyncFoldersReturn,
 } from "./folder.types";
 export {
+	bulkCreateFoldersInputSchema,
 	createFolderInputSchema,
 	deleteFolderInputSchema,
 	FOLDER_COLORS,

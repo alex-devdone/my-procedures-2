@@ -127,6 +127,19 @@ export const localReorderFolderInputSchema = z.object({
 	newOrder: z.number().min(0),
 });
 
+export const bulkCreateFoldersInputSchema = z.object({
+	folders: z.array(
+		z.object({
+			name: z
+				.string()
+				.min(1, "Folder name is required")
+				.max(100, "Folder name must be 100 characters or less"),
+			color: folderColorSchema.optional().default("slate"),
+			order: z.number().min(0).optional(),
+		}),
+	),
+});
+
 // ============================================================================
 // Input Types (inferred from Zod schemas)
 // ============================================================================
@@ -149,6 +162,9 @@ export type LocalDeleteFolderInput = z.infer<
 export type LocalReorderFolderInput = z.infer<
 	typeof localReorderFolderInputSchema
 >;
+export type BulkCreateFoldersInput = z.infer<
+	typeof bulkCreateFoldersInputSchema
+>;
 
 // ============================================================================
 // Output Types
@@ -156,6 +172,38 @@ export type LocalReorderFolderInput = z.infer<
 
 export interface DeleteFolderOutput {
 	success: boolean;
+}
+
+export interface BulkCreateFoldersOutput {
+	count: number;
+	folders: RemoteFolder[];
+}
+
+// ============================================================================
+// Sync Types
+// ============================================================================
+
+/**
+ * Available sync actions when local folders exist during login.
+ */
+export type FolderSyncAction = "sync" | "discard" | "keep_both";
+
+/**
+ * State for the folder sync prompt dialog.
+ */
+export interface FolderSyncPromptState {
+	isOpen: boolean;
+	localFoldersCount: number;
+	remoteFoldersCount: number;
+}
+
+/**
+ * Return type for useSyncFolders hook.
+ */
+export interface UseSyncFoldersReturn {
+	syncPrompt: FolderSyncPromptState;
+	handleSyncAction: (action: FolderSyncAction) => Promise<void>;
+	isSyncing: boolean;
 }
 
 // ============================================================================

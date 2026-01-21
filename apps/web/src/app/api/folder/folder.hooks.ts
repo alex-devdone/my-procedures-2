@@ -1,7 +1,14 @@
 "use client";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useCallback, useMemo, useSyncExternalStore } from "react";
+import {
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+	useSyncExternalStore,
+} from "react";
 import { notifyLocalTodosListeners } from "@/app/api/todo";
 import { useFolderRealtimeWithAuth } from "@/hooks/use-folder-realtime";
 import { useSession } from "@/lib/auth-client";
@@ -11,6 +18,7 @@ import { queryClient } from "@/utils/trpc";
 
 import {
 	getAllFoldersQueryOptions,
+	getBulkCreateFoldersMutationOptions,
 	getCreateFolderMutationOptions,
 	getDeleteFolderMutationOptions,
 	getFoldersQueryKey,
@@ -20,11 +28,14 @@ import {
 import type {
 	Folder,
 	FolderColor,
+	FolderSyncAction,
+	FolderSyncPromptState,
 	LocalCreateFolderInput,
 	LocalFolder,
 	RemoteFolder,
 	UpdateFolderInput,
 	UseFolderStorageReturn,
+	UseSyncFoldersReturn,
 } from "./folder.types";
 
 // ============================================================================
@@ -352,5 +363,132 @@ export function useFolderStorage(): UseFolderStorageReturn {
 		reorder,
 		isLoading,
 		isAuthenticated,
+	};
+}
+
+// ============================================================================
+// useSyncFolders Hook
+// ============================================================================
+
+/**
+ * Hook for syncing local folders to server when user logs in.
+ * Detects login transition and prompts user to sync, discard, or keep both.
+ */
+export function useSyncFolders(): UseSyncFoldersReturn {
+	const { data: session, isPending: isSessionPending } = useSession();
+	const isAuthenticated = !!session?.user;
+	const previousAuthState = useRef<boolean | null>(null);
+
+	const [syncPrompt, setSyncPrompt] = useState<FolderSyncPromptState>({
+		isOpen: false,
+		localFoldersCount: 0,
+		remoteFoldersCount: 0,
+	});
+
+	const queryKey = getFoldersQueryKey();
+
+	const { data: remoteFolders, isLoading: isRemoteFoldersLoading } = useQuery({
+		...getAllFoldersQueryOptions(),
+		enabled: isAuthenticated,
+	});
+
+	const bulkCreateMutation = useMutation({
+		mutationFn: getBulkCreateFoldersMutationOptions().mutationFn,
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey });
+		},
+	});
+
+	const checkForLocalFolders = useCallback(() => {
+		const localFolders = localFolderStorage.getAll();
+		if (localFolders.length > 0) {
+			setSyncPrompt({
+				isOpen: true,
+				localFoldersCount: localFolders.length,
+				remoteFoldersCount: remoteFolders?.length ?? 0,
+			});
+		}
+	}, [remoteFolders?.length]);
+
+	// Detect login transition (unauthenticated -> authenticated)
+	useEffect(() => {
+		if (isSessionPending || isRemoteFoldersLoading) return;
+
+		const wasAuthenticated = previousAuthState.current;
+		const isNowAuthenticated = isAuthenticated;
+
+		// Store current state for next comparison
+		previousAuthState.current = isNowAuthenticated;
+
+		// Only trigger on login transition (was not authenticated, now is)
+		if (wasAuthenticated === false && isNowAuthenticated === true) {
+			checkForLocalFolders();
+		}
+	}, [
+		isAuthenticated,
+		isSessionPending,
+		isRemoteFoldersLoading,
+		checkForLocalFolders,
+	]);
+
+	const handleSyncAction = useCallback(
+		async (action: FolderSyncAction) => {
+			const localFolders = localFolderStorage.getAll();
+
+			try {
+				switch (action) {
+					case "sync": {
+						// Upload local folders to server, then clear local storage
+						if (localFolders.length > 0) {
+							await bulkCreateMutation.mutateAsync({
+								folders: localFolders.map((f) => ({
+									name: f.name,
+									color: f.color,
+									order: f.order,
+								})),
+							});
+						}
+						localFolderStorage.clearAll();
+						notifyLocalFoldersListeners();
+						break;
+					}
+					case "discard": {
+						// Just clear local storage without syncing
+						localFolderStorage.clearAll();
+						notifyLocalFoldersListeners();
+						break;
+					}
+					case "keep_both": {
+						// Upload local folders and keep remote ones (they're already there)
+						if (localFolders.length > 0) {
+							await bulkCreateMutation.mutateAsync({
+								folders: localFolders.map((f) => ({
+									name: f.name,
+									color: f.color,
+									// Don't pass order to let server assign new orders
+									// This avoids order conflicts with existing remote folders
+								})),
+							});
+						}
+						localFolderStorage.clearAll();
+						notifyLocalFoldersListeners();
+						break;
+					}
+				}
+			} finally {
+				setSyncPrompt({
+					isOpen: false,
+					localFoldersCount: 0,
+					remoteFoldersCount: 0,
+				});
+			}
+		},
+		[bulkCreateMutation],
+	);
+
+	return {
+		syncPrompt,
+		handleSyncAction,
+		isSyncing: bulkCreateMutation.isPending,
 	};
 }

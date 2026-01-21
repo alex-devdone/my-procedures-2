@@ -924,3 +924,36 @@
 - [✓] 2026-01-21 11:35 - Run all unit tests: 1779 tests passed (27 new bulkCreate tests added)
 - [✓] 2026-01-21 11:35 - Run linting check: passed (50 pre-existing warnings)
 
+- [✓] 2026-01-21 11:32 - Create folder sync mechanism (Phase 16) with:
+  - Added bulkCreate procedure to folder router (packages/api/src/routers/folder.ts):
+    - bulkCreateFoldersInputSchema Zod schema for bulk folder input validation
+    - Calculates auto-incremented orders for folders without explicit order
+    - Preserves explicit order when provided
+    - Defaults color to slate when not specified
+    - Returns { count, folders } with created folder records
+  - Added bulkCreateFoldersInputSchema to folder.types.ts (apps/web/src/app/api/folder/folder.types.ts):
+    - Zod schema for bulk folder creation with name, color, order fields
+    - BulkCreateFoldersInput and BulkCreateFoldersOutput types
+    - FolderSyncAction type ("sync" | "discard" | "keep_both")
+    - FolderSyncPromptState and UseSyncFoldersReturn interfaces
+  - Added getBulkCreateFoldersMutationOptions to folder.api.ts
+  - Created useSyncFolders hook in folder.hooks.ts (apps/web/src/app/api/folder/folder.hooks.ts):
+    - Detects login transition (unauthenticated -> authenticated)
+    - Prompts user with sync dialog showing local/remote folder counts
+    - handleSyncAction for "sync", "discard", "keep_both" actions
+    - "sync" action preserves folder order when syncing
+    - "keep_both" action omits order to let server assign new orders
+    - Clears localStorage after sync and notifies listeners
+  - Updated folder barrel export (apps/web/src/app/api/folder/index.ts):
+    - Exports useSyncFolders, getBulkCreateFoldersMutationOptions
+    - Exports new types and schemas
+- [✓] 2026-01-21 11:32 - Add unit tests for folder sync mechanism:
+  - packages/api/src/routers/folder.test.ts: 19 new tests for bulkCreate covering:
+    - Input validation (empty array, single/multiple folders, name/color/order validation)
+    - Business logic (order calculation, color defaults, return value structure)
+  - apps/web/src/app/api/folder/folder.types.test.ts: 14 new tests for bulkCreateFoldersInputSchema
+  - apps/web/src/app/api/folder/folder.hooks.test.tsx: 18 new tests for useSyncFolders covering:
+    - Initial state, sync/discard/keep_both actions, empty folders, data preservation
+- [✓] 2026-01-21 11:32 - Run all unit tests: 1781 tests passed (51 new folder sync tests added)
+- [✓] 2026-01-21 11:32 - Run linting check: passed (50 pre-existing warnings)
+

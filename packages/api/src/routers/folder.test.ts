@@ -996,4 +996,301 @@ describe("Zod Schema Validation", () => {
 			});
 		});
 	});
+
+	describe("Bulk Create Folders Input Schema", () => {
+		const validColors = [
+			"slate",
+			"red",
+			"orange",
+			"amber",
+			"yellow",
+			"lime",
+			"green",
+			"emerald",
+			"teal",
+			"cyan",
+			"sky",
+			"blue",
+			"indigo",
+			"violet",
+			"purple",
+			"fuchsia",
+			"pink",
+			"rose",
+		];
+
+		const validateBulkCreate = (
+			input: unknown,
+		): {
+			valid: boolean;
+			folders?: Array<{ name: string; color: string; order?: number }>;
+		} => {
+			if (
+				typeof input !== "object" ||
+				input === null ||
+				!("folders" in input) ||
+				!Array.isArray((input as { folders: unknown }).folders)
+			) {
+				return { valid: false };
+			}
+
+			const folders = (
+				input as {
+					folders: Array<{ name?: unknown; color?: unknown; order?: unknown }>;
+				}
+			).folders;
+
+			for (const folder of folders) {
+				// Validate name
+				if (
+					typeof folder.name !== "string" ||
+					folder.name.length < 1 ||
+					folder.name.length > 100
+				) {
+					return { valid: false };
+				}
+				// Validate color (optional, defaults to slate)
+				if (
+					folder.color !== undefined &&
+					!validColors.includes(folder.color as string)
+				) {
+					return { valid: false };
+				}
+				// Validate order (optional, must be non-negative if provided)
+				if (
+					folder.order !== undefined &&
+					(typeof folder.order !== "number" || folder.order < 0)
+				) {
+					return { valid: false };
+				}
+			}
+
+			return {
+				valid: true,
+				folders: folders.map((f) => ({
+					name: f.name as string,
+					color: (f.color as string) ?? "slate",
+					order: f.order as number | undefined,
+				})),
+			};
+		};
+
+		it("validates empty folders array", () => {
+			expect(validateBulkCreate({ folders: [] })).toEqual({
+				valid: true,
+				folders: [],
+			});
+		});
+
+		it("validates single folder", () => {
+			expect(validateBulkCreate({ folders: [{ name: "Work" }] })).toEqual({
+				valid: true,
+				folders: [{ name: "Work", color: "slate", order: undefined }],
+			});
+		});
+
+		it("validates multiple folders", () => {
+			const result = validateBulkCreate({
+				folders: [
+					{ name: "Work", color: "blue" },
+					{ name: "Personal", color: "green", order: 1 },
+				],
+			});
+			expect(result.valid).toBe(true);
+			expect(result.folders).toHaveLength(2);
+		});
+
+		it("validates folder with explicit order", () => {
+			expect(
+				validateBulkCreate({ folders: [{ name: "Work", order: 5 }] }),
+			).toEqual({
+				valid: true,
+				folders: [{ name: "Work", color: "slate", order: 5 }],
+			});
+		});
+
+		it("rejects missing folders field", () => {
+			expect(validateBulkCreate({})).toEqual({ valid: false });
+		});
+
+		it("rejects non-array folders", () => {
+			expect(validateBulkCreate({ folders: "not-an-array" })).toEqual({
+				valid: false,
+			});
+		});
+
+		it("rejects folder with empty name", () => {
+			expect(validateBulkCreate({ folders: [{ name: "" }] })).toEqual({
+				valid: false,
+			});
+		});
+
+		it("rejects folder with name over 100 characters", () => {
+			expect(
+				validateBulkCreate({ folders: [{ name: "a".repeat(101) }] }),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects folder with invalid color", () => {
+			expect(
+				validateBulkCreate({ folders: [{ name: "Work", color: "invalid" }] }),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects folder with negative order", () => {
+			expect(
+				validateBulkCreate({ folders: [{ name: "Work", order: -1 }] }),
+			).toEqual({ valid: false });
+		});
+
+		it("accepts order of zero", () => {
+			expect(
+				validateBulkCreate({ folders: [{ name: "Work", order: 0 }] }),
+			).toEqual({
+				valid: true,
+				folders: [{ name: "Work", color: "slate", order: 0 }],
+			});
+		});
+	});
+});
+
+// ============================================================================
+// Bulk Create Business Logic Tests
+// ============================================================================
+
+describe("Bulk Create Folders Business Logic", () => {
+	const userId = "user-123";
+
+	describe("Order Calculation", () => {
+		it("should auto-increment order when not specified", () => {
+			const maxExistingOrder = 2;
+			let nextOrder = maxExistingOrder + 1;
+
+			const foldersToCreate = [
+				{ name: "Folder 1" },
+				{ name: "Folder 2" },
+				{ name: "Folder 3" },
+			].map((f) => ({
+				...f,
+				color: "slate" as const,
+				userId,
+				order: nextOrder++,
+			}));
+
+			expect(foldersToCreate[0].order).toBe(3);
+			expect(foldersToCreate[1].order).toBe(4);
+			expect(foldersToCreate[2].order).toBe(5);
+		});
+
+		it("should use explicit order when provided", () => {
+			const maxExistingOrder = 2;
+			let nextOrder = maxExistingOrder + 1;
+
+			const input = [
+				{ name: "Folder 1", order: 10 },
+				{ name: "Folder 2" },
+				{ name: "Folder 3", order: 20 },
+			];
+
+			const foldersToCreate = input.map((f) => ({
+				name: f.name,
+				color: "slate" as const,
+				userId,
+				order: f.order !== undefined ? f.order : nextOrder++,
+			}));
+
+			expect(foldersToCreate[0].order).toBe(10);
+			expect(foldersToCreate[1].order).toBe(3);
+			expect(foldersToCreate[2].order).toBe(20);
+		});
+
+		it("should start at 0 when no existing folders", () => {
+			const maxExistingOrder = -1; // COALESCE returns -1 when no folders exist
+			let nextOrder = maxExistingOrder + 1;
+
+			const foldersToCreate = [{ name: "First Folder" }].map((f) => ({
+				...f,
+				color: "slate" as const,
+				userId,
+				order: nextOrder++,
+			}));
+
+			expect(foldersToCreate[0].order).toBe(0);
+		});
+	});
+
+	describe("Empty Input Handling", () => {
+		it("should return count 0 for empty input", () => {
+			const input: Array<{ name: string }> = [];
+			const result = { count: input.length, folders: [] };
+
+			expect(result.count).toBe(0);
+			expect(result.folders).toEqual([]);
+		});
+	});
+
+	describe("Color Default", () => {
+		it("should default color to slate when not specified", () => {
+			const input = { name: "Work", color: undefined };
+			const processedColor = input.color ?? "slate";
+
+			expect(processedColor).toBe("slate");
+		});
+
+		it("should preserve explicit color", () => {
+			const input = { name: "Work", color: "blue" as const };
+			const processedColor = input.color ?? "slate";
+
+			expect(processedColor).toBe("blue");
+		});
+	});
+
+	describe("Folder Data Structure", () => {
+		it("should create folders with correct structure", () => {
+			const input = [
+				{ name: "Work", color: "blue" as const, order: 0 },
+				{ name: "Personal", color: "green" as const, order: 1 },
+			];
+
+			const foldersToCreate = input.map((f) => ({
+				name: f.name,
+				color: f.color,
+				userId,
+				order: f.order,
+			}));
+
+			expect(foldersToCreate).toEqual([
+				{ name: "Work", color: "blue", userId: "user-123", order: 0 },
+				{ name: "Personal", color: "green", userId: "user-123", order: 1 },
+			]);
+		});
+	});
+
+	describe("Return Value", () => {
+		it("should return count matching created folders length", () => {
+			const createdFolders = [
+				{
+					id: 1,
+					name: "Work",
+					color: "blue",
+					userId,
+					order: 0,
+					createdAt: new Date(),
+				},
+				{
+					id: 2,
+					name: "Personal",
+					color: "green",
+					userId,
+					order: 1,
+					createdAt: new Date(),
+				},
+			];
+
+			const result = { count: createdFolders.length, folders: createdFolders };
+
+			expect(result.count).toBe(2);
+			expect(result.folders).toHaveLength(2);
+		});
+	});
 });

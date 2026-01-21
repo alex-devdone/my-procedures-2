@@ -49,3 +49,10 @@ export function getDeleteFolderMutationOptions() {
 export function getReorderFolderMutationOptions() {
 	return trpc.folder.reorder.mutationOptions();
 }
+
+/**
+ * Get mutation options for bulk creating folders.
+ */
+export function getBulkCreateFoldersMutationOptions() {
+	return trpc.folder.bulkCreate.mutationOptions();
+}
