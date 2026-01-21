@@ -16,6 +16,10 @@ export const recurringPatternSchema = z.object({
 	monthOfYear: z.number().int().min(1).max(12).optional(),
 	endDate: z.string().optional(),
 	occurrences: z.number().int().positive().optional(),
+	notifyAt: z
+		.string()
+		.regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Must be in HH:mm format")
+		.optional(),
 });
 
 export type RecurringPattern = z.infer<typeof recurringPatternSchema>;
@@ -403,7 +407,7 @@ export function getNextNotificationTime(
 	}
 
 	// Parse the time from notifyAt (HH:mm format)
-	const [hours, minutes] = pattern.notifyAt.split(":").map(Number);
+	const [hours = 0, minutes = 0] = pattern.notifyAt.split(":").map(Number);
 
 	// Get the next occurrence date based on pattern type
 	const nextOccurrence = getNextOccurrence(pattern, fromDate);
