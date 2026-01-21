@@ -23,6 +23,18 @@ test.describe("Scheduled notifications (localStorage mode)", () => {
 			dueWithinTolerance?: boolean; // If true, set notification time within 60s tolerance window
 		},
 	) {
+		// If we need to be within tolerance, wait if we're too close to minute boundary
+		// This prevents race conditions where we set the time at second 58, and by the
+		// time the reminder checker runs (after reload + hydration), we've crossed into
+		// the next minute and are outside the tolerance window.
+		if (options.dueWithinTolerance) {
+			const secondsInMinute = new Date().getSeconds();
+			if (secondsInMinute > 50) {
+				// Wait until the next minute starts to ensure we have enough time
+				await page.waitForTimeout((60 - secondsInMinute + 1) * 1000);
+			}
+		}
+
 		await page.evaluate(
 			({ text, notifyAt, recurringType, dueWithinTolerance }) => {
 				const todos = JSON.parse(localStorage.getItem("todos") || "[]");
@@ -31,13 +43,13 @@ test.describe("Scheduled notifications (localStorage mode)", () => {
 				// Calculate notification time
 				let notifyAtTime: string;
 				if (dueWithinTolerance) {
-					// Set notification time to 10 seconds ago (within 60 second tolerance)
-					const notificationTime = new Date(now.getTime() - 10 * 1000);
-					const hours = notificationTime.getHours().toString().padStart(2, "0");
-					const minutes = notificationTime
-						.getMinutes()
-						.toString()
-						.padStart(2, "0");
+					// Set notification time to current minute (within 60 second tolerance window)
+					// Since notifyAt is in HH:mm format (minute precision), we use the current
+					// minute which guarantees we're within the 60-second tolerance window.
+					// The tolerance check compares current time against HH:mm:00, so as long as
+					// we're within the same minute, we'll be within 0-59 seconds tolerance.
+					const hours = now.getHours().toString().padStart(2, "0");
+					const minutes = now.getMinutes().toString().padStart(2, "0");
 					notifyAtTime = `${hours}:${minutes}`;
 				} else {
 					notifyAtTime = notifyAt;
@@ -266,6 +278,12 @@ test.describe("Scheduled notifications (localStorage mode)", () => {
 			page,
 		}) => {
 			const todoText = "Exact time notification";
+
+			// Wait if we're too close to minute boundary to avoid race conditions
+			const secondsInMinute = new Date().getSeconds();
+			if (secondsInMinute > 50) {
+				await page.waitForTimeout((60 - secondsInMinute + 1) * 1000);
+			}
 
 			// Create todo with current time as notification time
 			await page.evaluate((text) => {
