@@ -529,4 +529,67 @@ test.describe("Recurring Todos in Smart Views (localStorage mode)", () => {
 			).toHaveClass(/line-through/);
 		});
 	});
+
+	test.describe("Today view: toggling recurring todo behavior", () => {
+		test("should mark occurrence complete without creating new todo in Inbox", async ({
+			page,
+		}) => {
+			// Create a daily recurring todo
+			const todoText = "Daily morning standup";
+			const todoItem = await createTodo(page, todoText);
+			await setDailyRecurring(todoItem);
+
+			// Count the todos before toggling
+			const todosBeforeToggle = await page
+				.locator('[data-testid^="todo-item-"]')
+				.filter({ hasText: todoText })
+				.count();
+			expect(todosBeforeToggle).toBe(1);
+
+			// Navigate to Today view
+			await page.click('[data-testid="smart-view-today"]');
+			await expect(page.locator('[data-testid="today-view"]')).toBeVisible();
+
+			// The recurring todo should appear in Today view
+			const todayTodo = page
+				.locator('[data-testid="today-todo-list"]')
+				.locator('[data-testid^="todo-item-"]')
+				.filter({ hasText: todoText });
+			await expect(todayTodo).toBeVisible();
+
+			// Toggle the todo in Today view (mark as complete)
+			await todayTodo.locator('[data-testid="todo-toggle"]').click();
+
+			// Wait for the completion state to update
+			await expect(
+				todayTodo.locator('[data-testid="todo-toggle"]'),
+			).toHaveAttribute("aria-label", "Mark as incomplete");
+
+			// The occurrence should show as completed (strikethrough)
+			const todoTextElement = todayTodo.locator('[data-testid="todo-text"]');
+			await expect(todoTextElement).toHaveClass(/line-through/);
+
+			// Navigate back to Inbox
+			await page.click('[data-testid="inbox-folder"]');
+			await expect(
+				page.locator('[data-testid="inbox-folder"]'),
+			).toHaveAttribute("aria-current", "page");
+
+			// Count the todos after toggling - should still be 1 (no new todo created)
+			const todosAfterToggle = await page
+				.locator('[data-testid^="todo-item-"]')
+				.filter({ hasText: todoText })
+				.count();
+			expect(todosAfterToggle).toBe(1);
+
+			// The single todo should be the completed original
+			const completedTodo = page
+				.locator('[data-testid^="todo-item-"]')
+				.filter({ hasText: todoText });
+			await expect(completedTodo).toBeVisible();
+			await expect(
+				completedTodo.locator('[data-testid="todo-text"]'),
+			).toHaveClass(/line-through/);
+		});
+	});
 });
