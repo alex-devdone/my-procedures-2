@@ -253,7 +253,22 @@ export function getTodosUpcoming(
 	for (const todo of todos) {
 		// Case 1: Todo has a due date within the next 7 days
 		if (todo.dueDate && isWithinDays(todo.dueDate, 7)) {
-			addTodoToGroup(todo, todo.dueDate, String(todo.id));
+			// Non-recurring todo with dueDate - add as-is
+			if (!todo.recurringPattern) {
+				addTodoToGroup(todo, todo.dueDate, String(todo.id));
+			} else {
+				// Recurring todo with explicit dueDate
+				// Create virtual entry with occurrence completion status
+				const dueDateKey = getDateKey(todo.dueDate);
+				const completionKey = `${todo.id}-${dueDateKey}`;
+				const occurrenceCompleted = completionMap.get(completionKey);
+				const virtualEntry = createVirtualTodo(
+					todo,
+					new Date(todo.dueDate),
+					occurrenceCompleted,
+				);
+				addTodoToGroup(virtualEntry, todo.dueDate, virtualEntry.virtualKey);
+			}
 		}
 
 		// Case 2: Todo has a recurring pattern - create virtual entries for each matching date
