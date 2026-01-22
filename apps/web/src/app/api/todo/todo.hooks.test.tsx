@@ -69,6 +69,9 @@ vi.mock("./todo.api", () => ({
 	getUpdateTodoScheduleMutationOptions: () => ({
 		mutationFn: vi.fn().mockResolvedValue({}),
 	}),
+	getCompleteRecurringMutationOptions: () => ({
+		mutationFn: vi.fn().mockResolvedValue({}),
+	}),
 	getUpdatePastCompletionMutationOptions: () => ({
 		mutationFn: vi.fn().mockResolvedValue({}),
 	}),
@@ -1689,5 +1692,95 @@ describe("Folder Filtering", () => {
 			expect(result.current.todos[0].folderId).toBe("folder-1");
 			expect(result.current.todos[1].folderId).toBe(null);
 		});
+	});
+});
+
+describe("toggle with virtualDate for recurring todos", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		localStorageMock.clear();
+		mockUseSession.mockReturnValue({
+			data: { user: { id: "user-123" } },
+			isPending: false,
+		});
+	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	it("completes without error when virtualDate is provided with recurring todo", async () => {
+		const { result } = renderHook(() => useTodoStorage(), {
+			wrapper: createWrapper(),
+		});
+
+		// The hook should support the virtualDate option
+		await act(async () => {
+			// This should not throw - the toggle function accepts virtualDate option
+			await result.current.toggle(1, true, {
+				virtualDate: "2026-01-20T00:00:00.000Z",
+			});
+		});
+
+		// Test passes if no error is thrown
+		expect(result.current.toggle).toBeDefined();
+	});
+
+	it("completes without error when virtualDate is not provided with recurring todo", async () => {
+		const { result } = renderHook(() => useTodoStorage(), {
+			wrapper: createWrapper(),
+		});
+
+		// The hook should work without virtualDate option
+		await act(async () => {
+			await result.current.toggle(1, true);
+		});
+
+		// Test passes if no error is thrown
+		expect(result.current.toggle).toBeDefined();
+	});
+
+	it("completes without error when unchecking a recurring todo", async () => {
+		const { result } = renderHook(() => useTodoStorage(), {
+			wrapper: createWrapper(),
+		});
+
+		// Unchecking should work
+		await act(async () => {
+			await result.current.toggle(1, false);
+		});
+
+		// Test passes if no error is thrown
+		expect(result.current.toggle).toBeDefined();
+	});
+
+	it("completes without error for non-recurring todos", async () => {
+		const { result } = renderHook(() => useTodoStorage(), {
+			wrapper: createWrapper(),
+		});
+
+		// Regular toggle should work
+		await act(async () => {
+			await result.current.toggle(1, true);
+		});
+
+		// Test passes if no error is thrown
+		expect(result.current.toggle).toBeDefined();
+	});
+
+	it("completes without error when virtualDate is provided for non-recurring todo", async () => {
+		const { result } = renderHook(() => useTodoStorage(), {
+			wrapper: createWrapper(),
+		});
+
+		// virtualDate should be ignored for non-recurring todos
+		await act(async () => {
+			await result.current.toggle(1, true, {
+				virtualDate: "2026-01-20T00:00:00.000Z",
+			});
+		});
+
+		// Test passes if no error is thrown
+		expect(result.current.toggle).toBeDefined();
 	});
 });

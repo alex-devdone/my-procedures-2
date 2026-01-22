@@ -385,7 +385,7 @@ export function useTodoStorage(): UseTodoStorageReturn {
 		async (
 			id: number | string,
 			completed: boolean,
-			_options?: { virtualDate?: string },
+			options?: { virtualDate?: string },
 		) => {
 			if (isAuthenticated) {
 				// Skip server call for optimistic (negative) IDs - they haven't been created yet
@@ -393,13 +393,22 @@ export function useTodoStorage(): UseTodoStorageReturn {
 					return;
 				}
 
-				// For recurring todos being completed, use completeRecurring to create next occurrence
+				// For recurring todos being completed
 				if (completed) {
 					const currentTodos = remoteTodos || [];
 					const todo = currentTodos.find((t) => t.id === id);
 
 					if (todo?.recurringPattern) {
-						// Use completeRecurring mutation for recurring todos
+						// If virtualDate is provided, use updatePastCompletion for past occurrences
+						if (options?.virtualDate) {
+							await updatePastCompletionMutation.mutateAsync({
+								todoId: id as number,
+								scheduledDate: options.virtualDate,
+								completed: true,
+							});
+							return;
+						}
+						// Otherwise use completeRecurring mutation for recurring todos
 						await completeRecurringMutation.mutateAsync({ id: id as number });
 						return;
 					}
@@ -422,7 +431,13 @@ export function useTodoStorage(): UseTodoStorageReturn {
 				notifyLocalTodosListeners();
 			}
 		},
-		[isAuthenticated, toggleMutation, remoteTodos, completeRecurringMutation],
+		[
+			isAuthenticated,
+			toggleMutation,
+			remoteTodos,
+			completeRecurringMutation,
+			updatePastCompletionMutation,
+		],
 	);
 
 	const deleteTodo = useCallback(
