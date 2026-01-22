@@ -15,6 +15,13 @@
       "when": 1768947166695,
       "tag": "0001_easy_sally_floyd",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1769035952777,
+      "tag": "0002_fat_wolf_cub",
+      "breakpoints": true
     }
   ]
 }

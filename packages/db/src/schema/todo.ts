@@ -58,4 +58,42 @@ export const todoRelations = relations(todo, ({ one, many }) => ({
 		references: [folder.id],
 	}),
 	subtasks: many(subtask),
+	completions: many(recurringTodoCompletion),
 }));
+
+export const recurringTodoCompletion = pgTable(
+	"recurring_todo_completion",
+	{
+		id: serial("id").primaryKey(),
+		todoId: integer("todo_id")
+			.notNull()
+			.references(() => todo.id, { onDelete: "cascade" }),
+		scheduledDate: timestamp("scheduled_date").notNull(),
+		completedAt: timestamp("completed_at"),
+		userId: text("user_id")
+			.notNull()
+			.references(() => user.id, { onDelete: "cascade" }),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+	},
+	(table) => [
+		index("recurring_todo_completion_todoId_idx").on(table.todoId),
+		index("recurring_todo_completion_userId_idx").on(table.userId),
+		index("recurring_todo_completion_scheduledDate_idx").on(
+			table.scheduledDate,
+		),
+	],
+);
+
+export const recurringTodoCompletionRelations = relations(
+	recurringTodoCompletion,
+	({ one }) => ({
+		todo: one(todo, {
+			fields: [recurringTodoCompletion.todoId],
+			references: [todo.id],
+		}),
+		user: one(user, {
+			fields: [recurringTodoCompletion.userId],
+			references: [user.id],
+		}),
+	}),
+);

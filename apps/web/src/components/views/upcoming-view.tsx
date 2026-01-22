@@ -3,15 +3,21 @@
 import { Calendar, CheckCircle2, Circle, Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { useCompletionHistory } from "@/app/api/analytics";
 import type { FolderColor } from "@/app/api/folder";
 import { useFolderStorage } from "@/app/api/folder";
 import { useAllSubtasksProgress } from "@/app/api/subtask";
-import type { RecurringPattern, Todo } from "@/app/api/todo/todo.types";
+import type {
+	RecurringPattern,
+	Todo,
+	VirtualTodo,
+} from "@/app/api/todo/todo.types";
 import { isToday, isTomorrow } from "@/components/scheduling/due-date-badge";
 import { TodoExpandableItem } from "@/components/todos";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { isDateMatchingPattern } from "@/lib/recurring-utils";
 import { cn } from "@/lib/utils";
 
 type FilterType = "all" | "active" | "completed";
@@ -62,6 +68,16 @@ export interface UpcomingViewProps {
 	className?: string;
 }
 
+/** A todo entry that may be a regular todo or a virtual recurring instance */
+export type UpcomingTodoEntry = Todo | VirtualTodo;
+
+/**
+ * Type guard to check if a todo entry is a virtual recurring instance.
+ */
+export function isVirtualTodo(todo: UpcomingTodoEntry): todo is VirtualTodo {
+	return "isRecurringInstance" in todo && todo.isRecurringInstance === true;
+}
+
 /**
  * Represents a group of todos for a specific date.
  */
@@ -70,8 +86,8 @@ export interface TodoDateGroup {
 	dateKey: string;
 	/** Human-readable label for the date */
 	label: string;
-	/** Todos due on this date */
-	todos: Todo[];
+	/** Todos due on this date (may include virtual recurring instances) */
+	todos: UpcomingTodoEntry[];
 }
 
 /**
@@ -118,27 +134,143 @@ export function formatDateLabel(date: Date | string): string {
 }
 
 /**
- * Filters todos to return only those due within the next 7 days, grouped by date.
+ * Get an array of dates for the next N days (including today).
  */
-export function getTodosUpcoming(todos: Todo[]): TodoDateGroup[] {
-	const upcomingTodos = todos.filter((todo) => {
-		if (!todo.dueDate) return false;
-		return isWithinDays(todo.dueDate, 7);
-	});
+function getNextDays(days: number): Date[] {
+	const dates: Date[] = [];
+	const today = new Date();
+	today.setHours(0, 0, 0, 0);
+
+	for (let i = 0; i <= days; i++) {
+		const date = new Date(today);
+		date.setDate(date.getDate() + i);
+		dates.push(date);
+	}
+
+	return dates;
+}
+
+/**
+ * Check if a recurring pattern matches any date in the next N days.
+ * Returns the matching dates for the pattern.
+ */
+export function getRecurringMatchingDates(
+	pattern: RecurringPattern,
+	days: number,
+): Date[] {
+	const nextDays = getNextDays(days);
+	return nextDays.filter((date) => isDateMatchingPattern(pattern, date));
+}
+
+/**
+ * Creates a virtual todo entry for a recurring pattern on a specific date.
+ * @param todo - The original recurring todo
+ * @param date - The date for this virtual instance
+ * @param occurrenceCompleted - Whether this specific occurrence was completed
+ */
+export function createVirtualTodo(
+	todo: Todo,
+	date: Date,
+	occurrenceCompleted?: boolean,
+): VirtualTodo {
+	const dateKey = getDateKey(date);
+	return {
+		...todo,
+		isRecurringInstance: true,
+		virtualDate: dateKey,
+		virtualKey: `${todo.id}-${dateKey}`,
+		occurrenceCompleted,
+	};
+}
+
+/**
+ * Completion record for a recurring todo occurrence.
+ * Used to track which specific dates have been completed.
+ * todoId can be string (local storage) or number (remote).
+ */
+export interface CompletionRecord {
+	todoId: string | number;
+	scheduledDate: Date;
+	completedAt: Date | null;
+}
+
+/**
+ * Filters todos to return only those due within the next 7 days, grouped by date.
+ * Generates virtual todo entries for recurring patterns on each matching date.
+ * @param todos - All todos to filter
+ * @param completionHistory - Optional completion history for recurring todos
+ */
+export function getTodosUpcoming(
+	todos: Todo[],
+	completionHistory?: CompletionRecord[],
+): TodoDateGroup[] {
+	// Create a map for quick lookup of completion status by todoId and date
+	const completionMap = new Map<string, boolean>();
+	if (completionHistory) {
+		for (const record of completionHistory) {
+			const dateKey = getDateKey(record.scheduledDate);
+			const key = `${record.todoId}-${dateKey}`;
+			completionMap.set(key, record.completedAt !== null);
+		}
+	}
 
 	// Group by date
-	const groups = new Map<string, { label: string; todos: Todo[] }>();
+	const groups = new Map<
+		string,
+		{ label: string; todos: UpcomingTodoEntry[] }
+	>();
 
-	for (const todo of upcomingTodos) {
-		const dateKey = getDateKey(todo.dueDate as string);
-		const label = formatDateLabel(todo.dueDate as string);
+	// Helper to add a todo entry to a specific date group
+	const addTodoToGroup = (
+		entry: UpcomingTodoEntry,
+		date: Date | string,
+		uniqueKey: string,
+	) => {
+		const dateKey = getDateKey(date);
+		const label = formatDateLabel(date);
 
 		if (!groups.has(dateKey)) {
 			groups.set(dateKey, { label, todos: [] });
 		}
 		const group = groups.get(dateKey);
 		if (group) {
-			group.todos.push(todo);
+			// Avoid adding duplicates using unique key
+			const existingKeys = new Set(
+				group.todos.map((t) =>
+					isVirtualTodo(t) ? t.virtualKey : String(t.id),
+				),
+			);
+			if (!existingKeys.has(uniqueKey)) {
+				group.todos.push(entry);
+			}
+		}
+	};
+
+	for (const todo of todos) {
+		// Case 1: Todo has a due date within the next 7 days
+		if (todo.dueDate && isWithinDays(todo.dueDate, 7)) {
+			addTodoToGroup(todo, todo.dueDate, String(todo.id));
+		}
+
+		// Case 2: Todo has a recurring pattern - create virtual entries for each matching date
+		if (todo.recurringPattern) {
+			const matchingDates = getRecurringMatchingDates(todo.recurringPattern, 7);
+			for (const date of matchingDates) {
+				const dateKey = getDateKey(date);
+				// If the todo also has a dueDate matching this date, skip virtual entry
+				// to avoid duplication (the explicit dueDate takes precedence)
+				if (todo.dueDate) {
+					const dueDateKey = getDateKey(todo.dueDate);
+					if (dueDateKey === dateKey) {
+						continue;
+					}
+				}
+				// Check if this occurrence was completed
+				const completionKey = `${todo.id}-${dateKey}`;
+				const occurrenceCompleted = completionMap.get(completionKey);
+				const virtualEntry = createVirtualTodo(todo, date, occurrenceCompleted);
+				addTodoToGroup(virtualEntry, date, virtualEntry.virtualKey);
+			}
 		}
 	}
 
@@ -151,10 +283,23 @@ export function getTodosUpcoming(todos: Todo[]): TodoDateGroup[] {
 }
 
 /**
- * Flattens date groups into a flat array of todos.
+ * Flattens date groups into a flat array of todo entries.
  */
-export function flattenDateGroups(groups: TodoDateGroup[]): Todo[] {
+export function flattenDateGroups(
+	groups: TodoDateGroup[],
+): UpcomingTodoEntry[] {
 	return groups.flatMap((group) => group.todos);
+}
+
+/**
+ * Helper to check if a todo entry is effectively completed.
+ * For virtual todos, checks occurrenceCompleted; for regular todos, checks completed.
+ */
+export function isEntryCompleted(entry: UpcomingTodoEntry): boolean {
+	if (isVirtualTodo(entry)) {
+		return entry.occurrenceCompleted === true;
+	}
+	return entry.completed;
 }
 
 /**
@@ -183,10 +328,39 @@ export function UpcomingView({
 	const { folders } = useFolderStorage();
 	const { getProgress } = useAllSubtasksProgress();
 
+	// Calculate date range for completion history (today to 7 days from now)
+	const dateRange = useMemo(() => {
+		const today = new Date();
+		today.setHours(0, 0, 0, 0);
+		const endDate = new Date(today);
+		endDate.setDate(endDate.getDate() + 7);
+		endDate.setHours(23, 59, 59, 999);
+		return {
+			startDate: today.toISOString(),
+			endDate: endDate.toISOString(),
+		};
+	}, []);
+
+	// Fetch completion history for recurring todos
+	const { data: completionHistoryData } = useCompletionHistory(
+		dateRange.startDate,
+		dateRange.endDate,
+	);
+
+	// Convert completion history to the format expected by getTodosUpcoming
+	const completionHistory = useMemo(() => {
+		if (!completionHistoryData) return undefined;
+		return completionHistoryData.map((record) => ({
+			todoId: record.todoId,
+			scheduledDate: new Date(record.scheduledDate),
+			completedAt: record.completedAt ? new Date(record.completedAt) : null,
+		}));
+	}, [completionHistoryData]);
+
 	// Get todos grouped by date
 	const dateGroups = useMemo(() => {
-		return getTodosUpcoming(todos);
-	}, [todos]);
+		return getTodosUpcoming(todos, completionHistory);
+	}, [todos, completionHistory]);
 
 	// Flatten all upcoming todos for filtering
 	const allUpcomingTodos = useMemo(() => {
@@ -199,10 +373,11 @@ export function UpcomingView({
 			.map((group) => ({
 				...group,
 				todos: group.todos.filter((todo) => {
+					const isCompleted = isEntryCompleted(todo);
 					const matchesFilter =
 						filter === "all" ||
-						(filter === "active" && !todo.completed) ||
-						(filter === "completed" && todo.completed);
+						(filter === "active" && !isCompleted) ||
+						(filter === "completed" && isCompleted);
 
 					const matchesSearch =
 						!searchQuery ||
@@ -217,7 +392,9 @@ export function UpcomingView({
 	// Stats for all upcoming todos
 	const stats = useMemo(() => {
 		const total = allUpcomingTodos.length;
-		const completed = allUpcomingTodos.filter((t) => t.completed).length;
+		const completed = allUpcomingTodos.filter((t) =>
+			isEntryCompleted(t),
+		).length;
 		const active = total - completed;
 		return { total, completed, active };
 	}, [allUpcomingTodos]);
@@ -352,10 +529,22 @@ export function UpcomingView({
 									<ul className="space-y-2">
 										{group.todos.map((todo, index) => {
 											const todoFolder = getFolderForTodo(todo.folderId);
+											// Use virtualKey for recurring instances, otherwise use id
+											const itemKey = isVirtualTodo(todo)
+												? todo.virtualKey
+												: todo.id;
+											// For virtual todos, use occurrenceCompleted for display
+											const displayCompleted = isVirtualTodo(todo)
+												? todo.occurrenceCompleted === true
+												: todo.completed;
 											return (
 												<TodoExpandableItem
-													key={todo.id}
-													todo={todo}
+													key={itemKey}
+													todo={{
+														...todo,
+														// Override completed with the effective completion status
+														completed: displayCompleted,
+													}}
 													subtaskProgress={getProgress(todo.id)}
 													onToggle={handleToggleTodo}
 													onDelete={onDelete}
@@ -364,6 +553,10 @@ export function UpcomingView({
 													showFolderBadge={true}
 													folderColorBgClasses={folderColorBgClasses}
 													animationDelay={`${index * 0.03}s`}
+													isRecurringInstance={isVirtualTodo(todo)}
+													virtualDate={
+														isVirtualTodo(todo) ? todo.virtualDate : undefined
+													}
 												/>
 											);
 										})}

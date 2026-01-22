@@ -964,6 +964,92 @@ describe("Scheduling Fields Validation", () => {
 		});
 	});
 
+	describe("recurringPatternSchema notifyAt default", () => {
+		// Import the actual schema to test Zod defaults
+		// We need to test this separately as the schema has .default() behavior
+		it("should default notifyAt to '09:00' when not provided", async () => {
+			const { recurringPatternSchema } = await import("./todo");
+
+			const result = recurringPatternSchema.parse({ type: "daily" });
+
+			expect(result.notifyAt).toBe("09:00");
+		});
+
+		it("should default notifyAt to '09:00' for weekly pattern", async () => {
+			const { recurringPatternSchema } = await import("./todo");
+
+			const result = recurringPatternSchema.parse({
+				type: "weekly",
+				daysOfWeek: [1, 3, 5],
+			});
+
+			expect(result.notifyAt).toBe("09:00");
+		});
+
+		it("should use provided notifyAt value when specified", async () => {
+			const { recurringPatternSchema } = await import("./todo");
+
+			const result = recurringPatternSchema.parse({
+				type: "daily",
+				notifyAt: "14:30",
+			});
+
+			expect(result.notifyAt).toBe("14:30");
+		});
+
+		it("should accept valid HH:mm format for notifyAt", async () => {
+			const { recurringPatternSchema } = await import("./todo");
+
+			// Test various valid times
+			expect(
+				recurringPatternSchema.parse({ type: "daily", notifyAt: "00:00" })
+					.notifyAt,
+			).toBe("00:00");
+			expect(
+				recurringPatternSchema.parse({ type: "daily", notifyAt: "23:59" })
+					.notifyAt,
+			).toBe("23:59");
+			expect(
+				recurringPatternSchema.parse({ type: "daily", notifyAt: "12:00" })
+					.notifyAt,
+			).toBe("12:00");
+		});
+
+		it("should reject invalid notifyAt format", async () => {
+			const { recurringPatternSchema } = await import("./todo");
+
+			expect(() =>
+				recurringPatternSchema.parse({ type: "daily", notifyAt: "9:00" }),
+			).toThrow();
+			expect(() =>
+				recurringPatternSchema.parse({ type: "daily", notifyAt: "24:00" }),
+			).toThrow();
+			expect(() =>
+				recurringPatternSchema.parse({ type: "daily", notifyAt: "12:60" }),
+			).toThrow();
+			expect(() =>
+				recurringPatternSchema.parse({ type: "daily", notifyAt: "invalid" }),
+			).toThrow();
+		});
+
+		it("should default notifyAt for all pattern types", async () => {
+			const { recurringPatternSchema } = await import("./todo");
+
+			const patternTypes = [
+				{ type: "daily" as const },
+				{ type: "weekly" as const, daysOfWeek: [1] },
+				{ type: "monthly" as const, dayOfMonth: 15 },
+				{ type: "yearly" as const, monthOfYear: 1, dayOfMonth: 1 },
+				{ type: "custom" as const, interval: 2 },
+			];
+
+			for (const pattern of patternTypes) {
+				const result = recurringPatternSchema.parse(pattern);
+				expect(result.notifyAt).toBe("09:00");
+			}
+		});
+	});
+
 	describe("Create Todo with Scheduling Input Validation", () => {
 		interface CreateTodoWithSchedulingInput {
 			text: string;
@@ -2065,6 +2151,3042 @@ describe("CompleteRecurring Procedure", () => {
 				expect(result.getTime()).toBeGreaterThanOrEqual(beforeCall.getTime());
 				expect(result.getTime()).toBeLessThanOrEqual(afterCall.getTime());
 			});
+		});
+
+		describe("Completion Record Creation", () => {
+			interface CompletionRecordInput {
+				todoId: number;
+				scheduledDate: Date;
+				completedAt: Date;
+				userId: string;
+			}
+
+			const shouldCreateCompletionRecord = (
+				existingDueDate: Date | null | undefined,
+			): boolean => {
+				// Only create a completion record if the todo had a due date
+				return existingDueDate !== null && existingDueDate !== undefined;
+			};
+
+			const buildCompletionRecordData = (
+				newTodoId: number,
+				scheduledDate: Date,
+				userId: string,
+			): CompletionRecordInput => ({
+				todoId: newTodoId,
+				scheduledDate,
+				completedAt: new Date(),
+				userId,
+			});
+
+			it("should create completion record when todo has due date", () => {
+				const existingDueDate = new Date("2026-01-21T10:00:00Z");
+
+				expect(shouldCreateCompletionRecord(existingDueDate)).toBe(true);
+			});
+
+			it("should not create completion record when todo has no due date", () => {
+				expect(shouldCreateCompletionRecord(null)).toBe(false);
+				expect(shouldCreateCompletionRecord(undefined)).toBe(false);
+			});
+
+			it("should build correct completion record data structure", () => {
+				const newTodoId = 2;
+				const scheduledDate = new Date("2026-01-21T10:00:00Z");
+				const userId = "user-123";
+
+				const beforeCall = new Date();
+				const result = buildCompletionRecordData(
+					newTodoId,
+					scheduledDate,
+					userId,
+				);
+				const afterCall = new Date();
+
+				expect(result.todoId).toBe(newTodoId);
+				expect(result.scheduledDate).toEqual(scheduledDate);
+				expect(result.userId).toBe(userId);
+				// completedAt should be around the current time
+				expect(result.completedAt.getTime()).toBeGreaterThanOrEqual(
+					beforeCall.getTime(),
+				);
+				expect(result.completedAt.getTime()).toBeLessThanOrEqual(
+					afterCall.getTime(),
+				);
+			});
+
+			it("should use new todo ID for completion record (not completed todo ID)", () => {
+				// This test documents the design decision that the completion record
+				// references the new todo (the continuing series), not the completed one
+				const completedTodoId = 1;
+				const newTodoId = 2;
+				const scheduledDate = new Date("2026-01-21T10:00:00Z");
+				const userId = "user-123";
+
+				const result = buildCompletionRecordData(
+					newTodoId,
+					scheduledDate,
+					userId,
+				);
+
+				expect(result.todoId).toBe(newTodoId);
+				expect(result.todoId).not.toBe(completedTodoId);
+			});
+
+			it("should use completed todo's due date as scheduled date", () => {
+				// The scheduled date should be when the occurrence was originally scheduled,
+				// not when it was completed
+				const completedTodoDueDate = new Date("2026-01-21T10:00:00Z");
+				const newTodoId = 2;
+				const userId = "user-123";
+
+				const result = buildCompletionRecordData(
+					newTodoId,
+					completedTodoDueDate,
+					userId,
+				);
+
+				expect(result.scheduledDate).toEqual(completedTodoDueDate);
+			});
+		});
+	});
+});
+
+describe("GetCompletionHistory Procedure", () => {
+	describe("Input Validation", () => {
+		interface GetCompletionHistoryInput {
+			startDate: string;
+			endDate: string;
+		}
+
+		const validateGetCompletionHistoryInput = (
+			input: unknown,
+		): { valid: boolean; data?: GetCompletionHistoryInput } => {
+			if (typeof input !== "object" || input === null) {
+				return { valid: false };
+			}
+
+			const i = input as Record<string, unknown>;
+
+			// startDate is required and must be valid datetime string
+			if (typeof i.startDate !== "string") {
+				return { valid: false };
+			}
+			const startDate = new Date(i.startDate);
+			if (Number.isNaN(startDate.getTime())) {
+				return { valid: false };
+			}
+
+			// endDate is required and must be valid datetime string
+			if (typeof i.endDate !== "string") {
+				return { valid: false };
+			}
+			const endDate = new Date(i.endDate);
+			if (Number.isNaN(endDate.getTime())) {
+				return { valid: false };
+			}
+
+			return {
+				valid: true,
+				data: input as GetCompletionHistoryInput,
+			};
+		};
+
+		it("validates valid date range", () => {
+			const result = validateGetCompletionHistoryInput({
+				startDate: "2026-01-01T00:00:00Z",
+				endDate: "2026-01-31T23:59:59Z",
+			});
+			expect(result.valid).toBe(true);
+			expect(result.data?.startDate).toBe("2026-01-01T00:00:00Z");
+			expect(result.data?.endDate).toBe("2026-01-31T23:59:59Z");
+		});
+
+		it("validates same day range", () => {
+			const result = validateGetCompletionHistoryInput({
+				startDate: "2026-01-15T00:00:00Z",
+				endDate: "2026-01-15T23:59:59Z",
+			});
+			expect(result.valid).toBe(true);
+		});
+
+		it("rejects missing startDate", () => {
+			expect(
+				validateGetCompletionHistoryInput({
+					endDate: "2026-01-31T23:59:59Z",
+				}),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects missing endDate", () => {
+			expect(
+				validateGetCompletionHistoryInput({
+					startDate: "2026-01-01T00:00:00Z",
+				}),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects invalid startDate string", () => {
+			expect(
+				validateGetCompletionHistoryInput({
+					startDate: "not-a-date",
+					endDate: "2026-01-31T23:59:59Z",
+				}),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects invalid endDate string", () => {
+			expect(
+				validateGetCompletionHistoryInput({
+					startDate: "2026-01-01T00:00:00Z",
+					endDate: "invalid",
+				}),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects non-object input", () => {
+			expect(validateGetCompletionHistoryInput("invalid")).toEqual({
+				valid: false,
+			});
+		});
+
+		it("rejects null input", () => {
+			expect(validateGetCompletionHistoryInput(null)).toEqual({ valid: false });
+		});
+	});
+
+	describe("Business Logic", () => {
+		interface CompletionRecord {
+			id: number;
+			todoId: number;
+			scheduledDate: Date;
+			completedAt: Date | null;
+			createdAt: Date;
+			userId: string;
+		}
+
+		interface CompletionWithTodoText extends CompletionRecord {
+			todoText: string;
+		}
+
+		describe("Filtering by Date Range", () => {
+			it("should filter completions within date range", () => {
+				const completions: CompletionRecord[] = [
+					{
+						id: 1,
+						todoId: 10,
+						scheduledDate: new Date("2026-01-05T10:00:00Z"),
+						completedAt: new Date("2026-01-05T10:30:00Z"),
+						createdAt: new Date("2026-01-01T00:00:00Z"),
+						userId: "user-123",
+					},
+					{
+						id: 2,
+						todoId: 10,
+						scheduledDate: new Date("2026-01-15T10:00:00Z"),
+						completedAt: new Date("2026-01-15T11:00:00Z"),
+						createdAt: new Date("2026-01-01T00:00:00Z"),
+						userId: "user-123",
+					},
+					{
+						id: 3,
+						todoId: 10,
+						scheduledDate: new Date("2026-02-01T10:00:00Z"),
+						completedAt: null,
+						createdAt: new Date("2026-01-01T00:00:00Z"),
+						userId: "user-123",
+					},
+				];
+
+				const filterByDateRange = (
+					records: CompletionRecord[],
+					startDate: Date,
+					endDate: Date,
+				) => {
+					return records.filter(
+						(r) => r.scheduledDate >= startDate && r.scheduledDate <= endDate,
+					);
+				};
+
+				const startDate = new Date("2026-01-01T00:00:00Z");
+				const endDate = new Date("2026-01-31T23:59:59Z");
+
+				const result = filterByDateRange(completions, startDate, endDate);
+
+				expect(result).toHaveLength(2);
+				expect(result.map((r) => r.id)).toEqual([1, 2]);
+			});
+
+			it("should return empty array when no completions in range", () => {
+				const completions: CompletionRecord[] = [
+					{
+						id: 1,
+						todoId: 10,
+						scheduledDate: new Date("2026-03-01T10:00:00Z"),
+						completedAt: new Date("2026-03-01T10:30:00Z"),
+						createdAt: new Date("2026-03-01T00:00:00Z"),
+						userId: "user-123",
+					},
+				];
+
+				const filterByDateRange = (
+					records: CompletionRecord[],
+					startDate: Date,
+					endDate: Date,
+				) => {
+					return records.filter(
+						(r) => r.scheduledDate >= startDate && r.scheduledDate <= endDate,
+					);
+				};
+
+				const startDate = new Date("2026-01-01T00:00:00Z");
+				const endDate = new Date("2026-01-31T23:59:59Z");
+
+				const result = filterByDateRange(completions, startDate, endDate);
+
+				expect(result).toHaveLength(0);
+			});
+		});
+
+		describe("Filtering by User", () => {
+			it("should only return completions for the authenticated user", () => {
+				const completions: CompletionRecord[] = [
+					{
+						id: 1,
+						todoId: 10,
+						scheduledDate: new Date("2026-01-15T10:00:00Z"),
+						completedAt: new Date("2026-01-15T10:30:00Z"),
+						createdAt: new Date("2026-01-01T00:00:00Z"),
+						userId: "user-123",
+					},
+					{
+						id: 2,
+						todoId: 20,
+						scheduledDate: new Date("2026-01-15T10:00:00Z"),
+						completedAt: new Date("2026-01-15T11:00:00Z"),
+						createdAt: new Date("2026-01-01T00:00:00Z"),
+						userId: "user-456", // Different user
+					},
+					{
+						id: 3,
+						todoId: 30,
+						scheduledDate: new Date("2026-01-16T10:00:00Z"),
+						completedAt: null,
+						createdAt: new Date("2026-01-01T00:00:00Z"),
+						userId: "user-123",
+					},
+				];
+
+				const filterByUser = (records: CompletionRecord[], userId: string) => {
+					return records.filter((r) => r.userId === userId);
+				};
+
+				const result = filterByUser(completions, "user-123");
+
+				expect(result).toHaveLength(2);
+				expect(result.every((r) => r.userId === "user-123")).toBe(true);
+			});
+		});
+
+		describe("Join with Todo Data", () => {
+			it("should include todo text in completion record", () => {
+				const todos = [
+					{ id: 10, text: "Daily standup", userId: "user-123" },
+					{ id: 20, text: "Weekly review", userId: "user-123" },
+				];
+
+				const completions: CompletionRecord[] = [
+					{
+						id: 1,
+						todoId: 10,
+						scheduledDate: new Date("2026-01-15T10:00:00Z"),
+						completedAt: new Date("2026-01-15T10:30:00Z"),
+						createdAt: new Date("2026-01-01T00:00:00Z"),
+						userId: "user-123",
+					},
+					{
+						id: 2,
+						todoId: 20,
+						scheduledDate: new Date("2026-01-15T14:00:00Z"),
+						completedAt: null,
+						createdAt: new Date("2026-01-01T00:00:00Z"),
+						userId: "user-123",
+					},
+				];
+
+				const joinWithTodoText = (
+					completionRecords: CompletionRecord[],
+					todoRecords: Array<{ id: number; text: string; userId: string }>,
+				): CompletionWithTodoText[] => {
+					return completionRecords
+						.map((completion) => {
+							const todo = todoRecords.find((t) => t.id === completion.todoId);
+							if (!todo) return null;
+							return {
+								...completion,
+								todoText: todo.text,
+							};
+						})
+						.filter((r): r is CompletionWithTodoText => r !== null);
+				};
+
+				const result = joinWithTodoText(completions, todos);
+
+				expect(result).toHaveLength(2);
+				expect(result[0]?.todoText).toBe("Daily standup");
+				expect(result[1]?.todoText).toBe("Weekly review");
+			});
+
+			it("should exclude completions where todo no longer exists (inner join behavior)", () => {
+				const todos = [{ id: 10, text: "Existing todo", userId: "user-123" }];
+
+				const completions: CompletionRecord[] = [
+					{
+						id: 1,
+						todoId: 10,
+						scheduledDate: new Date("2026-01-15T10:00:00Z"),
+						completedAt: new Date("2026-01-15T10:30:00Z"),
+						createdAt: new Date("2026-01-01T00:00:00Z"),
+						userId: "user-123",
+					},
+					{
+						id: 2,
+						todoId: 99, // Todo was deleted
+						scheduledDate: new Date("2026-01-16T10:00:00Z"),
+						completedAt: null,
+						createdAt: new Date("2026-01-01T00:00:00Z"),
+						userId: "user-123",
+					},
+				];
+
+				const joinWithTodoText = (
+					completionRecords: CompletionRecord[],
+					todoRecords: Array<{ id: number; text: string; userId: string }>,
+				): CompletionWithTodoText[] => {
+					return completionRecords
+						.map((completion) => {
+							const todo = todoRecords.find((t) => t.id === completion.todoId);
+							if (!todo) return null;
+							return {
+								...completion,
+								todoText: todo.text,
+							};
+						})
+						.filter((r): r is CompletionWithTodoText => r !== null);
+				};
+
+				const result = joinWithTodoText(completions, todos);
+
+				expect(result).toHaveLength(1);
+				expect(result[0]?.todoId).toBe(10);
+			});
+		});
+
+		describe("Return Value Structure", () => {
+			it("should return correct shape for completion history records", () => {
+				interface CompletionHistoryRecord {
+					id: number;
+					todoId: number;
+					scheduledDate: Date;
+					completedAt: Date | null;
+					createdAt: Date;
+					todoText: string;
+				}
+
+				const createCompletionHistoryRecord = (data: {
+					id: number;
+					todoId: number;
+					scheduledDate: Date;
+					completedAt: Date | null;
+					createdAt: Date;
+					todoText: string;
+				}): CompletionHistoryRecord => ({
+					id: data.id,
+					todoId: data.todoId,
+					scheduledDate: data.scheduledDate,
+					completedAt: data.completedAt,
+					createdAt: data.createdAt,
+					todoText: data.todoText,
+				});
+
+				const record = createCompletionHistoryRecord({
+					id: 1,
+					todoId: 10,
+					scheduledDate: new Date("2026-01-15T10:00:00Z"),
+					completedAt: new Date("2026-01-15T10:30:00Z"),
+					createdAt: new Date("2026-01-01T00:00:00Z"),
+					todoText: "Daily standup",
+				});
+
+				expect(record).toHaveProperty("id");
+				expect(record).toHaveProperty("todoId");
+				expect(record).toHaveProperty("scheduledDate");
+				expect(record).toHaveProperty("completedAt");
+				expect(record).toHaveProperty("createdAt");
+				expect(record).toHaveProperty("todoText");
+			});
+
+			it("should handle completedAt being null for incomplete records", () => {
+				interface CompletionHistoryRecord {
+					id: number;
+					todoId: number;
+					scheduledDate: Date;
+					completedAt: Date | null;
+					createdAt: Date;
+					todoText: string;
+				}
+
+				const record: CompletionHistoryRecord = {
+					id: 1,
+					todoId: 10,
+					scheduledDate: new Date("2026-01-15T10:00:00Z"),
+					completedAt: null, // Not yet completed
+					createdAt: new Date("2026-01-01T00:00:00Z"),
+					todoText: "Pending task",
+				};
+
+				expect(record.completedAt).toBeNull();
+			});
+		});
+
+		describe("Combined Filters", () => {
+			it("should apply both user and date range filters", () => {
+				const completions: CompletionRecord[] = [
+					{
+						id: 1,
+						todoId: 10,
+						scheduledDate: new Date("2026-01-15T10:00:00Z"),
+						completedAt: new Date("2026-01-15T10:30:00Z"),
+						createdAt: new Date("2026-01-01T00:00:00Z"),
+						userId: "user-123",
+					},
+					{
+						id: 2,
+						todoId: 20,
+						scheduledDate: new Date("2026-01-15T10:00:00Z"),
+						completedAt: new Date("2026-01-15T11:00:00Z"),
+						createdAt: new Date("2026-01-01T00:00:00Z"),
+						userId: "user-456", // Different user - should be excluded
+					},
+					{
+						id: 3,
+						todoId: 30,
+						scheduledDate: new Date("2026-02-15T10:00:00Z"), // Outside range
+						completedAt: null,
+						createdAt: new Date("2026-01-01T00:00:00Z"),
+						userId: "user-123",
+					},
+					{
+						id: 4,
+						todoId: 40,
+						scheduledDate: new Date("2026-01-20T10:00:00Z"),
+						completedAt: new Date("2026-01-20T10:30:00Z"),
+						createdAt: new Date("2026-01-01T00:00:00Z"),
+						userId: "user-123",
+					},
+				];
+
+				const filterCompletions = (
+					records: CompletionRecord[],
+					userId: string,
+					startDate: Date,
+					endDate: Date,
+				) => {
+					return records.filter(
+						(r) =>
+							r.userId === userId &&
+							r.scheduledDate >= startDate &&
+							r.scheduledDate <= endDate,
+					);
+				};
+
+				const result = filterCompletions(
+					completions,
+					"user-123",
+					new Date("2026-01-01T00:00:00Z"),
+					new Date("2026-01-31T23:59:59Z"),
+				);
+
+				expect(result).toHaveLength(2);
+				expect(result.map((r) => r.id)).toEqual([1, 4]);
+			});
+		});
+	});
+});
+
+describe("GetAnalytics Procedure", () => {
+	describe("Input Validation", () => {
+		interface GetAnalyticsInput {
+			startDate: string;
+			endDate: string;
+		}
+
+		const validateGetAnalyticsInput = (
+			input: unknown,
+		): { valid: boolean; data?: GetAnalyticsInput } => {
+			if (typeof input !== "object" || input === null) {
+				return { valid: false };
+			}
+
+			const i = input as Record<string, unknown>;
+
+			// startDate is required and must be valid datetime string
+			if (typeof i.startDate !== "string") {
+				return { valid: false };
+			}
+			const startDate = new Date(i.startDate);
+			if (Number.isNaN(startDate.getTime())) {
+				return { valid: false };
+			}
+
+			// endDate is required and must be valid datetime string
+			if (typeof i.endDate !== "string") {
+				return { valid: false };
+			}
+			const endDate = new Date(i.endDate);
+			if (Number.isNaN(endDate.getTime())) {
+				return { valid: false };
+			}
+
+			return {
+				valid: true,
+				data: input as GetAnalyticsInput,
+			};
+		};
+
+		it("validates valid date range", () => {
+			const result = validateGetAnalyticsInput({
+				startDate: "2026-01-01T00:00:00Z",
+				endDate: "2026-01-31T23:59:59Z",
+			});
+			expect(result.valid).toBe(true);
+			expect(result.data?.startDate).toBe("2026-01-01T00:00:00Z");
+			expect(result.data?.endDate).toBe("2026-01-31T23:59:59Z");
+		});
+
+		it("validates same day range", () => {
+			const result = validateGetAnalyticsInput({
+				startDate: "2026-01-15T00:00:00Z",
+				endDate: "2026-01-15T23:59:59Z",
+			});
+			expect(result.valid).toBe(true);
+		});
+
+		it("rejects missing startDate", () => {
+			expect(
+				validateGetAnalyticsInput({
+					endDate: "2026-01-31T23:59:59Z",
+				}),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects missing endDate", () => {
+			expect(
+				validateGetAnalyticsInput({
+					startDate: "2026-01-01T00:00:00Z",
+				}),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects invalid startDate string", () => {
+			expect(
+				validateGetAnalyticsInput({
+					startDate: "not-a-date",
+					endDate: "2026-01-31T23:59:59Z",
+				}),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects invalid endDate string", () => {
+			expect(
+				validateGetAnalyticsInput({
+					startDate: "2026-01-01T00:00:00Z",
+					endDate: "invalid",
+				}),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects non-object input", () => {
+			expect(validateGetAnalyticsInput("invalid")).toEqual({
+				valid: false,
+			});
+		});
+
+		it("rejects null input", () => {
+			expect(validateGetAnalyticsInput(null)).toEqual({ valid: false });
+		});
+	});
+
+	describe("Completion Rate Calculation", () => {
+		const calculateCompletionRate = (
+			totalCompleted: number,
+			totalExpected: number,
+		): number => {
+			if (totalExpected === 0) {
+				return 100; // No tasks expected = 100% completion
+			}
+			return Math.round((totalCompleted / totalExpected) * 100);
+		};
+
+		it("should return 100% when all tasks are completed", () => {
+			expect(calculateCompletionRate(10, 10)).toBe(100);
+		});
+
+		it("should return 0% when no tasks are completed", () => {
+			expect(calculateCompletionRate(0, 10)).toBe(0);
+		});
+
+		it("should return correct percentage for partial completion", () => {
+			expect(calculateCompletionRate(7, 10)).toBe(70);
+			expect(calculateCompletionRate(1, 3)).toBe(33);
+			expect(calculateCompletionRate(2, 3)).toBe(67);
+		});
+
+		it("should return 100% when no tasks are expected", () => {
+			expect(calculateCompletionRate(0, 0)).toBe(100);
+		});
+
+		it("should round to nearest integer", () => {
+			expect(calculateCompletionRate(1, 6)).toBe(17); // 16.67 rounds to 17
+			expect(calculateCompletionRate(5, 6)).toBe(83); // 83.33 rounds to 83
+		});
+	});
+
+	describe("Streak Calculation", () => {
+		const calculateStreak = (
+			completionDates: string[],
+			today: Date,
+		): number => {
+			if (completionDates.length === 0) {
+				return 0;
+			}
+
+			// Sort dates in descending order (most recent first)
+			const sortedDates = [...completionDates].sort(
+				(a, b) => new Date(b).getTime() - new Date(a).getTime(),
+			);
+
+			const todayStr = today.toISOString().split("T")[0] ?? "";
+			const yesterday = new Date(today);
+			yesterday.setDate(yesterday.getDate() - 1);
+			const yesterdayStr = yesterday.toISOString().split("T")[0] ?? "";
+
+			let streak = 0;
+			let checkDate = todayStr;
+
+			// If no completion today but there's one yesterday, start from yesterday
+			if (
+				sortedDates.length > 0 &&
+				sortedDates[0] !== todayStr &&
+				sortedDates[0] === yesterdayStr
+			) {
+				checkDate = yesterdayStr;
+			}
+
+			for (const dateStr of sortedDates) {
+				if (dateStr === checkDate) {
+					streak++;
+					const checkDateObj = new Date(checkDate);
+					checkDateObj.setDate(checkDateObj.getDate() - 1);
+					const newCheckDate = checkDateObj.toISOString().split("T")[0];
+					checkDate = newCheckDate ?? "";
+				} else if (new Date(dateStr) < new Date(checkDate)) {
+					// Gap in dates, streak broken
+					break;
+				}
+			}
+
+			return streak;
+		};
+
+		it("should return 0 when no completion dates", () => {
+			const today = new Date("2026-01-22T12:00:00Z");
+			expect(calculateStreak([], today)).toBe(0);
+		});
+
+		it("should return 1 for completion today only", () => {
+			const today = new Date("2026-01-22T12:00:00Z");
+			expect(calculateStreak(["2026-01-22"], today)).toBe(1);
+		});
+
+		it("should return 1 for completion yesterday only", () => {
+			const today = new Date("2026-01-22T12:00:00Z");
+			expect(calculateStreak(["2026-01-21"], today)).toBe(1);
+		});
+
+		it("should return 0 when last completion is more than 1 day ago", () => {
+			const today = new Date("2026-01-22T12:00:00Z");
+			expect(calculateStreak(["2026-01-20"], today)).toBe(0);
+		});
+
+		it("should count consecutive days starting from today", () => {
+			const today = new Date("2026-01-22T12:00:00Z");
+			expect(
+				calculateStreak(["2026-01-22", "2026-01-21", "2026-01-20"], today),
+			).toBe(3);
+		});
+
+		it("should count consecutive days starting from yesterday", () => {
+			const today = new Date("2026-01-22T12:00:00Z");
+			// No completion today, but consecutive days before
+			expect(
+				calculateStreak(["2026-01-21", "2026-01-20", "2026-01-19"], today),
+			).toBe(3);
+		});
+
+		it("should break streak on gaps", () => {
+			const today = new Date("2026-01-22T12:00:00Z");
+			// Gap on Jan 20
+			expect(
+				calculateStreak(["2026-01-22", "2026-01-21", "2026-01-19"], today),
+			).toBe(2);
+		});
+
+		it("should handle unsorted input dates", () => {
+			const today = new Date("2026-01-22T12:00:00Z");
+			expect(
+				calculateStreak(["2026-01-20", "2026-01-22", "2026-01-21"], today),
+			).toBe(3);
+		});
+
+		it("should handle duplicate dates", () => {
+			const today = new Date("2026-01-22T12:00:00Z");
+			expect(
+				calculateStreak(
+					["2026-01-22", "2026-01-22", "2026-01-21", "2026-01-21"],
+					today,
+				),
+			).toBe(2);
+		});
+	});
+
+	describe("Daily Breakdown Calculation", () => {
+		interface DailyStats {
+			date: string;
+			regularCompleted: number;
+			recurringCompleted: number;
+			recurringMissed: number;
+		}
+
+		const buildDailyBreakdown = (
+			startDate: Date,
+			endDate: Date,
+			regularCompletions: Array<{ date: string; count: number }>,
+			recurringCompletions: Array<{ date: string; count: number }>,
+			recurringMissed: Array<{ date: string; count: number }>,
+		): DailyStats[] => {
+			const dailyBreakdownMap = new Map<string, DailyStats>();
+
+			// Initialize all dates in range
+			const currentDate = new Date(startDate);
+			while (currentDate <= endDate) {
+				const dateStr = currentDate.toISOString().split("T")[0] ?? "";
+				dailyBreakdownMap.set(dateStr, {
+					date: dateStr,
+					regularCompleted: 0,
+					recurringCompleted: 0,
+					recurringMissed: 0,
+				});
+				currentDate.setDate(currentDate.getDate() + 1);
+			}
+
+			// Fill in regular completions
+			for (const { date, count } of regularCompletions) {
+				const entry = dailyBreakdownMap.get(date);
+				if (entry) {
+					entry.regularCompleted = count;
+				}
+			}
+
+			// Fill in recurring completions
+			for (const { date, count } of recurringCompletions) {
+				const entry = dailyBreakdownMap.get(date);
+				if (entry) {
+					entry.recurringCompleted = count;
+				}
+			}
+
+			// Fill in recurring missed
+			for (const { date, count } of recurringMissed) {
+				const entry = dailyBreakdownMap.get(date);
+				if (entry) {
+					entry.recurringMissed = count;
+				}
+			}
+
+			return Array.from(dailyBreakdownMap.values()).sort((a, b) =>
+				a.date.localeCompare(b.date),
+			);
+		};
+
+		it("should create entry for each day in range", () => {
+			const startDate = new Date("2026-01-20T00:00:00Z");
+			const endDate = new Date("2026-01-22T23:59:59Z");
+
+			const result = buildDailyBreakdown(startDate, endDate, [], [], []);
+
+			expect(result).toHaveLength(3);
+			expect(result.map((d) => d.date)).toEqual([
+				"2026-01-20",
+				"2026-01-21",
+				"2026-01-22",
+			]);
+		});
+
+		it("should initialize all counts to zero", () => {
+			const startDate = new Date("2026-01-20T00:00:00Z");
+			const endDate = new Date("2026-01-20T23:59:59Z");
+
+			const result = buildDailyBreakdown(startDate, endDate, [], [], []);
+
+			expect(result[0]).toEqual({
+				date: "2026-01-20",
+				regularCompleted: 0,
+				recurringCompleted: 0,
+				recurringMissed: 0,
+			});
+		});
+
+		it("should populate regular completions", () => {
+			const startDate = new Date("2026-01-20T00:00:00Z");
+			const endDate = new Date("2026-01-22T23:59:59Z");
+
+			const result = buildDailyBreakdown(
+				startDate,
+				endDate,
+				[
+					{ date: "2026-01-20", count: 3 },
+					{ date: "2026-01-22", count: 1 },
+				],
+				[],
+				[],
+			);
+
+			expect(result[0]?.regularCompleted).toBe(3);
+			expect(result[1]?.regularCompleted).toBe(0);
+			expect(result[2]?.regularCompleted).toBe(1);
+		});
+
+		it("should populate recurring completions and missed", () => {
+			const startDate = new Date("2026-01-20T00:00:00Z");
+			const endDate = new Date("2026-01-22T23:59:59Z");
+
+			const result = buildDailyBreakdown(
+				startDate,
+				endDate,
+				[],
+				[
+					{ date: "2026-01-20", count: 2 },
+					{ date: "2026-01-21", count: 4 },
+				],
+				[{ date: "2026-01-22", count: 1 }],
+			);
+
+			expect(result[0]?.recurringCompleted).toBe(2);
+			expect(result[1]?.recurringCompleted).toBe(4);
+			expect(result[2]?.recurringMissed).toBe(1);
+		});
+
+		it("should handle all types of data together", () => {
+			const startDate = new Date("2026-01-20T00:00:00Z");
+			const endDate = new Date("2026-01-21T23:59:59Z");
+
+			const result = buildDailyBreakdown(
+				startDate,
+				endDate,
+				[{ date: "2026-01-20", count: 2 }],
+				[{ date: "2026-01-20", count: 3 }],
+				[{ date: "2026-01-21", count: 1 }],
+			);
+
+			expect(result[0]).toEqual({
+				date: "2026-01-20",
+				regularCompleted: 2,
+				recurringCompleted: 3,
+				recurringMissed: 0,
+			});
+			expect(result[1]).toEqual({
+				date: "2026-01-21",
+				regularCompleted: 0,
+				recurringCompleted: 0,
+				recurringMissed: 1,
+			});
+		});
+
+		it("should sort results by date", () => {
+			const startDate = new Date("2026-01-18T00:00:00Z");
+			const endDate = new Date("2026-01-22T23:59:59Z");
+
+			const result = buildDailyBreakdown(startDate, endDate, [], [], []);
+
+			const dates = result.map((d) => d.date);
+			const sortedDates = [...dates].sort();
+			expect(dates).toEqual(sortedDates);
+		});
+	});
+
+	describe("Return Value Structure", () => {
+		interface AnalyticsResult {
+			totalRegularCompleted: number;
+			totalRecurringCompleted: number;
+			totalRecurringMissed: number;
+			completionRate: number;
+			currentStreak: number;
+			dailyBreakdown: Array<{
+				date: string;
+				regularCompleted: number;
+				recurringCompleted: number;
+				recurringMissed: number;
+			}>;
+		}
+
+		it("should have all required fields", () => {
+			const result: AnalyticsResult = {
+				totalRegularCompleted: 5,
+				totalRecurringCompleted: 10,
+				totalRecurringMissed: 2,
+				completionRate: 88,
+				currentStreak: 3,
+				dailyBreakdown: [
+					{
+						date: "2026-01-20",
+						regularCompleted: 2,
+						recurringCompleted: 5,
+						recurringMissed: 1,
+					},
+				],
+			};
+
+			expect(result).toHaveProperty("totalRegularCompleted");
+			expect(result).toHaveProperty("totalRecurringCompleted");
+			expect(result).toHaveProperty("totalRecurringMissed");
+			expect(result).toHaveProperty("completionRate");
+			expect(result).toHaveProperty("currentStreak");
+			expect(result).toHaveProperty("dailyBreakdown");
+		});
+
+		it("should have numeric values for totals", () => {
+			const result: AnalyticsResult = {
+				totalRegularCompleted: 5,
+				totalRecurringCompleted: 10,
+				totalRecurringMissed: 2,
+				completionRate: 88,
+				currentStreak: 3,
+				dailyBreakdown: [],
+			};
+
+			expect(typeof result.totalRegularCompleted).toBe("number");
+			expect(typeof result.totalRecurringCompleted).toBe("number");
+			expect(typeof result.totalRecurringMissed).toBe("number");
+			expect(typeof result.completionRate).toBe("number");
+			expect(typeof result.currentStreak).toBe("number");
+		});
+
+		it("should have dailyBreakdown as an array", () => {
+			const result: AnalyticsResult = {
+				totalRegularCompleted: 0,
+				totalRecurringCompleted: 0,
+				totalRecurringMissed: 0,
+				completionRate: 100,
+				currentStreak: 0,
+				dailyBreakdown: [],
+			};
+
+			expect(Array.isArray(result.dailyBreakdown)).toBe(true);
+		});
+	});
+
+	describe("Missed Detection Logic", () => {
+		const isMissed = (
+			scheduledDate: Date,
+			completedAt: Date | null,
+			today: Date,
+		): boolean => {
+			// A recurring occurrence is missed if:
+			// 1. Its scheduled date has passed (before today)
+			// 2. No completion record exists (completedAt is null)
+			return scheduledDate < today && completedAt === null;
+		};
+
+		it("should return true for past scheduled date with no completion", () => {
+			const scheduledDate = new Date("2026-01-20T10:00:00Z");
+			const today = new Date("2026-01-22T12:00:00Z");
+
+			expect(isMissed(scheduledDate, null, today)).toBe(true);
+		});
+
+		it("should return false for past scheduled date with completion", () => {
+			const scheduledDate = new Date("2026-01-20T10:00:00Z");
+			const completedAt = new Date("2026-01-20T11:00:00Z");
+			const today = new Date("2026-01-22T12:00:00Z");
+
+			expect(isMissed(scheduledDate, completedAt, today)).toBe(false);
+		});
+
+		it("should return false for future scheduled date with no completion", () => {
+			const scheduledDate = new Date("2026-01-25T10:00:00Z");
+			const today = new Date("2026-01-22T12:00:00Z");
+
+			expect(isMissed(scheduledDate, null, today)).toBe(false);
+		});
+
+		it("should return false for today's scheduled date with no completion", () => {
+			const scheduledDate = new Date("2026-01-22T10:00:00Z");
+			const today = new Date("2026-01-22T00:00:00Z");
+			// scheduledDate is same day or after today start
+
+			// At midnight today, 10am is in the future
+			expect(isMissed(scheduledDate, null, today)).toBe(false);
+		});
+	});
+
+	describe("Completion Rate Edge Cases", () => {
+		const calculateCompletionRate = (
+			totalCompleted: number,
+			totalExpected: number,
+		): number => {
+			if (totalExpected === 0) {
+				return 100;
+			}
+			return Math.round((totalCompleted / totalExpected) * 100);
+		};
+
+		const calculateAnalyticsCompletionRate = (
+			regularCompleted: number,
+			recurringCompleted: number,
+			recurringMissed: number,
+		): number => {
+			const totalRecurringExpected = recurringCompleted + recurringMissed;
+			const totalCompleted = regularCompleted + recurringCompleted;
+			const totalExpected = regularCompleted + totalRecurringExpected;
+			return calculateCompletionRate(totalCompleted, totalExpected);
+		};
+
+		it("should calculate combined rate with regular and recurring todos", () => {
+			// 5 regular completed, 10 recurring completed, 2 recurring missed
+			// totalCompleted = 5 + 10 = 15
+			// totalExpected = 5 + (10 + 2) = 17
+			// rate = 15/17 * 100 = 88.2 -> 88
+			expect(calculateAnalyticsCompletionRate(5, 10, 2)).toBe(88);
+		});
+
+		it("should handle all regular tasks and no recurring", () => {
+			// 10 regular completed, 0 recurring completed, 0 recurring missed
+			// totalCompleted = 10, totalExpected = 10
+			expect(calculateAnalyticsCompletionRate(10, 0, 0)).toBe(100);
+		});
+
+		it("should handle all recurring tasks and no regular", () => {
+			// 0 regular, 8 recurring completed, 2 recurring missed
+			// totalCompleted = 8, totalExpected = 10
+			expect(calculateAnalyticsCompletionRate(0, 8, 2)).toBe(80);
+		});
+
+		it("should handle perfect completion rate", () => {
+			// 5 regular, 10 recurring completed, 0 missed
+			expect(calculateAnalyticsCompletionRate(5, 10, 0)).toBe(100);
+		});
+
+		it("should handle zero completion rate", () => {
+			// 0 regular, 0 recurring completed, 10 missed
+			expect(calculateAnalyticsCompletionRate(0, 0, 10)).toBe(0);
+		});
+
+		it("should handle large numbers of tasks", () => {
+			// 1000 regular, 5000 recurring completed, 500 missed
+			// totalCompleted = 6000, totalExpected = 6500
+			// rate = 6000/6500 * 100 = 92.3 -> 92
+			expect(calculateAnalyticsCompletionRate(1000, 5000, 500)).toBe(92);
+		});
+
+		it("should return 100 when no tasks expected (empty date range)", () => {
+			// No regular, no recurring - 100% by default
+			expect(calculateAnalyticsCompletionRate(0, 0, 0)).toBe(100);
+		});
+
+		it("should handle single task scenarios", () => {
+			// 1 regular completed only
+			expect(calculateAnalyticsCompletionRate(1, 0, 0)).toBe(100);
+			// 1 recurring completed only
+			expect(calculateAnalyticsCompletionRate(0, 1, 0)).toBe(100);
+			// 1 recurring missed only
+			expect(calculateAnalyticsCompletionRate(0, 0, 1)).toBe(0);
+		});
+	});
+
+	describe("Streak Edge Cases", () => {
+		const calculateStreak = (
+			completionDates: string[],
+			today: Date,
+		): number => {
+			if (completionDates.length === 0) {
+				return 0;
+			}
+
+			const uniqueDates = [...new Set(completionDates)];
+			const sortedDates = uniqueDates.sort(
+				(a, b) => new Date(b).getTime() - new Date(a).getTime(),
+			);
+
+			const todayStr = today.toISOString().split("T")[0] ?? "";
+			const yesterday = new Date(today);
+			yesterday.setDate(yesterday.getDate() - 1);
+			const yesterdayStr = yesterday.toISOString().split("T")[0] ?? "";
+
+			let streak = 0;
+			let checkDate = todayStr;
+
+			if (
+				sortedDates.length > 0 &&
+				sortedDates[0] !== todayStr &&
+				sortedDates[0] === yesterdayStr
+			) {
+				checkDate = yesterdayStr;
+			}
+
+			for (const dateStr of sortedDates) {
+				if (dateStr === checkDate) {
+					streak++;
+					const checkDateObj = new Date(checkDate);
+					checkDateObj.setDate(checkDateObj.getDate() - 1);
+					const newCheckDate = checkDateObj.toISOString().split("T")[0];
+					checkDate = newCheckDate ?? "";
+				} else if (new Date(dateStr) < new Date(checkDate)) {
+					break;
+				}
+			}
+
+			return streak;
+		};
+
+		it("should handle very long streak (30+ days)", () => {
+			const today = new Date("2026-01-31T12:00:00Z");
+			const dates: string[] = [];
+			for (let i = 0; i < 30; i++) {
+				const date = new Date(today);
+				date.setDate(date.getDate() - i);
+				dates.push(date.toISOString().split("T")[0] ?? "");
+			}
+			expect(calculateStreak(dates, today)).toBe(30);
+		});
+
+		it("should handle single completion on boundary (end of day)", () => {
+			const today = new Date("2026-01-22T23:59:59Z");
+			expect(calculateStreak(["2026-01-22"], today)).toBe(1);
+		});
+
+		it("should handle single completion on boundary (start of day)", () => {
+			const today = new Date("2026-01-22T00:00:01Z");
+			expect(calculateStreak(["2026-01-22"], today)).toBe(1);
+		});
+
+		it("should handle multiple completions on same day (deduplication)", () => {
+			const today = new Date("2026-01-22T12:00:00Z");
+			expect(
+				calculateStreak(
+					["2026-01-22", "2026-01-22", "2026-01-22", "2026-01-21"],
+					today,
+				),
+			).toBe(2);
+		});
+
+		it("should not count future dates", () => {
+			const today = new Date("2026-01-22T12:00:00Z");
+			// Future dates should not affect streak starting from today
+			expect(
+				calculateStreak(["2026-01-25", "2026-01-22", "2026-01-21"], today),
+			).toBe(2);
+		});
+
+		it("should return 0 if last completion was more than a day ago", () => {
+			const today = new Date("2026-01-22T12:00:00Z");
+			// Last completion on Jan 15, gap too large
+			expect(calculateStreak(["2026-01-15"], today)).toBe(0);
+		});
+
+		it("should handle month boundary correctly", () => {
+			const today = new Date("2026-02-01T12:00:00Z");
+			expect(
+				calculateStreak(["2026-02-01", "2026-01-31", "2026-01-30"], today),
+			).toBe(3);
+		});
+
+		it("should handle year boundary correctly", () => {
+			const today = new Date("2026-01-01T12:00:00Z");
+			expect(
+				calculateStreak(["2026-01-01", "2025-12-31", "2025-12-30"], today),
+			).toBe(3);
+		});
+	});
+
+	describe("Daily Breakdown Edge Cases", () => {
+		interface DailyStats {
+			date: string;
+			regularCompleted: number;
+			recurringCompleted: number;
+			recurringMissed: number;
+		}
+
+		const buildDailyBreakdown = (
+			startDate: Date,
+			endDate: Date,
+			regularCompletions: Array<{ date: string; count: number }>,
+			recurringCompletions: Array<{ date: string; count: number }>,
+			recurringMissed: Array<{ date: string; count: number }>,
+		): DailyStats[] => {
+			const dailyBreakdownMap = new Map<string, DailyStats>();
+
+			const currentDate = new Date(startDate);
+			while (currentDate <= endDate) {
+				const dateStr = currentDate.toISOString().split("T")[0] ?? "";
+				dailyBreakdownMap.set(dateStr, {
+					date: dateStr,
+					regularCompleted: 0,
+					recurringCompleted: 0,
+					recurringMissed: 0,
+				});
+				currentDate.setDate(currentDate.getDate() + 1);
+			}
+
+			for (const { date, count } of regularCompletions) {
+				const entry = dailyBreakdownMap.get(date);
+				if (entry) {
+					entry.regularCompleted = count;
+				}
+			}
+
+			for (const { date, count } of recurringCompletions) {
+				const entry = dailyBreakdownMap.get(date);
+				if (entry) {
+					entry.recurringCompleted = count;
+				}
+			}
+
+			for (const { date, count } of recurringMissed) {
+				const entry = dailyBreakdownMap.get(date);
+				if (entry) {
+					entry.recurringMissed = count;
+				}
+			}
+
+			return Array.from(dailyBreakdownMap.values()).sort((a, b) =>
+				a.date.localeCompare(b.date),
+			);
+		};
+
+		it("should handle single day range", () => {
+			const startDate = new Date("2026-01-22T00:00:00Z");
+			const endDate = new Date("2026-01-22T23:59:59Z");
+
+			const result = buildDailyBreakdown(
+				startDate,
+				endDate,
+				[{ date: "2026-01-22", count: 5 }],
+				[{ date: "2026-01-22", count: 3 }],
+				[{ date: "2026-01-22", count: 1 }],
+			);
+
+			expect(result).toHaveLength(1);
+			expect(result[0]).toEqual({
+				date: "2026-01-22",
+				regularCompleted: 5,
+				recurringCompleted: 3,
+				recurringMissed: 1,
+			});
+		});
+
+		it("should handle week-long range", () => {
+			const startDate = new Date("2026-01-19T00:00:00Z");
+			const endDate = new Date("2026-01-25T23:59:59Z");
+
+			const result = buildDailyBreakdown(startDate, endDate, [], [], []);
+
+			expect(result).toHaveLength(7);
+			expect(result[0]?.date).toBe("2026-01-19");
+			expect(result[6]?.date).toBe("2026-01-25");
+		});
+
+		it("should ignore data for dates outside range", () => {
+			const startDate = new Date("2026-01-20T00:00:00Z");
+			const endDate = new Date("2026-01-22T23:59:59Z");
+
+			const result = buildDailyBreakdown(
+				startDate,
+				endDate,
+				[
+					{ date: "2026-01-19", count: 10 }, // Before range
+					{ date: "2026-01-21", count: 5 },
+					{ date: "2026-01-23", count: 10 }, // After range
+				],
+				[],
+				[],
+			);
+
+			// Should only have 3 days in range
+			expect(result).toHaveLength(3);
+			// Jan 19 data should be ignored (not in range)
+			expect(result[0]?.regularCompleted).toBe(0); // Jan 20
+			expect(result[1]?.regularCompleted).toBe(5); // Jan 21
+			expect(result[2]?.regularCompleted).toBe(0); // Jan 22
+		});
+
+		it("should handle month boundary crossing", () => {
+			const startDate = new Date("2026-01-30T00:00:00Z");
+			const endDate = new Date("2026-02-02T23:59:59Z");
+
+			const result = buildDailyBreakdown(
+				startDate,
+				endDate,
+				[
+					{ date: "2026-01-30", count: 1 },
+					{ date: "2026-02-01", count: 2 },
+				],
+				[],
+				[],
+			);
+
+			expect(result).toHaveLength(4);
+			expect(result.map((r) => r.date)).toEqual([
+				"2026-01-30",
+				"2026-01-31",
+				"2026-02-01",
+				"2026-02-02",
+			]);
+			expect(result[0]?.regularCompleted).toBe(1);
+			expect(result[2]?.regularCompleted).toBe(2);
+		});
+
+		it("should handle large date range (30 days)", () => {
+			const startDate = new Date("2026-01-01T00:00:00Z");
+			const endDate = new Date("2026-01-30T23:59:59Z");
+
+			const result = buildDailyBreakdown(startDate, endDate, [], [], []);
+
+			expect(result).toHaveLength(30);
+			expect(result[0]?.date).toBe("2026-01-01");
+			expect(result[29]?.date).toBe("2026-01-30");
+		});
+
+		it("should handle sparse data across date range", () => {
+			const startDate = new Date("2026-01-01T00:00:00Z");
+			const endDate = new Date("2026-01-10T23:59:59Z");
+
+			const result = buildDailyBreakdown(
+				startDate,
+				endDate,
+				[{ date: "2026-01-05", count: 3 }],
+				[{ date: "2026-01-01", count: 2 }],
+				[{ date: "2026-01-10", count: 1 }],
+			);
+
+			expect(result).toHaveLength(10);
+			// Most days should be zeros
+			expect(result[0]?.recurringCompleted).toBe(2); // Jan 1
+			expect(result[4]?.regularCompleted).toBe(3); // Jan 5
+			expect(result[9]?.recurringMissed).toBe(1); // Jan 10
+			// Check some zeros in between
+			expect(result[2]?.regularCompleted).toBe(0);
+			expect(result[2]?.recurringCompleted).toBe(0);
+			expect(result[2]?.recurringMissed).toBe(0);
+		});
+
+		it("should handle high activity days with multiple completions", () => {
+			const startDate = new Date("2026-01-20T00:00:00Z");
+			const endDate = new Date("2026-01-20T23:59:59Z");
+
+			const result = buildDailyBreakdown(
+				startDate,
+				endDate,
+				[{ date: "2026-01-20", count: 100 }],
+				[{ date: "2026-01-20", count: 50 }],
+				[{ date: "2026-01-20", count: 25 }],
+			);
+
+			expect(result[0]).toEqual({
+				date: "2026-01-20",
+				regularCompleted: 100,
+				recurringCompleted: 50,
+				recurringMissed: 25,
+			});
+		});
+	});
+
+	describe("Combined Analytics Calculation", () => {
+		interface AnalyticsResult {
+			totalRegularCompleted: number;
+			totalRecurringCompleted: number;
+			totalRecurringMissed: number;
+			completionRate: number;
+			currentStreak: number;
+			dailyBreakdown: Array<{
+				date: string;
+				regularCompleted: number;
+				recurringCompleted: number;
+				recurringMissed: number;
+			}>;
+		}
+
+		const calculateFullAnalytics = (
+			regularCompleted: number,
+			recurringCompleted: number,
+			recurringMissed: number,
+			completionDates: string[],
+			today: Date,
+			startDate: Date,
+			endDate: Date,
+		): AnalyticsResult => {
+			// Completion rate
+			const totalRecurringExpected = recurringCompleted + recurringMissed;
+			const totalCompleted = regularCompleted + recurringCompleted;
+			const totalExpected = regularCompleted + totalRecurringExpected;
+			const completionRate =
+				totalExpected > 0
+					? Math.round((totalCompleted / totalExpected) * 100)
+					: 100;
+
+			// Streak
+			const uniqueDates = [...new Set(completionDates)];
+			const sortedDates = uniqueDates.sort(
+				(a, b) => new Date(b).getTime() - new Date(a).getTime(),
+			);
+			const todayStr = today.toISOString().split("T")[0] ?? "";
+			const yesterday = new Date(today);
+			yesterday.setDate(yesterday.getDate() - 1);
+			const yesterdayStr = yesterday.toISOString().split("T")[0] ?? "";
+
+			let currentStreak = 0;
+			let checkDate = todayStr;
+			if (
+				sortedDates.length > 0 &&
+				sortedDates[0] !== todayStr &&
+				sortedDates[0] === yesterdayStr
+			) {
+				checkDate = yesterdayStr;
+			}
+			for (const dateStr of sortedDates) {
+				if (dateStr === checkDate) {
+					currentStreak++;
+					const checkDateObj = new Date(checkDate);
+					checkDateObj.setDate(checkDateObj.getDate() - 1);
+					checkDate = checkDateObj.toISOString().split("T")[0] ?? "";
+				} else if (new Date(dateStr) < new Date(checkDate)) {
+					break;
+				}
+			}
+
+			// Daily breakdown
+			const dailyBreakdown: AnalyticsResult["dailyBreakdown"] = [];
+			const currentDate = new Date(startDate);
+			while (currentDate <= endDate) {
+				const dateStr = currentDate.toISOString().split("T")[0] ?? "";
+				dailyBreakdown.push({
+					date: dateStr,
+					regularCompleted: 0,
+					recurringCompleted: 0,
+					recurringMissed: 0,
+				});
+				currentDate.setDate(currentDate.getDate() + 1);
+			}
+
+			return {
+				totalRegularCompleted: regularCompleted,
+				totalRecurringCompleted: recurringCompleted,
+				totalRecurringMissed: recurringMissed,
+				completionRate,
+				currentStreak,
+				dailyBreakdown,
+			};
+		};
+
+		it("should calculate comprehensive analytics for active user", () => {
+			const today = new Date("2026-01-22T12:00:00Z");
+			const startDate = new Date("2026-01-20T00:00:00Z");
+			const endDate = new Date("2026-01-22T23:59:59Z");
+
+			const result = calculateFullAnalytics(
+				5, // regular completed
+				10, // recurring completed
+				2, // recurring missed
+				["2026-01-22", "2026-01-21", "2026-01-20"], // streak of 3
+				today,
+				startDate,
+				endDate,
+			);
+
+			expect(result.totalRegularCompleted).toBe(5);
+			expect(result.totalRecurringCompleted).toBe(10);
+			expect(result.totalRecurringMissed).toBe(2);
+			expect(result.completionRate).toBe(88); // 15/17 * 100
+			expect(result.currentStreak).toBe(3);
+			expect(result.dailyBreakdown).toHaveLength(3);
+		});
+
+		it("should handle new user with no activity", () => {
+			const today = new Date("2026-01-22T12:00:00Z");
+			const startDate = new Date("2026-01-20T00:00:00Z");
+			const endDate = new Date("2026-01-22T23:59:59Z");
+
+			const result = calculateFullAnalytics(
+				0,
+				0,
+				0,
+				[],
+				today,
+				startDate,
+				endDate,
+			);
+
+			expect(result.completionRate).toBe(100);
+			expect(result.currentStreak).toBe(0);
+			expect(result.dailyBreakdown).toHaveLength(3);
+		});
+
+		it("should handle user with all missed tasks", () => {
+			const today = new Date("2026-01-22T12:00:00Z");
+			const startDate = new Date("2026-01-20T00:00:00Z");
+			const endDate = new Date("2026-01-22T23:59:59Z");
+
+			const result = calculateFullAnalytics(
+				0,
+				0,
+				5,
+				[],
+				today,
+				startDate,
+				endDate,
+			);
+
+			expect(result.completionRate).toBe(0);
+			expect(result.currentStreak).toBe(0);
+		});
+
+		it("should handle user with perfect completion", () => {
+			const today = new Date("2026-01-22T12:00:00Z");
+			const startDate = new Date("2026-01-20T00:00:00Z");
+			const endDate = new Date("2026-01-22T23:59:59Z");
+
+			const result = calculateFullAnalytics(
+				10,
+				20,
+				0,
+				["2026-01-22", "2026-01-21", "2026-01-20"],
+				today,
+				startDate,
+				endDate,
+			);
+
+			expect(result.completionRate).toBe(100);
+			expect(result.currentStreak).toBe(3);
+		});
+	});
+});
+
+describe("UpdatePastCompletion Procedure", () => {
+	describe("Input Validation", () => {
+		interface UpdatePastCompletionInput {
+			todoId: number;
+			scheduledDate: string;
+			completed: boolean;
+		}
+
+		const validateUpdatePastCompletionInput = (
+			input: unknown,
+		): { valid: boolean; data?: UpdatePastCompletionInput } => {
+			if (typeof input !== "object" || input === null) {
+				return { valid: false };
+			}
+
+			const i = input as Record<string, unknown>;
+
+			// todoId is required and must be a number
+			if (typeof i.todoId !== "number") {
+				return { valid: false };
+			}
+
+			// scheduledDate is required and must be valid datetime string
+			if (typeof i.scheduledDate !== "string") {
+				return { valid: false };
+			}
+			const scheduledDate = new Date(i.scheduledDate);
+			if (Number.isNaN(scheduledDate.getTime())) {
+				return { valid: false };
+			}
+
+			// completed is required and must be a boolean
+			if (typeof i.completed !== "boolean") {
+				return { valid: false };
+			}
+
+			return {
+				valid: true,
+				data: input as UpdatePastCompletionInput,
+			};
+		};
+
+		it("validates valid input with completed=true", () => {
+			const result = validateUpdatePastCompletionInput({
+				todoId: 1,
+				scheduledDate: "2026-01-15T10:00:00Z",
+				completed: true,
+			});
+			expect(result.valid).toBe(true);
+			expect(result.data?.todoId).toBe(1);
+			expect(result.data?.scheduledDate).toBe("2026-01-15T10:00:00Z");
+			expect(result.data?.completed).toBe(true);
+		});
+
+		it("validates valid input with completed=false", () => {
+			const result = validateUpdatePastCompletionInput({
+				todoId: 5,
+				scheduledDate: "2026-01-10T09:00:00Z",
+				completed: false,
+			});
+			expect(result.valid).toBe(true);
+			expect(result.data?.completed).toBe(false);
+		});
+
+		it("rejects missing todoId", () => {
+			expect(
+				validateUpdatePastCompletionInput({
+					scheduledDate: "2026-01-15T10:00:00Z",
+					completed: true,
+				}),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects string todoId", () => {
+			expect(
+				validateUpdatePastCompletionInput({
+					todoId: "1",
+					scheduledDate: "2026-01-15T10:00:00Z",
+					completed: true,
+				}),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects missing scheduledDate", () => {
+			expect(
+				validateUpdatePastCompletionInput({
+					todoId: 1,
+					completed: true,
+				}),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects invalid scheduledDate string", () => {
+			expect(
+				validateUpdatePastCompletionInput({
+					todoId: 1,
+					scheduledDate: "not-a-date",
+					completed: true,
+				}),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects missing completed field", () => {
+			expect(
+				validateUpdatePastCompletionInput({
+					todoId: 1,
+					scheduledDate: "2026-01-15T10:00:00Z",
+				}),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects string completed field", () => {
+			expect(
+				validateUpdatePastCompletionInput({
+					todoId: 1,
+					scheduledDate: "2026-01-15T10:00:00Z",
+					completed: "true",
+				}),
+			).toEqual({ valid: false });
+		});
+
+		it("rejects non-object input", () => {
+			expect(validateUpdatePastCompletionInput("invalid")).toEqual({
+				valid: false,
+			});
+		});
+
+		it("rejects null input", () => {
+			expect(validateUpdatePastCompletionInput(null)).toEqual({ valid: false });
+		});
+	});
+
+	describe("Business Logic", () => {
+		interface RecurringPattern {
+			type: "daily" | "weekly" | "monthly" | "yearly" | "custom";
+			interval?: number;
+			daysOfWeek?: number[];
+			dayOfMonth?: number;
+			monthOfYear?: number;
+			endDate?: string;
+			occurrences?: number;
+		}
+
+		interface MockTodo {
+			id: number;
+			text: string;
+			completed: boolean;
+			userId: string;
+			recurringPattern?: RecurringPattern | null;
+		}
+
+		interface CompletionRecord {
+			id: number;
+			todoId: number;
+			scheduledDate: Date;
+			completedAt: Date | null;
+			userId: string;
+			createdAt: Date;
+		}
+
+		describe("Todo Ownership Verification", () => {
+			it("should throw NOT_FOUND for non-existent todo", () => {
+				const verifyTodoExists = (
+					existingTodo: MockTodo | undefined,
+					currentUserId: string,
+				) => {
+					if (!existingTodo || existingTodo.userId !== currentUserId) {
+						throw new TRPCError({
+							code: "NOT_FOUND",
+							message:
+								"Todo not found or you do not have permission to modify it",
+						});
+					}
+					return existingTodo;
+				};
+
+				expect(() => verifyTodoExists(undefined, "user-123")).toThrow(
+					TRPCError,
+				);
+			});
+
+			it("should throw NOT_FOUND for todo owned by different user", () => {
+				const verifyTodoExists = (
+					existingTodo: MockTodo | undefined,
+					currentUserId: string,
+				) => {
+					if (!existingTodo || existingTodo.userId !== currentUserId) {
+						throw new TRPCError({
+							code: "NOT_FOUND",
+							message:
+								"Todo not found or you do not have permission to modify it",
+						});
+					}
+					return existingTodo;
+				};
+
+				const todo: MockTodo = {
+					id: 1,
+					text: "Test",
+					completed: false,
+					userId: "user-456",
+					recurringPattern: { type: "daily" },
+				};
+
+				expect(() => verifyTodoExists(todo, "user-123")).toThrow(TRPCError);
+			});
+
+			it("should pass for todo owned by current user", () => {
+				const verifyTodoExists = (
+					existingTodo: MockTodo | undefined,
+					currentUserId: string,
+				) => {
+					if (!existingTodo || existingTodo.userId !== currentUserId) {
+						throw new TRPCError({
+							code: "NOT_FOUND",
+							message:
+								"Todo not found or you do not have permission to modify it",
+						});
+					}
+					return existingTodo;
+				};
+
+				const todo: MockTodo = {
+					id: 1,
+					text: "Test",
+					completed: false,
+					userId: "user-123",
+					recurringPattern: { type: "daily" },
+				};
+
+				expect(() => verifyTodoExists(todo, "user-123")).not.toThrow();
+			});
+		});
+
+		describe("Recurring Pattern Validation", () => {
+			it("should throw BAD_REQUEST if todo has no recurring pattern", () => {
+				const verifyRecurringPattern = (
+					recurringPattern: RecurringPattern | null | undefined,
+				) => {
+					if (!recurringPattern) {
+						throw new TRPCError({
+							code: "BAD_REQUEST",
+							message: "Todo does not have a recurring pattern",
+						});
+					}
+					return recurringPattern;
+				};
+
+				expect(() => verifyRecurringPattern(null)).toThrow(TRPCError);
+				expect(() => verifyRecurringPattern(undefined)).toThrow(TRPCError);
+			});
+
+			it("should pass if todo has recurring pattern", () => {
+				const verifyRecurringPattern = (
+					recurringPattern: RecurringPattern | null | undefined,
+				) => {
+					if (!recurringPattern) {
+						throw new TRPCError({
+							code: "BAD_REQUEST",
+							message: "Todo does not have a recurring pattern",
+						});
+					}
+					return recurringPattern;
+				};
+
+				const pattern: RecurringPattern = { type: "daily" };
+				expect(() => verifyRecurringPattern(pattern)).not.toThrow();
+			});
+		});
+
+		describe("Completion Record Update Logic", () => {
+			it("should return 'updated' action when record exists and completed=true", () => {
+				const determineAction = (
+					existingRecord: CompletionRecord | undefined,
+					completed: boolean,
+				): { action: "created" | "updated"; completedAt: Date | null } => {
+					if (existingRecord) {
+						return {
+							action: "updated",
+							completedAt: completed ? new Date() : null,
+						};
+					}
+					return {
+						action: "created",
+						completedAt: completed ? new Date() : null,
+					};
+				};
+
+				const existingRecord: CompletionRecord = {
+					id: 1,
+					todoId: 10,
+					scheduledDate: new Date("2026-01-15T10:00:00Z"),
+					completedAt: null,
+					userId: "user-123",
+					createdAt: new Date(),
+				};
+
+				const result = determineAction(existingRecord, true);
+				expect(result.action).toBe("updated");
+				expect(result.completedAt).toBeInstanceOf(Date);
+			});
+
+			it("should return 'updated' action when record exists and completed=false", () => {
+				const determineAction = (
+					existingRecord: CompletionRecord | undefined,
+					completed: boolean,
+				): { action: "created" | "updated"; completedAt: Date | null } => {
+					if (existingRecord) {
+						return {
+							action: "updated",
+							completedAt: completed ? new Date() : null,
+						};
+					}
+					return {
+						action: "created",
+						completedAt: completed ? new Date() : null,
+					};
+				};
+
+				const existingRecord: CompletionRecord = {
+					id: 1,
+					todoId: 10,
+					scheduledDate: new Date("2026-01-15T10:00:00Z"),
+					completedAt: new Date("2026-01-15T11:00:00Z"),
+					userId: "user-123",
+					createdAt: new Date(),
+				};
+
+				const result = determineAction(existingRecord, false);
+				expect(result.action).toBe("updated");
+				expect(result.completedAt).toBeNull();
+			});
+
+			it("should return 'created' action when no record exists and completed=true", () => {
+				const determineAction = (
+					existingRecord: CompletionRecord | undefined,
+					completed: boolean,
+				): { action: "created" | "updated"; completedAt: Date | null } => {
+					if (existingRecord) {
+						return {
+							action: "updated",
+							completedAt: completed ? new Date() : null,
+						};
+					}
+					return {
+						action: "created",
+						completedAt: completed ? new Date() : null,
+					};
+				};
+
+				const result = determineAction(undefined, true);
+				expect(result.action).toBe("created");
+				expect(result.completedAt).toBeInstanceOf(Date);
+			});
+
+			it("should return 'created' action when no record exists and completed=false", () => {
+				const determineAction = (
+					existingRecord: CompletionRecord | undefined,
+					completed: boolean,
+				): { action: "created" | "updated"; completedAt: Date | null } => {
+					if (existingRecord) {
+						return {
+							action: "updated",
+							completedAt: completed ? new Date() : null,
+						};
+					}
+					return {
+						action: "created",
+						completedAt: completed ? new Date() : null,
+					};
+				};
+
+				const result = determineAction(undefined, false);
+				expect(result.action).toBe("created");
+				expect(result.completedAt).toBeNull();
+			});
+		});
+
+		describe("New Completion Record Creation", () => {
+			it("should create record with correct fields when completed=true", () => {
+				interface CreateCompletionInput {
+					todoId: number;
+					scheduledDate: Date;
+					completed: boolean;
+					userId: string;
+				}
+
+				const buildCompletionRecord = (input: CreateCompletionInput) => ({
+					todoId: input.todoId,
+					scheduledDate: input.scheduledDate,
+					completedAt: input.completed ? new Date() : null,
+					userId: input.userId,
+				});
+
+				const result = buildCompletionRecord({
+					todoId: 10,
+					scheduledDate: new Date("2026-01-15T10:00:00Z"),
+					completed: true,
+					userId: "user-123",
+				});
+
+				expect(result.todoId).toBe(10);
+				expect(result.scheduledDate).toEqual(new Date("2026-01-15T10:00:00Z"));
+				expect(result.completedAt).toBeInstanceOf(Date);
+				expect(result.userId).toBe("user-123");
+			});
+
+			it("should create record with null completedAt when completed=false", () => {
+				interface CreateCompletionInput {
+					todoId: number;
+					scheduledDate: Date;
+					completed: boolean;
+					userId: string;
+				}
+
+				const buildCompletionRecord = (input: CreateCompletionInput) => ({
+					todoId: input.todoId,
+					scheduledDate: input.scheduledDate,
+					completedAt: input.completed ? new Date() : null,
+					userId: input.userId,
+				});
+
+				const result = buildCompletionRecord({
+					todoId: 10,
+					scheduledDate: new Date("2026-01-15T10:00:00Z"),
+					completed: false,
+					userId: "user-123",
+				});
+
+				expect(result.completedAt).toBeNull();
+			});
+		});
+
+		describe("Return Value Structure", () => {
+			it("should return correct structure for created action", () => {
+				interface UpdatePastCompletionResult {
+					action: "created" | "updated";
+					completion: CompletionRecord;
+				}
+
+				const createResult = (
+					action: "created" | "updated",
+					completion: CompletionRecord,
+				): UpdatePastCompletionResult => ({
+					action,
+					completion,
+				});
+
+				const completion: CompletionRecord = {
+					id: 1,
+					todoId: 10,
+					scheduledDate: new Date("2026-01-15T10:00:00Z"),
+					completedAt: new Date("2026-01-22T11:00:00Z"),
+					userId: "user-123",
+					createdAt: new Date(),
+				};
+
+				const result = createResult("created", completion);
+
+				expect(result.action).toBe("created");
+				expect(result.completion).toEqual(completion);
+			});
+
+			it("should return correct structure for updated action", () => {
+				interface UpdatePastCompletionResult {
+					action: "created" | "updated";
+					completion: CompletionRecord;
+				}
+
+				const createResult = (
+					action: "created" | "updated",
+					completion: CompletionRecord,
+				): UpdatePastCompletionResult => ({
+					action,
+					completion,
+				});
+
+				const completion: CompletionRecord = {
+					id: 5,
+					todoId: 10,
+					scheduledDate: new Date("2026-01-15T10:00:00Z"),
+					completedAt: null, // Marked as incomplete
+					userId: "user-123",
+					createdAt: new Date("2026-01-10T00:00:00Z"),
+				};
+
+				const result = createResult("updated", completion);
+
+				expect(result.action).toBe("updated");
+				expect(result.completion.completedAt).toBeNull();
+			});
+		});
+
+		describe("Scheduled Date Lookup", () => {
+			it("should find existing record by todoId and scheduledDate", () => {
+				const existingRecords: CompletionRecord[] = [
+					{
+						id: 1,
+						todoId: 10,
+						scheduledDate: new Date("2026-01-15T10:00:00Z"),
+						completedAt: new Date("2026-01-15T11:00:00Z"),
+						userId: "user-123",
+						createdAt: new Date(),
+					},
+					{
+						id: 2,
+						todoId: 10,
+						scheduledDate: new Date("2026-01-16T10:00:00Z"),
+						completedAt: null,
+						userId: "user-123",
+						createdAt: new Date(),
+					},
+					{
+						id: 3,
+						todoId: 20,
+						scheduledDate: new Date("2026-01-15T10:00:00Z"),
+						completedAt: null,
+						userId: "user-123",
+						createdAt: new Date(),
+					},
+				];
+
+				const findRecord = (
+					records: CompletionRecord[],
+					todoId: number,
+					scheduledDate: Date,
+					userId: string,
+				): CompletionRecord | undefined => {
+					return records.find(
+						(r) =>
+							r.todoId === todoId &&
+							r.scheduledDate.getTime() === scheduledDate.getTime() &&
+							r.userId === userId,
+					);
+				};
+
+				// Should find exact match
+				const result1 = findRecord(
+					existingRecords,
+					10,
+					new Date("2026-01-15T10:00:00Z"),
+					"user-123",
+				);
+				expect(result1?.id).toBe(1);
+
+				// Should find different date for same todo
+				const result2 = findRecord(
+					existingRecords,
+					10,
+					new Date("2026-01-16T10:00:00Z"),
+					"user-123",
+				);
+				expect(result2?.id).toBe(2);
+
+				// Should not find non-existent combination
+				const result3 = findRecord(
+					existingRecords,
+					10,
+					new Date("2026-01-17T10:00:00Z"),
+					"user-123",
+				);
+				expect(result3).toBeUndefined();
+
+				// Should not find record for different user
+				const result4 = findRecord(
+					existingRecords,
+					10,
+					new Date("2026-01-15T10:00:00Z"),
+					"user-456",
+				);
+				expect(result4).toBeUndefined();
+			});
+		});
+
+		describe("Use Cases", () => {
+			it("should support marking a missed occurrence as completed retroactively", () => {
+				// Simulating: User forgot to check in on Jan 15, now marking it completed on Jan 22
+				interface MarkCompletedInput {
+					todoId: number;
+					scheduledDate: Date;
+					completed: boolean;
+					userId: string;
+				}
+
+				const processUpdate = (
+					input: MarkCompletedInput,
+					existingRecord: CompletionRecord | undefined,
+				): { action: "created" | "updated"; completedAt: Date | null } => {
+					if (existingRecord) {
+						return {
+							action: "updated",
+							completedAt: input.completed ? new Date() : null,
+						};
+					}
+					return {
+						action: "created",
+						completedAt: input.completed ? new Date() : null,
+					};
+				};
+
+				// No existing record - creating new one
+				const result = processUpdate(
+					{
+						todoId: 10,
+						scheduledDate: new Date("2026-01-15T10:00:00Z"),
+						completed: true,
+						userId: "user-123",
+					},
+					undefined,
+				);
+
+				expect(result.action).toBe("created");
+				expect(result.completedAt).toBeInstanceOf(Date);
+			});
+
+			it("should support unmarking an accidentally completed occurrence", () => {
+				// Simulating: User accidentally marked completed, now reverting
+				interface MarkCompletedInput {
+					todoId: number;
+					scheduledDate: Date;
+					completed: boolean;
+					userId: string;
+				}
+
+				const processUpdate = (
+					input: MarkCompletedInput,
+					existingRecord: CompletionRecord | undefined,
+				): { action: "created" | "updated"; completedAt: Date | null } => {
+					if (existingRecord) {
+						return {
+							action: "updated",
+							completedAt: input.completed ? new Date() : null,
+						};
+					}
+					return {
+						action: "created",
+						completedAt: input.completed ? new Date() : null,
+					};
+				};
+
+				const existingRecord: CompletionRecord = {
+					id: 1,
+					todoId: 10,
+					scheduledDate: new Date("2026-01-15T10:00:00Z"),
+					completedAt: new Date("2026-01-15T11:00:00Z"),
+					userId: "user-123",
+					createdAt: new Date(),
+				};
+
+				const result = processUpdate(
+					{
+						todoId: 10,
+						scheduledDate: new Date("2026-01-15T10:00:00Z"),
+						completed: false,
+						userId: "user-123",
+					},
+					existingRecord,
+				);
+
+				expect(result.action).toBe("updated");
+				expect(result.completedAt).toBeNull();
+			});
+
+			it("should support pre-creating a record as missed (completed=false)", () => {
+				// Simulating: Creating a record for a missed occurrence explicitly
+				interface MarkCompletedInput {
+					todoId: number;
+					scheduledDate: Date;
+					completed: boolean;
+					userId: string;
+				}
+
+				const processUpdate = (
+					input: MarkCompletedInput,
+					existingRecord: CompletionRecord | undefined,
+				): { action: "created" | "updated"; completedAt: Date | null } => {
+					if (existingRecord) {
+						return {
+							action: "updated",
+							completedAt: input.completed ? new Date() : null,
+						};
+					}
+					return {
+						action: "created",
+						completedAt: input.completed ? new Date() : null,
+					};
+				};
+
+				const result = processUpdate(
+					{
+						todoId: 10,
+						scheduledDate: new Date("2026-01-15T10:00:00Z"),
+						completed: false,
+						userId: "user-123",
+					},
+					undefined,
+				);
+
+				expect(result.action).toBe("created");
+				expect(result.completedAt).toBeNull();
+			});
+		});
+	});
+
+	describe("isDateMatchingPattern Logic", () => {
+		// Helper function that mirrors the logic from the router
+		const isDateMatchingPattern = (
+			pattern: RecurringPattern,
+			date: Date,
+			startDate?: Date | null,
+		): boolean => {
+			const dayOfWeek = date.getDay();
+			const dayOfMonth = date.getDate();
+			const month = date.getMonth() + 1; // 1-indexed
+
+			// Check endDate first
+			if (pattern.endDate) {
+				const endDate = new Date(pattern.endDate);
+				if (date > endDate) {
+					return false;
+				}
+			}
+
+			// For interval-based patterns, we need to check if the date falls on a valid interval
+			const interval = pattern.interval ?? 1;
+
+			switch (pattern.type) {
+				case "daily": {
+					if (interval === 1) {
+						return true;
+					}
+					// For intervals > 1, check if the date is on the interval
+					if (startDate) {
+						const daysDiff = Math.floor(
+							(date.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
+						);
+						return daysDiff >= 0 && daysDiff % interval === 0;
+					}
+					return true;
+				}
+
+				case "weekly": {
+					// Check if the day of week matches
+					if (pattern.daysOfWeek && pattern.daysOfWeek.length > 0) {
+						if (!pattern.daysOfWeek.includes(dayOfWeek)) {
+							return false;
+						}
+					}
+					// For intervals > 1, check if the week is on the interval
+					if (interval > 1 && startDate) {
+						const weeksDiff = Math.floor(
+							(date.getTime() - startDate.getTime()) /
+								(1000 * 60 * 60 * 24 * 7),
+						);
+						if (weeksDiff < 0 || weeksDiff % interval !== 0) {
+							return false;
+						}
+					}
+					return true;
+				}
+
+				case "monthly": {
+					// Check if the day of month matches
+					if (pattern.dayOfMonth !== undefined) {
+						if (dayOfMonth !== pattern.dayOfMonth) {
+							return false;
+						}
+					}
+					// For intervals > 1, check if the month is on the interval
+					if (interval > 1 && startDate) {
+						const monthsDiff =
+							(date.getFullYear() - startDate.getFullYear()) * 12 +
+							(date.getMonth() - startDate.getMonth());
+						if (monthsDiff < 0 || monthsDiff % interval !== 0) {
+							return false;
+						}
+					}
+					return true;
+				}
+
+				case "yearly": {
+					// Check if month and day match
+					if (
+						pattern.monthOfYear !== undefined &&
+						pattern.dayOfMonth !== undefined
+					) {
+						if (
+							month !== pattern.monthOfYear ||
+							dayOfMonth !== pattern.dayOfMonth
+						) {
+							return false;
+						}
+					} else if (pattern.monthOfYear !== undefined) {
+						if (month !== pattern.monthOfYear) {
+							return false;
+						}
+					} else if (pattern.dayOfMonth !== undefined) {
+						if (dayOfMonth !== pattern.dayOfMonth) {
+							return false;
+						}
+					}
+					// For intervals > 1, check if the year is on the interval
+					if (interval > 1 && startDate) {
+						const yearsDiff = date.getFullYear() - startDate.getFullYear();
+						if (yearsDiff < 0 || yearsDiff % interval !== 0) {
+							return false;
+						}
+					}
+					return true;
+				}
+
+				case "custom": {
+					// Custom patterns use daysOfWeek like weekly
+					if (pattern.daysOfWeek && pattern.daysOfWeek.length > 0) {
+						if (!pattern.daysOfWeek.includes(dayOfWeek)) {
+							return false;
+						}
+					}
+					// For intervals > 1, check if the week is on the interval
+					if (interval > 1 && startDate) {
+						const weeksDiff = Math.floor(
+							(date.getTime() - startDate.getTime()) /
+								(1000 * 60 * 60 * 24 * 7),
+						);
+						if (weeksDiff < 0 || weeksDiff % interval !== 0) {
+							return false;
+						}
+					}
+					return true;
+				}
+
+				default:
+					return true;
+			}
+		};
+
+		describe("Daily patterns", () => {
+			it("should match any day for simple daily pattern", () => {
+				const pattern: RecurringPattern = { type: "daily" };
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-20"))).toBe(
+					true,
+				);
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-21"))).toBe(
+					true,
+				);
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-22"))).toBe(
+					true,
+				);
+			});
+
+			it("should match every N days when interval is set", () => {
+				const pattern: RecurringPattern = { type: "daily", interval: 3 };
+				const startDate = new Date("2026-01-01");
+
+				// Day 0 (start date)
+				expect(
+					isDateMatchingPattern(pattern, new Date("2026-01-01"), startDate),
+				).toBe(true);
+				// Day 1 - no match
+				expect(
+					isDateMatchingPattern(pattern, new Date("2026-01-02"), startDate),
+				).toBe(false);
+				// Day 2 - no match
+				expect(
+					isDateMatchingPattern(pattern, new Date("2026-01-03"), startDate),
+				).toBe(false);
+				// Day 3 - match
+				expect(
+					isDateMatchingPattern(pattern, new Date("2026-01-04"), startDate),
+				).toBe(true);
+				// Day 6 - match
+				expect(
+					isDateMatchingPattern(pattern, new Date("2026-01-07"), startDate),
+				).toBe(true);
+			});
+		});
+
+		describe("Weekly patterns", () => {
+			it("should match any day when no daysOfWeek specified", () => {
+				const pattern: RecurringPattern = { type: "weekly" };
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-19"))).toBe(
+					true,
+				); // Monday
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-25"))).toBe(
+					true,
+				); // Sunday
+			});
+
+			it("should match only specified days of week", () => {
+				// Monday=1, Wednesday=3, Friday=5
+				const pattern: RecurringPattern = {
+					type: "weekly",
+					daysOfWeek: [1, 3, 5],
+				};
+
+				// 2026-01-19 is Monday
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-19"))).toBe(
+					true,
+				); // Monday - match
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-20"))).toBe(
+					false,
+				); // Tuesday - no match
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-21"))).toBe(
+					true,
+				); // Wednesday - match
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-22"))).toBe(
+					false,
+				); // Thursday - no match
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-23"))).toBe(
+					true,
+				); // Friday - match
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-24"))).toBe(
+					false,
+				); // Saturday - no match
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-25"))).toBe(
+					false,
+				); // Sunday - no match
+			});
+
+			it("should match only on every Nth week when interval is set", () => {
+				const pattern: RecurringPattern = {
+					type: "weekly",
+					interval: 2,
+					daysOfWeek: [1], // Monday
+				};
+				const startDate = new Date("2026-01-05"); // A Monday
+
+				// Week 0 - Monday of start week
+				expect(
+					isDateMatchingPattern(pattern, new Date("2026-01-05"), startDate),
+				).toBe(true);
+				// Week 1 - Monday of next week - no match (bi-weekly)
+				expect(
+					isDateMatchingPattern(pattern, new Date("2026-01-12"), startDate),
+				).toBe(false);
+				// Week 2 - Monday - match
+				expect(
+					isDateMatchingPattern(pattern, new Date("2026-01-19"), startDate),
+				).toBe(true);
+			});
+		});
+
+		describe("Monthly patterns", () => {
+			it("should match any day when no dayOfMonth specified", () => {
+				const pattern: RecurringPattern = { type: "monthly" };
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-01"))).toBe(
+					true,
+				);
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-15"))).toBe(
+					true,
+				);
+				expect(isDateMatchingPattern(pattern, new Date("2026-02-28"))).toBe(
+					true,
+				);
+			});
+
+			it("should match only on the specified day of month", () => {
+				const pattern: RecurringPattern = { type: "monthly", dayOfMonth: 15 };
+
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-15"))).toBe(
+					true,
+				);
+				expect(isDateMatchingPattern(pattern, new Date("2026-02-15"))).toBe(
+					true,
+				);
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-14"))).toBe(
+					false,
+				);
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-16"))).toBe(
+					false,
+				);
+			});
+
+			it("should match only on every Nth month when interval is set", () => {
+				const pattern: RecurringPattern = {
+					type: "monthly",
+					interval: 3,
+					dayOfMonth: 1,
+				};
+				const startDate = new Date("2026-01-01");
+
+				// Month 0 - January
+				expect(
+					isDateMatchingPattern(pattern, new Date("2026-01-01"), startDate),
+				).toBe(true);
+				// Month 1 - February - no match
+				expect(
+					isDateMatchingPattern(pattern, new Date("2026-02-01"), startDate),
+				).toBe(false);
+				// Month 2 - March - no match
+				expect(
+					isDateMatchingPattern(pattern, new Date("2026-03-01"), startDate),
+				).toBe(false);
+				// Month 3 - April - match
+				expect(
+					isDateMatchingPattern(pattern, new Date("2026-04-01"), startDate),
+				).toBe(true);
+			});
+		});
+
+		describe("Yearly patterns", () => {
+			it("should match any day when no monthOfYear or dayOfMonth specified", () => {
+				const pattern: RecurringPattern = { type: "yearly" };
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-01"))).toBe(
+					true,
+				);
+				expect(isDateMatchingPattern(pattern, new Date("2026-12-31"))).toBe(
+					true,
+				);
+			});
+
+			it("should match only on specific month and day", () => {
+				const pattern: RecurringPattern = {
+					type: "yearly",
+					monthOfYear: 3,
+					dayOfMonth: 15,
+				};
+
+				expect(isDateMatchingPattern(pattern, new Date("2026-03-15"))).toBe(
+					true,
+				);
+				expect(isDateMatchingPattern(pattern, new Date("2027-03-15"))).toBe(
+					true,
+				);
+				expect(isDateMatchingPattern(pattern, new Date("2026-03-14"))).toBe(
+					false,
+				);
+				expect(isDateMatchingPattern(pattern, new Date("2026-04-15"))).toBe(
+					false,
+				);
+			});
+
+			it("should match only on every Nth year when interval is set", () => {
+				const pattern: RecurringPattern = {
+					type: "yearly",
+					interval: 2,
+					monthOfYear: 1,
+					dayOfMonth: 1,
+				};
+				const startDate = new Date("2026-01-01");
+
+				// Year 0 - 2026
+				expect(
+					isDateMatchingPattern(pattern, new Date("2026-01-01"), startDate),
+				).toBe(true);
+				// Year 1 - 2027 - no match
+				expect(
+					isDateMatchingPattern(pattern, new Date("2027-01-01"), startDate),
+				).toBe(false);
+				// Year 2 - 2028 - match
+				expect(
+					isDateMatchingPattern(pattern, new Date("2028-01-01"), startDate),
+				).toBe(true);
+			});
+		});
+
+		describe("Custom patterns", () => {
+			it("should match specified days of week like weekly", () => {
+				const pattern: RecurringPattern = {
+					type: "custom",
+					daysOfWeek: [2, 4], // Tuesday, Thursday
+				};
+
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-20"))).toBe(
+					true,
+				); // Tuesday
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-22"))).toBe(
+					true,
+				); // Thursday
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-21"))).toBe(
+					false,
+				); // Wednesday
+			});
+		});
+
+		describe("End date handling", () => {
+			it("should not match dates after endDate", () => {
+				const pattern: RecurringPattern = {
+					type: "daily",
+					endDate: "2026-01-31",
+				};
+
+				expect(isDateMatchingPattern(pattern, new Date("2026-01-31"))).toBe(
+					true,
+				);
+				expect(isDateMatchingPattern(pattern, new Date("2026-02-01"))).toBe(
+					false,
+				);
+			});
+		});
+	});
+
+	describe("getRecurringTodosForDateRange Logic", () => {
+		// Helper function that mirrors the logic from the router
+		const isDateMatchingPattern = (
+			pattern: RecurringPattern,
+			date: Date,
+			startDate?: Date | null,
+		): boolean => {
+			const dayOfWeek = date.getDay();
+			const dayOfMonth = date.getDate();
+			const month = date.getMonth() + 1;
+
+			if (pattern.endDate) {
+				const endDate = new Date(pattern.endDate);
+				if (date > endDate) {
+					return false;
+				}
+			}
+
+			const interval = pattern.interval ?? 1;
+
+			switch (pattern.type) {
+				case "daily": {
+					if (interval === 1) return true;
+					if (startDate) {
+						const daysDiff = Math.floor(
+							(date.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
+						);
+						return daysDiff >= 0 && daysDiff % interval === 0;
+					}
+					return true;
+				}
+				case "weekly": {
+					if (pattern.daysOfWeek && pattern.daysOfWeek.length > 0) {
+						if (!pattern.daysOfWeek.includes(dayOfWeek)) return false;
+					}
+					if (interval > 1 && startDate) {
+						const weeksDiff = Math.floor(
+							(date.getTime() - startDate.getTime()) /
+								(1000 * 60 * 60 * 24 * 7),
+						);
+						if (weeksDiff < 0 || weeksDiff % interval !== 0) return false;
+					}
+					return true;
+				}
+				case "monthly": {
+					if (pattern.dayOfMonth !== undefined) {
+						if (dayOfMonth !== pattern.dayOfMonth) return false;
+					}
+					if (interval > 1 && startDate) {
+						const monthsDiff =
+							(date.getFullYear() - startDate.getFullYear()) * 12 +
+							(date.getMonth() - startDate.getMonth());
+						if (monthsDiff < 0 || monthsDiff % interval !== 0) return false;
+					}
+					return true;
+				}
+				case "yearly": {
+					if (
+						pattern.monthOfYear !== undefined &&
+						pattern.dayOfMonth !== undefined
+					) {
+						if (
+							month !== pattern.monthOfYear ||
+							dayOfMonth !== pattern.dayOfMonth
+						)
+							return false;
+					} else if (pattern.monthOfYear !== undefined) {
+						if (month !== pattern.monthOfYear) return false;
+					} else if (pattern.dayOfMonth !== undefined) {
+						if (dayOfMonth !== pattern.dayOfMonth) return false;
+					}
+					if (interval > 1 && startDate) {
+						const yearsDiff = date.getFullYear() - startDate.getFullYear();
+						if (yearsDiff < 0 || yearsDiff % interval !== 0) return false;
+					}
+					return true;
+				}
+				case "custom": {
+					if (pattern.daysOfWeek && pattern.daysOfWeek.length > 0) {
+						if (!pattern.daysOfWeek.includes(dayOfWeek)) return false;
+					}
+					if (interval > 1 && startDate) {
+						const weeksDiff = Math.floor(
+							(date.getTime() - startDate.getTime()) /
+								(1000 * 60 * 60 * 24 * 7),
+						);
+						if (weeksDiff < 0 || weeksDiff % interval !== 0) return false;
+					}
+					return true;
+				}
+				default:
+					return true;
+			}
+		};
+
+		interface RecurringTodo extends MockTodo {
+			recurringPattern: RecurringPattern;
+		}
+
+		// Helper to simulate getRecurringTodosForDateRange logic
+		const getMatchingDatesForTodo = (
+			todo: RecurringTodo,
+			startDate: Date,
+			endDate: Date,
+		): Date[] => {
+			const pattern = todo.recurringPattern;
+			const matchingDates: Date[] = [];
+
+			// Normalize todoStartDate to local midnight for consistent interval calculations
+			const todoStartDate = todo.dueDate ? new Date(todo.dueDate) : null;
+			if (todoStartDate) {
+				todoStartDate.setHours(0, 0, 0, 0);
+			}
+
+			const currentDate = new Date(startDate);
+			currentDate.setHours(0, 0, 0, 0);
+
+			const normalizedEndDate = new Date(endDate);
+			normalizedEndDate.setHours(23, 59, 59, 999);
+
+			while (currentDate <= normalizedEndDate) {
+				if (todoStartDate) {
+					if (currentDate < todoStartDate) {
+						currentDate.setDate(currentDate.getDate() + 1);
+						continue;
+					}
+				}
+
+				if (pattern.endDate) {
+					const patternEndDate = new Date(pattern.endDate);
+					if (currentDate > patternEndDate) {
+						break;
+					}
+				}
+
+				if (isDateMatchingPattern(pattern, currentDate, todoStartDate)) {
+					matchingDates.push(new Date(currentDate));
+				}
+
+				currentDate.setDate(currentDate.getDate() + 1);
+			}
+
+			return matchingDates;
+		};
+
+		it("should return all dates in range for a daily pattern", () => {
+			const todo: RecurringTodo = {
+				id: 1,
+				text: "Daily task",
+				completed: false,
+				userId: "user-123",
+				dueDate: new Date("2026-01-01"),
+				recurringPattern: { type: "daily" },
+			};
+
+			const startDate = new Date("2026-01-20");
+			const endDate = new Date("2026-01-25");
+
+			const matchingDates = getMatchingDatesForTodo(todo, startDate, endDate);
+
+			// Should match all 6 days: Jan 20, 21, 22, 23, 24, 25
+			expect(matchingDates.length).toBe(6);
+		});
+
+		it("should return only matching days for weekly pattern with daysOfWeek", () => {
+			const todo: RecurringTodo = {
+				id: 1,
+				text: "Weekly MWF task",
+				completed: false,
+				userId: "user-123",
+				dueDate: new Date("2026-01-05"), // Monday
+				recurringPattern: { type: "weekly", daysOfWeek: [1, 3, 5] }, // Mon, Wed, Fri
+			};
+
+			// Jan 19 (Mon) to Jan 25 (Sun)
+			const startDate = new Date("2026-01-19");
+			const endDate = new Date("2026-01-25");
+
+			const matchingDates = getMatchingDatesForTodo(todo, startDate, endDate);
+
+			// Should match: Jan 19 (Mon), Jan 21 (Wed), Jan 23 (Fri)
+			expect(matchingDates.length).toBe(3);
+			expect(matchingDates[0]?.getDate()).toBe(19);
+			expect(matchingDates[1]?.getDate()).toBe(21);
+			expect(matchingDates[2]?.getDate()).toBe(23);
+		});
+
+		it("should not include dates before todo's start date", () => {
+			const todo: RecurringTodo = {
+				id: 1,
+				text: "Task starting Jan 22",
+				completed: false,
+				userId: "user-123",
+				dueDate: new Date("2026-01-22"),
+				recurringPattern: { type: "daily" },
+			};
+
+			const startDate = new Date("2026-01-19");
+			const endDate = new Date("2026-01-25");
+
+			const matchingDates = getMatchingDatesForTodo(todo, startDate, endDate);
+
+			// Should only match: Jan 22, 23, 24, 25
+			expect(matchingDates.length).toBe(4);
+			expect(matchingDates[0]?.getDate()).toBe(22);
+		});
+
+		it("should respect pattern endDate", () => {
+			const todo: RecurringTodo = {
+				id: 1,
+				text: "Task ending Jan 22",
+				completed: false,
+				userId: "user-123",
+				dueDate: new Date("2026-01-01"),
+				recurringPattern: { type: "daily", endDate: "2026-01-22" },
+			};
+
+			const startDate = new Date("2026-01-19");
+			const endDate = new Date("2026-01-25");
+
+			const matchingDates = getMatchingDatesForTodo(todo, startDate, endDate);
+
+			// Should only match: Jan 19, 20, 21, 22
+			expect(matchingDates.length).toBe(4);
+			expect(matchingDates[3]?.getDate()).toBe(22);
+		});
+
+		it("should handle monthly patterns correctly", () => {
+			const todo: RecurringTodo = {
+				id: 1,
+				text: "Monthly on 15th",
+				completed: false,
+				userId: "user-123",
+				dueDate: new Date("2026-01-15"),
+				recurringPattern: { type: "monthly", dayOfMonth: 15 },
+			};
+
+			const startDate = new Date("2026-01-01");
+			const endDate = new Date("2026-03-31");
+
+			const matchingDates = getMatchingDatesForTodo(todo, startDate, endDate);
+
+			// Should match: Jan 15, Feb 15, Mar 15
+			expect(matchingDates.length).toBe(3);
+			expect(matchingDates[0]?.getMonth()).toBe(0); // January
+			expect(matchingDates[1]?.getMonth()).toBe(1); // February
+			expect(matchingDates[2]?.getMonth()).toBe(2); // March
+		});
+
+		it("should handle bi-weekly patterns correctly", () => {
+			const todo: RecurringTodo = {
+				id: 1,
+				text: "Bi-weekly Monday",
+				completed: false,
+				userId: "user-123",
+				dueDate: new Date("2026-01-05"), // Monday
+				recurringPattern: { type: "weekly", interval: 2, daysOfWeek: [1] },
+			};
+
+			const startDate = new Date("2026-01-05");
+			const endDate = new Date("2026-02-02");
+
+			const matchingDates = getMatchingDatesForTodo(todo, startDate, endDate);
+
+			// Should match: Jan 5 (week 0), Jan 19 (week 2), Feb 2 (week 4)
+			expect(matchingDates.length).toBe(3);
+			expect(matchingDates[0]?.getDate()).toBe(5);
+			expect(matchingDates[1]?.getDate()).toBe(19);
+			expect(matchingDates[2]?.getDate()).toBe(2);
+		});
+
+		it("should handle every 3 days pattern correctly", () => {
+			const todo: RecurringTodo = {
+				id: 1,
+				text: "Every 3 days",
+				completed: false,
+				userId: "user-123",
+				dueDate: new Date("2026-01-01"),
+				recurringPattern: { type: "daily", interval: 3 },
+			};
+
+			const startDate = new Date("2026-01-01");
+			const endDate = new Date("2026-01-10");
+
+			const matchingDates = getMatchingDatesForTodo(todo, startDate, endDate);
+
+			// Should match: Jan 1 (day 0), Jan 4 (day 3), Jan 7 (day 6), Jan 10 (day 9)
+			expect(matchingDates.length).toBe(4);
+			expect(matchingDates[0]?.getDate()).toBe(1);
+			expect(matchingDates[1]?.getDate()).toBe(4);
+			expect(matchingDates[2]?.getDate()).toBe(7);
+			expect(matchingDates[3]?.getDate()).toBe(10);
+		});
+
+		it("should handle yearly patterns correctly", () => {
+			const todo: RecurringTodo = {
+				id: 1,
+				text: "Yearly on March 15",
+				completed: false,
+				userId: "user-123",
+				dueDate: new Date("2025-03-15"),
+				recurringPattern: { type: "yearly", monthOfYear: 3, dayOfMonth: 15 },
+			};
+
+			const startDate = new Date("2026-01-01");
+			const endDate = new Date("2028-12-31");
+
+			const matchingDates = getMatchingDatesForTodo(todo, startDate, endDate);
+
+			// Should match: March 15 2026, March 15 2027, March 15 2028
+			expect(matchingDates.length).toBe(3);
+			expect(matchingDates[0]?.getFullYear()).toBe(2026);
+			expect(matchingDates[1]?.getFullYear()).toBe(2027);
+			expect(matchingDates[2]?.getFullYear()).toBe(2028);
 		});
 	});
 });

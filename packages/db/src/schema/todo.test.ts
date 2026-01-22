@@ -1,6 +1,12 @@
 import { getTableColumns } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-import { type RecurringPattern, todo, todoRelations } from "./todo";
+import {
+	type RecurringPattern,
+	recurringTodoCompletion,
+	recurringTodoCompletionRelations,
+	todo,
+	todoRelations,
+} from "./todo";
 
 describe("todo schema", () => {
 	it("has all required columns", () => {
@@ -141,5 +147,53 @@ describe("RecurringPattern type", () => {
 	it("accepts pattern without notifyAt (undefined)", () => {
 		const pattern: RecurringPattern = { type: "daily" };
 		expect(pattern.notifyAt).toBeUndefined();
+	});
+});
+
+describe("recurringTodoCompletion schema", () => {
+	it("has all required columns", () => {
+		const columns = getTableColumns(recurringTodoCompletion);
+
+		expect(columns.id).toBeDefined();
+		expect(columns.todoId).toBeDefined();
+		expect(columns.scheduledDate).toBeDefined();
+		expect(columns.completedAt).toBeDefined();
+		expect(columns.userId).toBeDefined();
+		expect(columns.createdAt).toBeDefined();
+	});
+
+	it("has id as primary key", () => {
+		const columns = getTableColumns(recurringTodoCompletion);
+		expect(columns.id.primary).toBe(true);
+	});
+
+	it("has todoId as not null", () => {
+		const columns = getTableColumns(recurringTodoCompletion);
+		expect(columns.todoId.notNull).toBe(true);
+	});
+
+	it("has scheduledDate as not null", () => {
+		const columns = getTableColumns(recurringTodoCompletion);
+		expect(columns.scheduledDate.notNull).toBe(true);
+	});
+
+	it("has completedAt as nullable", () => {
+		const columns = getTableColumns(recurringTodoCompletion);
+		expect(columns.completedAt.notNull).toBe(false);
+	});
+
+	it("has userId as not null", () => {
+		const columns = getTableColumns(recurringTodoCompletion);
+		expect(columns.userId.notNull).toBe(true);
+	});
+
+	it("has createdAt as not null with default", () => {
+		const columns = getTableColumns(recurringTodoCompletion);
+		expect(columns.createdAt.notNull).toBe(true);
+		expect(columns.createdAt.hasDefault).toBe(true);
+	});
+
+	it("exports recurringTodoCompletion relations", () => {
+		expect(recurringTodoCompletionRelations).toBeDefined();
 	});
 });

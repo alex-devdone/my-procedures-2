@@ -2,6 +2,7 @@
 
 import {
 	AlertCircle,
+	BarChart3,
 	CalendarDays,
 	FolderIcon,
 	GripVertical,
@@ -26,7 +27,7 @@ import { cn } from "@/lib/utils";
 /**
  * Smart view types for filtering todos.
  */
-export type SmartViewType = "today" | "upcoming" | "overdue";
+export type SmartViewType = "today" | "upcoming" | "overdue" | "analytics";
 
 /**
  * Smart view metadata.
@@ -59,6 +60,12 @@ const SMART_VIEWS: SmartView[] = [
 		label: "Overdue",
 		icon: AlertCircle,
 		"aria-label": "Overdue todos",
+	},
+	{
+		id: "analytics",
+		label: "Analytics",
+		icon: BarChart3,
+		"aria-label": "Analytics dashboard",
 	},
 ];
 

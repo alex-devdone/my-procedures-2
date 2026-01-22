@@ -127,12 +127,8 @@ export function TimePicker({
 		if (isFocusedRef.current) {
 			return;
 		}
-		if (value !== null && value !== inputValue) {
-			setInputValue(value);
-		} else if (value === null && inputValue !== "") {
-			setInputValue("");
-		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
+		// Sync inputValue to match external value
+		setInputValue(value ?? "");
 	}, [value]);
 
 	return (

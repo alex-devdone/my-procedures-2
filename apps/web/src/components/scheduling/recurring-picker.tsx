@@ -17,15 +17,37 @@ export interface RecurringPreset {
 	pattern: RecurringPattern;
 }
 
+/**
+ * Default notification time for recurring todos when not explicitly set.
+ * Format: "HH:mm" (24-hour)
+ */
+export const DEFAULT_RECURRING_NOTIFY_TIME = "09:00";
+
 export const DEFAULT_RECURRING_PRESETS: RecurringPreset[] = [
-	{ label: "Daily", pattern: { type: "daily" } },
-	{ label: "Weekly", pattern: { type: "weekly" } },
+	{
+		label: "Daily",
+		pattern: { type: "daily", notifyAt: DEFAULT_RECURRING_NOTIFY_TIME },
+	},
+	{
+		label: "Weekly",
+		pattern: { type: "weekly", notifyAt: DEFAULT_RECURRING_NOTIFY_TIME },
+	},
 	{
 		label: "Weekdays",
-		pattern: { type: "weekly", daysOfWeek: [1, 2, 3, 4, 5] },
+		pattern: {
+			type: "weekly",
+			daysOfWeek: [1, 2, 3, 4, 5],
+			notifyAt: DEFAULT_RECURRING_NOTIFY_TIME,
+		},
 	},
-	{ label: "Monthly", pattern: { type: "monthly" } },
-	{ label: "Yearly", pattern: { type: "yearly" } },
+	{
+		label: "Monthly",
+		pattern: { type: "monthly", notifyAt: DEFAULT_RECURRING_NOTIFY_TIME },
+	},
+	{
+		label: "Yearly",
+		pattern: { type: "yearly", notifyAt: DEFAULT_RECURRING_NOTIFY_TIME },
+	},
 ];
 
 export const PATTERN_TYPE_LABELS: Record<RecurringPatternType, string> = {
@@ -446,8 +468,9 @@ export function RecurringPicker({
 	const [open, setOpen] = useState(false);
 
 	// Editing state for custom pattern building
+	// Default to 09:00 notification time when creating new patterns
 	const [editingPattern, setEditingPattern] = useState<RecurringPattern>(
-		() => value ?? { type: "daily" },
+		() => value ?? { type: "daily", notifyAt: DEFAULT_RECURRING_NOTIFY_TIME },
 	);
 
 	const handleSelectPreset = useCallback(
@@ -471,7 +494,10 @@ export function RecurringPicker({
 			setOpen(isOpen);
 			if (isOpen) {
 				// Reset editing pattern to current value when opening
-				setEditingPattern(value ?? { type: "daily" });
+				// Default to 09:00 notification time when creating new patterns
+				setEditingPattern(
+					value ?? { type: "daily", notifyAt: DEFAULT_RECURRING_NOTIFY_TIME },
+				);
 			}
 		},
 		[value],

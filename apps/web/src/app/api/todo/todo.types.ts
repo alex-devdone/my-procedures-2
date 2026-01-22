@@ -60,6 +60,21 @@ export interface Todo {
 }
 
 /**
+ * Virtual todo entry representing a recurring pattern instance on a specific date.
+ * Used in views like Upcoming to show recurring todos on each matching date.
+ */
+export interface VirtualTodo extends Todo {
+	/** Indicates this is a virtual entry generated from a recurring pattern */
+	isRecurringInstance: true;
+	/** The date this virtual instance represents (YYYY-MM-DD format) */
+	virtualDate: string;
+	/** Unique key for this virtual instance (originalId-virtualDate) */
+	virtualKey: string;
+	/** Whether this specific occurrence was completed (from completion history) */
+	occurrenceCompleted?: boolean;
+}
+
+/**
  * Remote todo from the database (via tRPC).
  * Includes scheduling fields from the database schema.
  */

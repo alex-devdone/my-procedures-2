@@ -9,10 +9,13 @@ export const db = drizzle(env.DATABASE_URL, { schema });
 export {
 	and,
 	asc,
+	count,
 	desc,
 	eq,
 	gt,
 	gte,
+	isNotNull,
+	isNull,
 	lt,
 	lte,
 	not,

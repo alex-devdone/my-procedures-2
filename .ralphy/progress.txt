@@ -1135,3 +1135,64 @@
     - Test realtime sync across multiple devices
   - All automated development work for Scheduled Todos, Folders & Subtasks feature is complete
 - [✓] 2026-01-21 21:31 - Browser notification fires automatically when scheduled time arrives
+- [✓] 2026-01-21 22:52 - Create `recurringTodoCompletion` table in `packages/db/src/schema/todo.ts` with fields: `id`, `todoId` (FK to todo), `scheduledDate` (the date it was supposed to be done), `completedAt` (nullable timestamp - null means missed), `userId`, `createdAt`
+- [✓] 2026-01-21 22:53 - Generate migration for the new completion history table using `bun run db:generate`
+- [✓] 2026-01-21 23:01 - Apply migration using `bun run db:migrate`
+- [✓] 2026-01-21 23:03 - Update `recurringPatternSchema` in `packages/api/src/routers/todo.ts` to default `notifyAt` to `"09:00"` when creating new recurring patterns without explicit time
+- [✓] 2026-01-21 23:19 - Create `getCompletionHistory` procedure in `packages/api/src/routers/todo.ts` that returns completion records for a date range, joining with todo data to include todo text
+- [✓] 2026-01-21 23:28 - Create `getAnalytics` procedure in `packages/api/src/routers/todo.ts` that calculates for a date range: total regular todos completed, total recurring occurrences completed, total recurring missed, completion rate %, current streak (consecutive days with completions), daily breakdown
+- [✓] 2026-01-21 23:31 - Create `updatePastCompletion` procedure in `packages/api/src/routers/todo.ts` to insert/update/delete completion records for past recurring todo occurrences (for forgotten check-ins)
+- [✓] 2026-01-21 23:35 - Update `completeRecurring` procedure in `packages/api/src/routers/todo.ts` (lines 234-320) to also insert a record into `recurringTodoCompletion` table with the scheduled date and completedAt timestamp
+- [✓] 2026-01-21 23:41 - Create `getRecurringTodosForDateRange` procedure in `packages/api/src/routers/todo.ts` that returns all recurring todos matching dates within a range using pattern matching logic similar to `isDateMatchingPattern()`
+- [✓] 2026-01-21 23:44 - Create `apps/web/src/app/api/analytics/analytics.types.ts` with interfaces: `AnalyticsData` (totals, rates, streak, dailyBreakdown), `CompletionRecord` (todoId, todoText, scheduledDate, completedAt, isRecurring), `DailyStats` (date, regularCompleted, recurringCompleted, recurringMissed), and Zod input schemas
+- [✓] 2026-01-21 23:47 - Create `apps/web/src/app/api/analytics/analytics.api.ts` with tRPC query option wrappers for `getAnalytics`, `getCompletionHistory`, `updatePastCompletion`
+- [✓] 2026-01-21 23:52 - Create `apps/web/src/app/api/analytics/analytics.hooks.ts` with `"use client"` directive and hooks: `useAnalytics(startDate, endDate)`, `useCompletionHistory(startDate, endDate)`, `useUpdatePastCompletion()` with optimistic cache updates
+- [✓] 2026-01-22 00:10 - Create `apps/web/src/app/api/analytics/index.ts` barrel file exporting all types, schemas, API functions, and hooks
+- [✓] 2026-01-22 00:13 - Update `apps/web/src/components/views/today-view.tsx` `getTodosDueToday()` function to include completed recurring todos (currently line 84 filters to incomplete only) and render them inline with strikethrough styling
+- [✓] 2026-01-22 00:29 - Update `apps/web/src/components/views/upcoming-view.tsx` `getTodosUpcoming()` function (lines 123-151) to include recurring todos matching dates in next 7 days using `isDateMatchingPattern()` from `use-reminder-checker.ts`
+- [✓] 2026-01-22 00:43 - Update `apps/web/src/components/views/upcoming-view.tsx` to generate virtual todo entries for each recurring pattern match date, merging them with explicit due date todos in the date-grouped display
+- [✓] 2026-01-22 00:49 - Update `apps/web/src/components/views/upcoming-view.tsx` to show completed recurring todos inline with strikethrough styling for each matched date
+- [✓] 2026-01-22 00:53 - Add visual indicator (repeat icon from lucide-react) on todo items to distinguish recurring todos from one-time todos in both Today and Upcoming views
+- [✓] 2026-01-22 00:56 - Create `apps/web/src/components/analytics/stats-cards.tsx` showing 4 cards: Total Completed (regular + recurring), Completion Rate %, Current Streak (days), Missed Recurring count - using shadcn/ui Card component
+- [✓] 2026-01-22 00:59 - Create `apps/web/src/components/analytics/completion-chart.tsx` using recharts (add to dependencies if not present) showing stacked bar chart of daily completions: regular vs recurring, with missed recurring shown separately
+- [✓] 2026-01-22 01:02 - Create `apps/web/src/components/analytics/calendar-heatmap.tsx` showing GitHub-style activity grid for selected date range with color intensity (gray=0, light green=1-2, medium green=3-5, dark green=6+)
+- [✗] 2026-01-22 07:24 - Create `apps/web/src/components/analytics/completion-history-list.tsx` showing chronological list of recurring todo completions with columns: Todo text, Scheduled date, Status (completed with timestamp / missed), and toggle button to change status
+- [✓] 2026-01-22 08:07 - Create `apps/web/src/components/analytics/completion-history-list.tsx` showing chronological list of recurring todo completions with columns: Todo text, Scheduled date, Status (completed with timestamp / missed), and toggle button to change status
+- [✓] 2026-01-22 08:23 - Create `apps/web/src/components/analytics/analytics-dashboard.tsx` as main container with: date range selector (default last 7 days), tabs for "Overview" (stats + chart) and "History" (heatmap + list)
+- [✓] 2026-01-22 08:27 - Create `apps/web/src/components/analytics/index.ts` barrel file exporting all analytics components
+- [✓] 2026-01-22 08:32 - Create `apps/web/src/app/(dashboard)/analytics/page.tsx` that renders AnalyticsDashboard with authentication check (redirect to login if not authenticated)
+- [✓] 2026-01-22 08:36 - Update sidebar navigation component to add "Analytics" menu item with BarChart3 icon from lucide-react, positioned after existing menu items
+- [✓] 2026-01-22 08:48 - Add route protection to ensure analytics page requires authentication
+- [✓] 2026-01-22 09:00 - Add completion history storage key in `apps/web/src/lib/local-todo-storage.ts` with array of `{ todoId: string, scheduledDate: string, completedAt: string | null }`
+- [✓] 2026-01-22 09:05 - Update `completeRecurring()` in `apps/web/src/lib/local-todo-storage.ts` (lines 390-455) to also store completion record in localStorage
+- [✓] 2026-01-22 09:14 - Create `getLocalCompletionHistory(startDate, endDate)` function in `apps/web/src/lib/local-todo-storage.ts`
+- [✓] 2026-01-22 09:34 - Create `getLocalAnalytics(startDate, endDate)` function in `apps/web/src/lib/local-todo-storage.ts` calculating same metrics as backend
+- [✓] 2026-01-22 09:42 - Create `updateLocalPastCompletion(todoId, scheduledDate, completed)` function in `apps/web/src/lib/local-todo-storage.ts`
+- [✗] 2026-01-22 09:53 - Update analytics hooks in `apps/web/src/app/api/analytics/analytics.hooks.ts` to use local storage functions when user is not authenticated (follow pattern from `useTodoStorage` in todo.hooks.ts)
+- [✓] 2026-01-22 10:04 - Update analytics hooks in `apps/web/src/app/api/analytics/analytics.hooks.ts` to use local storage functions when user is not authenticated (follow pattern from `useTodoStorage` in todo.hooks.ts)
+- [✓] 2026-01-22 10:08 - Write unit tests for analytics calculation logic in `packages/api/src/routers/todo.test.ts` covering: completion rate calculation, streak calculation, daily breakdown grouping
+- [✓] 2026-01-22 10:12 - Write unit tests for `isDateMatchingPattern()` edge cases in `apps/web/src/hooks/use-reminder-checker.test.ts` covering: pattern at month boundaries, leap years, weekly patterns crossing month boundaries
+- [✓] 2026-01-22 10:14 - Write unit tests for analytics hooks in `apps/web/src/app/api/analytics/analytics.hooks.test.ts`
+- [✓] 2026-01-22 10:20 - Write E2E tests in `apps/web/e2e/analytics.spec.ts` covering: viewing stats cards, interacting with date range selector, toggling past completion status, chart renders correctly
+- [✓] 2026-01-22 10:25 - Write E2E tests in `apps/web/e2e/recurring-views.spec.ts` covering: recurring todos appear in Today view, recurring todos appear in Upcoming view, completed recurring shown with strikethrough
+- [✓] 2026-01-22 10:27 - Run `bun run check && bun run check-types` and fix any issues
+- [✓] 2026-01-22 10:31 - Run `bun run test` and ensure all unit tests pass
+- [✓] 2026-01-22 10:33 - Run `bun run test:e2e` and ensure all E2E tests pass
+- [✓] 2026-01-22 10:33 - Run `bun run build` and ensure production build succeeds
+- [✓] 2026-01-22 10:34 - All tests pass (`bun run test`)
+- [✓] 2026-01-22 10:34 - No type errors (`bun run check-types`)
+- [✓] 2026-01-22 10:34 - Linting passes (`bun run check`)
+- [✓] 2026-01-22 10:35 - Build succeeds (`bun run build`)
+- [✓] 2026-01-22 10:37 - E2E tests pass (`bun run test:e2e`)
+- [✓] 2026-01-22 10:39 - Analytics dashboard displays stats for last 7 days by default
+- [✓] 2026-01-22 10:42 - Stats cards show: total completed, completion rate %, current streak, missed recurring count
+- [✓] 2026-01-22 10:44 - Bar chart shows daily breakdown of regular vs recurring completions
+- [✓] 2026-01-22 10:48 - Calendar heatmap shows activity intensity with color coding
+- [✓] 2026-01-22 10:57 - Completion history list shows all recurring occurrences with status
+- [✓] 2026-01-22 11:01 - Users can toggle completion status for past recurring todo occurrences
+- [✓] 2026-01-22 11:08 - Today view shows completed recurring todos inline with strikethrough
+- [✓] 2026-01-22 11:12 - Upcoming view includes recurring todos matching dates in next 7 days
+- [✓] 2026-01-22 11:17 - Upcoming view shows completed recurring todos inline with strikethrough
+- [✓] 2026-01-22 11:19 - Recurring todos have visual indicator (repeat icon) distinguishing them from one-time todos
+- [✓] 2026-01-22 11:25 - New recurring todos default to 09:00 notification time when not explicitly set
+- [✓] 2026-01-22 11:31 - Analytics works in guest mode using localStorage
