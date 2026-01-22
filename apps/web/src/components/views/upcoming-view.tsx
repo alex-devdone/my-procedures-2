@@ -470,13 +470,14 @@ export function UpcomingView({
 		return folders.find((f) => f.id === folderId) ?? null;
 	};
 
-	const handleToggleTodo = (
-		id: number | string,
-		completed: boolean,
-		options?: { virtualDate?: string },
-	) => {
-		// Pass through - TodoExpandableItem will pass options for virtual instances
-		onToggle(id, completed, options);
+	const handleToggleTodo = (entry: UpcomingTodoEntry, completed: boolean) => {
+		const id = entry.id;
+		// Detect virtual recurring instances and pass virtualDate option
+		if (isVirtualTodo(entry)) {
+			onToggle(id, completed, { virtualDate: entry.virtualDate });
+		} else {
+			onToggle(id, completed);
+		}
 	};
 
 	return (
@@ -616,7 +617,9 @@ export function UpcomingView({
 														completed: displayCompleted,
 													}}
 													subtaskProgress={getProgress(todo.id)}
-													onToggle={handleToggleTodo}
+													onToggle={(_id, completed) =>
+														handleToggleTodo(todo, completed)
+													}
 													onDelete={onDelete}
 													onScheduleChange={onScheduleChange}
 													folder={todoFolder}
