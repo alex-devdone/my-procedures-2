@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Folder, UseFolderStorageReturn } from "@/app/api/folder";
 import type { SubtaskProgress } from "@/app/api/subtask";
-import type { Todo } from "@/app/api/todo/todo.types";
+import type { Todo, VirtualTodo } from "@/app/api/todo/todo.types";
 
 // Mock the folder hooks
 const mockUseFolderStorage = vi.fn<() => UseFolderStorageReturn>();
@@ -42,11 +42,13 @@ vi.mock("@/components/notifications/reminder-provider", () => ({
 
 // Import after mocks
 import {
+	createVirtualTodo,
 	flattenDateGroups,
 	formatDateLabel,
 	getDateKey,
 	getRecurringMatchingDates,
 	getTodosUpcoming,
+	isVirtualTodo,
 	isWithinDays,
 	UpcomingView,
 } from "./upcoming-view";
@@ -435,6 +437,148 @@ describe("getTodosUpcoming", () => {
 		// This is a probabilistic test - the yearly task should not match most of the time
 		// We're checking that yearly filtering works and runs without error
 		expect(result).toBeDefined();
+	});
+
+	it("creates virtual entries with unique virtualKey for recurring todos", () => {
+		const todos = [
+			createMockTodo({
+				id: "1",
+				text: "Daily task",
+				recurringPattern: { type: "daily" },
+			}),
+		];
+
+		const result = getTodosUpcoming(todos);
+		// All entries should be virtual todos with unique virtualKeys
+		for (const group of result) {
+			for (const todo of group.todos) {
+				expect(isVirtualTodo(todo)).toBe(true);
+				if (isVirtualTodo(todo)) {
+					expect(todo.virtualKey).toMatch(/^1-\d{4}-\d{2}-\d{2}$/);
+					expect(todo.isRecurringInstance).toBe(true);
+					expect(todo.virtualDate).toBe(group.dateKey);
+				}
+			}
+		}
+	});
+
+	it("virtual entries have correct virtualDate matching their group", () => {
+		const todos = [
+			createMockTodo({
+				id: "1",
+				text: "Daily task",
+				recurringPattern: { type: "daily" },
+			}),
+		];
+
+		const result = getTodosUpcoming(todos);
+		for (const group of result) {
+			for (const todo of group.todos) {
+				if (isVirtualTodo(todo)) {
+					expect(todo.virtualDate).toBe(group.dateKey);
+				}
+			}
+		}
+	});
+
+	it("regular due date todos are not marked as virtual", () => {
+		const todos = [
+			createMockTodo({
+				id: "1",
+				text: "Task with due date",
+				dueDate: getTodayISOString(),
+			}),
+		];
+
+		const result = getTodosUpcoming(todos);
+		expect(result).toHaveLength(1);
+		const todayTodo = result[0].todos[0];
+		expect(isVirtualTodo(todayTodo)).toBe(false);
+	});
+
+	it("skips virtual entry for recurring todo on its dueDate", () => {
+		const todos = [
+			createMockTodo({
+				id: "1",
+				text: "Recurring with due date",
+				dueDate: getTodayISOString(),
+				recurringPattern: { type: "daily" },
+			}),
+		];
+
+		const result = getTodosUpcoming(todos);
+		// Today's group should have the original todo (not virtual)
+		const todayGroup = result.find((g) => g.label === "Today");
+		expect(todayGroup).toBeDefined();
+		expect(todayGroup?.todos).toHaveLength(1);
+		const todayTodo = todayGroup?.todos[0];
+		expect(isVirtualTodo(todayTodo!)).toBe(false);
+
+		// Other days should have virtual entries
+		const otherGroups = result.filter((g) => g.label !== "Today");
+		for (const group of otherGroups) {
+			for (const todo of group.todos) {
+				expect(isVirtualTodo(todo)).toBe(true);
+			}
+		}
+	});
+});
+
+describe("createVirtualTodo", () => {
+	it("creates a virtual todo with correct properties", () => {
+		const todo = createMockTodo({
+			id: "original-1",
+			text: "Test todo",
+			completed: false,
+		});
+		const date = new Date(2024, 5, 15); // June 15, 2024
+
+		const virtual = createVirtualTodo(todo, date);
+
+		expect(virtual.id).toBe("original-1");
+		expect(virtual.text).toBe("Test todo");
+		expect(virtual.completed).toBe(false);
+		expect(virtual.isRecurringInstance).toBe(true);
+		expect(virtual.virtualDate).toBe("2024-06-15");
+		expect(virtual.virtualKey).toBe("original-1-2024-06-15");
+	});
+
+	it("preserves all original todo properties", () => {
+		const todo = createMockTodo({
+			id: "1",
+			text: "Test",
+			completed: true,
+			folderId: "folder-1",
+			recurringPattern: { type: "daily" },
+		});
+		const date = new Date();
+
+		const virtual = createVirtualTodo(todo, date);
+
+		expect(virtual.completed).toBe(true);
+		expect(virtual.folderId).toBe("folder-1");
+		expect(virtual.recurringPattern).toEqual({ type: "daily" });
+	});
+});
+
+describe("isVirtualTodo", () => {
+	it("returns true for virtual todos", () => {
+		const todo = createMockTodo({ id: "1" });
+		const virtual = createVirtualTodo(todo, new Date());
+		expect(isVirtualTodo(virtual)).toBe(true);
+	});
+
+	it("returns false for regular todos", () => {
+		const todo = createMockTodo({ id: "1" });
+		expect(isVirtualTodo(todo)).toBe(false);
+	});
+
+	it("returns false for todos with isRecurringInstance set to false", () => {
+		const todo = {
+			...createMockTodo({ id: "1" }),
+			isRecurringInstance: false,
+		} as Todo & { isRecurringInstance: boolean };
+		expect(isVirtualTodo(todo)).toBe(false);
 	});
 });
 

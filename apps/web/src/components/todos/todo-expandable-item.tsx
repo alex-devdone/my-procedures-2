@@ -65,6 +65,10 @@ export interface TodoExpandableItemProps {
 	className?: string;
 	/** Animation delay for staggered rendering */
 	animationDelay?: string;
+	/** Whether this is a virtual recurring instance (not the original todo) */
+	isRecurringInstance?: boolean;
+	/** The virtual date this instance represents (YYYY-MM-DD format) */
+	virtualDate?: string;
 }
 
 /**
@@ -90,6 +94,8 @@ export function TodoExpandableItem({
 	folderColorBgClasses = {},
 	className,
 	animationDelay,
+	isRecurringInstance = false,
+	virtualDate,
 }: TodoExpandableItemProps) {
 	const [isExpanded, setIsExpanded] = useState(false);
 	const { create: createSubtask } = useSubtaskStorage(todo.id);

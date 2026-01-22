@@ -6,7 +6,11 @@ import { useMemo, useState } from "react";
 import type { FolderColor } from "@/app/api/folder";
 import { useFolderStorage } from "@/app/api/folder";
 import { useAllSubtasksProgress } from "@/app/api/subtask";
-import type { RecurringPattern, Todo } from "@/app/api/todo/todo.types";
+import type {
+	RecurringPattern,
+	Todo,
+	VirtualTodo,
+} from "@/app/api/todo/todo.types";
 import { isToday, isTomorrow } from "@/components/scheduling/due-date-badge";
 import { TodoExpandableItem } from "@/components/todos";
 import { Card, CardContent } from "@/components/ui/card";
@@ -63,6 +67,16 @@ export interface UpcomingViewProps {
 	className?: string;
 }
 
+/** A todo entry that may be a regular todo or a virtual recurring instance */
+export type UpcomingTodoEntry = Todo | VirtualTodo;
+
+/**
+ * Type guard to check if a todo entry is a virtual recurring instance.
+ */
+export function isVirtualTodo(todo: UpcomingTodoEntry): todo is VirtualTodo {
+	return "isRecurringInstance" in todo && todo.isRecurringInstance === true;
+}
+
 /**
  * Represents a group of todos for a specific date.
  */
@@ -71,8 +85,8 @@ export interface TodoDateGroup {
 	dateKey: string;
 	/** Human-readable label for the date */
 	label: string;
-	/** Todos due on this date */
-	todos: Todo[];
+	/** Todos due on this date (may include virtual recurring instances) */
+	todos: UpcomingTodoEntry[];
 }
 
 /**
@@ -148,15 +162,35 @@ export function getRecurringMatchingDates(
 }
 
 /**
+ * Creates a virtual todo entry for a recurring pattern on a specific date.
+ */
+export function createVirtualTodo(todo: Todo, date: Date): VirtualTodo {
+	const dateKey = getDateKey(date);
+	return {
+		...todo,
+		isRecurringInstance: true,
+		virtualDate: dateKey,
+		virtualKey: `${todo.id}-${dateKey}`,
+	};
+}
+
+/**
  * Filters todos to return only those due within the next 7 days, grouped by date.
- * Also includes recurring todos that match dates in the next 7 days.
+ * Generates virtual todo entries for recurring patterns on each matching date.
  */
 export function getTodosUpcoming(todos: Todo[]): TodoDateGroup[] {
 	// Group by date
-	const groups = new Map<string, { label: string; todos: Todo[] }>();
+	const groups = new Map<
+		string,
+		{ label: string; todos: UpcomingTodoEntry[] }
+	>();
 
-	// Helper to add a todo to a specific date group
-	const addTodoToGroup = (todo: Todo, date: Date | string) => {
+	// Helper to add a todo entry to a specific date group
+	const addTodoToGroup = (
+		entry: UpcomingTodoEntry,
+		date: Date | string,
+		uniqueKey: string,
+	) => {
 		const dateKey = getDateKey(date);
 		const label = formatDateLabel(date);
 
@@ -165,9 +199,14 @@ export function getTodosUpcoming(todos: Todo[]): TodoDateGroup[] {
 		}
 		const group = groups.get(dateKey);
 		if (group) {
-			// Avoid adding duplicates (same todo id in same group)
-			if (!group.todos.some((t) => t.id === todo.id)) {
-				group.todos.push(todo);
+			// Avoid adding duplicates using unique key
+			const existingKeys = new Set(
+				group.todos.map((t) =>
+					isVirtualTodo(t) ? t.virtualKey : String(t.id),
+				),
+			);
+			if (!existingKeys.has(uniqueKey)) {
+				group.todos.push(entry);
 			}
 		}
 	};
@@ -175,14 +214,24 @@ export function getTodosUpcoming(todos: Todo[]): TodoDateGroup[] {
 	for (const todo of todos) {
 		// Case 1: Todo has a due date within the next 7 days
 		if (todo.dueDate && isWithinDays(todo.dueDate, 7)) {
-			addTodoToGroup(todo, todo.dueDate);
+			addTodoToGroup(todo, todo.dueDate, String(todo.id));
 		}
 
-		// Case 2: Todo has a recurring pattern (add to all matching dates in next 7 days)
+		// Case 2: Todo has a recurring pattern - create virtual entries for each matching date
 		if (todo.recurringPattern) {
 			const matchingDates = getRecurringMatchingDates(todo.recurringPattern, 7);
 			for (const date of matchingDates) {
-				addTodoToGroup(todo, date);
+				const dateKey = getDateKey(date);
+				// If the todo also has a dueDate matching this date, skip virtual entry
+				// to avoid duplication (the explicit dueDate takes precedence)
+				if (todo.dueDate) {
+					const dueDateKey = getDateKey(todo.dueDate);
+					if (dueDateKey === dateKey) {
+						continue;
+					}
+				}
+				const virtualEntry = createVirtualTodo(todo, date);
+				addTodoToGroup(virtualEntry, date, virtualEntry.virtualKey);
 			}
 		}
 	}
@@ -196,9 +245,11 @@ export function getTodosUpcoming(todos: Todo[]): TodoDateGroup[] {
 }
 
 /**
- * Flattens date groups into a flat array of todos.
+ * Flattens date groups into a flat array of todo entries.
  */
-export function flattenDateGroups(groups: TodoDateGroup[]): Todo[] {
+export function flattenDateGroups(
+	groups: TodoDateGroup[],
+): UpcomingTodoEntry[] {
 	return groups.flatMap((group) => group.todos);
 }
 
@@ -397,9 +448,13 @@ export function UpcomingView({
 									<ul className="space-y-2">
 										{group.todos.map((todo, index) => {
 											const todoFolder = getFolderForTodo(todo.folderId);
+											// Use virtualKey for recurring instances, otherwise use id
+											const itemKey = isVirtualTodo(todo)
+												? todo.virtualKey
+												: todo.id;
 											return (
 												<TodoExpandableItem
-													key={todo.id}
+													key={itemKey}
 													todo={todo}
 													subtaskProgress={getProgress(todo.id)}
 													onToggle={handleToggleTodo}
@@ -409,6 +464,10 @@ export function UpcomingView({
 													showFolderBadge={true}
 													folderColorBgClasses={folderColorBgClasses}
 													animationDelay={`${index * 0.03}s`}
+													isRecurringInstance={isVirtualTodo(todo)}
+													virtualDate={
+														isVirtualTodo(todo) ? todo.virtualDate : undefined
+													}
 												/>
 											);
 										})}

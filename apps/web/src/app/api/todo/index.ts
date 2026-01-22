@@ -32,6 +32,7 @@ export type {
 	UpdateTodoFolderInput,
 	UseSyncTodosReturn,
 	UseTodoStorageReturn,
+	VirtualTodo,
 } from "./todo.types";
 export {
 	bulkCreateTodosInputSchema,
