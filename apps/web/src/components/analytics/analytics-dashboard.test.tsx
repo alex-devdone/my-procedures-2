@@ -1,19 +1,41 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import type {
+	AnalyticsData,
+	RecurringOccurrenceWithStatus,
+} from "@/app/api/analytics";
 import { AnalyticsDashboard } from "./analytics-dashboard";
 
-// Mock the analytics hooks
-const mockUseAnalytics = vi.fn(() => ({
-	data: undefined,
-	isLoading: false,
-	error: null,
-}));
-const mockUseRecurringOccurrencesWithStatus = vi.fn(() => ({
-	data: [],
-	isLoading: false,
-	isError: false,
-	error: null,
-}));
+// Mock return types
+interface UseAnalyticsReturn {
+	data: AnalyticsData | undefined;
+	isLoading: boolean;
+	error: Error | null;
+}
+
+interface UseRecurringOccurrencesReturn {
+	data: RecurringOccurrenceWithStatus[];
+	isLoading: boolean;
+	isError: boolean;
+	error: Error | null;
+}
+
+// Mock the analytics hooks with proper types
+const mockUseAnalytics = vi.fn(
+	(): UseAnalyticsReturn => ({
+		data: undefined,
+		isLoading: false,
+		error: null,
+	}),
+);
+const mockUseRecurringOccurrencesWithStatus = vi.fn(
+	(): UseRecurringOccurrencesReturn => ({
+		data: [],
+		isLoading: false,
+		isError: false,
+		error: null,
+	}),
+);
 
 vi.mock("@/app/api/analytics", () => ({
 	useAnalytics: () => mockUseAnalytics(),

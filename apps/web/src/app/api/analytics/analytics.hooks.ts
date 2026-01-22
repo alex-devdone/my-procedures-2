@@ -466,8 +466,36 @@ export function useUpdatePastCompletion() {
 		[isAuthenticated, remoteMutation],
 	);
 
+	const updatePastCompletionAsync = useCallback(
+		async (input: UpdatePastCompletionInputLocal) => {
+			if (isAuthenticated) {
+				// For authenticated users, ensure todoId is a number and use remoteMutation.mutateAsync
+				// This triggers the optimistic updates in onMutate
+				return remoteMutation.mutateAsync({
+					todoId:
+						typeof input.todoId === "number"
+							? input.todoId
+							: Number.parseInt(input.todoId, 10),
+					scheduledDate: input.scheduledDate,
+					completed: input.completed,
+				} as UpdatePastCompletionInput);
+			}
+			// For local storage, use the local storage function with string todoId
+			localTodoStorage.updateLocalPastCompletion(
+				typeof input.todoId === "string" ? input.todoId : String(input.todoId),
+				input.scheduledDate,
+				input.completed,
+			);
+			// Notify listeners to trigger re-renders in useAnalytics and useCompletionHistory
+			notifyLocalAnalyticsListeners();
+			return undefined;
+		},
+		[isAuthenticated, remoteMutation],
+	);
+
 	return {
 		mutate: updatePastCompletion,
+		mutateAsync: updatePastCompletionAsync,
 		isPending: remoteMutation.isPending,
 		isSuccess: remoteMutation.isSuccess,
 		isError: remoteMutation.isError,
@@ -658,7 +686,8 @@ export function useRecurringOccurrencesWithStatus(
 		const occurrences: RecurringOccurrenceWithStatus[] = [];
 
 		// Create a map of completion records for fast lookup
-		const completionMap = new Map<string, CompletionHistoryRecord>();
+		// The API returns dates as strings (JSON serialization), so we accept UnifiedCompletionHistoryRecord
+		const completionMap = new Map<string, UnifiedCompletionHistoryRecord>();
 		if (completionQuery.data) {
 			for (const record of completionQuery.data) {
 				const dateKey = new Date(record.scheduledDate)
