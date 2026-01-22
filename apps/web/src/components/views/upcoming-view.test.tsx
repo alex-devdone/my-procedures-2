@@ -642,6 +642,125 @@ describe("getTodosUpcoming", () => {
 			expect(todayTodo.occurrenceCompleted).toBe(false);
 		}
 	});
+
+	it("includes custom recurring todos on matching days", () => {
+		const today = new Date();
+		const currentDayOfWeek = today.getDay();
+		const tomorrowDayOfWeek = (currentDayOfWeek + 1) % 7;
+
+		const todos = [
+			createMockTodo({
+				id: "1",
+				text: "Custom pattern task",
+				recurringPattern: {
+					type: "custom",
+					daysOfWeek: [currentDayOfWeek, tomorrowDayOfWeek],
+				},
+			}),
+		];
+
+		const result = getTodosUpcoming(todos);
+		// Should appear on today and tomorrow at minimum
+		expect(result.length).toBeGreaterThanOrEqual(2);
+		// First group should be today
+		expect(result[0].label).toBe("Today");
+		expect(result[0].todos[0].id).toBe("1");
+		// Second group should be tomorrow
+		expect(result[1].label).toBe("Tomorrow");
+		expect(result[1].todos[0].id).toBe("1");
+	});
+
+	it("includes weekly recurring todos with multiple days", () => {
+		const today = new Date();
+		const currentDayOfWeek = today.getDay();
+		const dayAfterTomorrow = (currentDayOfWeek + 2) % 7;
+
+		const todos = [
+			createMockTodo({
+				id: "1",
+				text: "Weekly multi-day task",
+				recurringPattern: {
+					type: "weekly",
+					daysOfWeek: [currentDayOfWeek, dayAfterTomorrow],
+				},
+			}),
+		];
+
+		const result = getTodosUpcoming(todos);
+		// Should appear on today and 2 days from now at minimum
+		expect(result.length).toBeGreaterThanOrEqual(2);
+		// First group should be today
+		expect(result[0].label).toBe("Today");
+		expect(result[0].todos[0].id).toBe("1");
+	});
+
+	it("handles multiple recurring todos on the same date", () => {
+		const todos = [
+			createMockTodo({
+				id: "1",
+				text: "Daily task 1",
+				recurringPattern: { type: "daily" },
+			}),
+			createMockTodo({
+				id: "2",
+				text: "Daily task 2",
+				recurringPattern: { type: "daily" },
+			}),
+		];
+
+		const result = getTodosUpcoming(todos);
+		// Each day should have both recurring todos
+		for (const group of result) {
+			expect(group.todos).toHaveLength(2);
+			const ids = group.todos.map((t) => t.id);
+			expect(ids).toContain("1");
+			expect(ids).toContain("2");
+		}
+	});
+
+	it("includes yearly recurring todo when it matches within 7 days", () => {
+		const today = new Date();
+		const currentMonth = today.getMonth() + 1; // 1-indexed
+		const currentDayOfMonth = today.getDate();
+
+		const todos = [
+			createMockTodo({
+				id: "1",
+				text: "Yearly birthday reminder",
+				recurringPattern: {
+					type: "yearly",
+					monthOfYear: currentMonth,
+					dayOfMonth: currentDayOfMonth,
+				},
+			}),
+		];
+
+		const result = getTodosUpcoming(todos);
+		// Should appear today since it matches current date
+		expect(result.length).toBeGreaterThanOrEqual(1);
+		expect(result[0].label).toBe("Today");
+		expect(result[0].todos[0].id).toBe("1");
+	});
+
+	it("handles todos with only recurring pattern (no due date)", () => {
+		const todos = [
+			createMockTodo({
+				id: "1",
+				text: "Recurring only",
+				dueDate: null,
+				recurringPattern: { type: "daily" },
+			}),
+		];
+
+		const result = getTodosUpcoming(todos);
+		// Daily pattern should still show on all 8 days
+		expect(result).toHaveLength(8);
+		// All entries should be virtual
+		for (const group of result) {
+			expect(group.todos).toHaveLength(1);
+			expect(isVirtualTodo(group.todos[0])).toBe(true);
+		}
+	});
 });
 
 describe("createVirtualTodo", () => {
