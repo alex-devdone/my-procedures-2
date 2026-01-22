@@ -1,6 +1,7 @@
 import * as localSubtaskStorage from "./local-subtask-storage";
 
 const STORAGE_KEY = "todos";
+const COMPLETION_HISTORY_KEY = "completion_history";
 
 export interface RecurringPattern {
 	type: "daily" | "weekly" | "monthly" | "yearly" | "custom";
@@ -452,4 +453,112 @@ export function completeRecurring(
 		nextTodo,
 		message: "Next occurrence created",
 	};
+}
+
+// ============================================================================
+// Completion History
+// ============================================================================
+
+export interface CompletionHistoryEntry {
+	todoId: string;
+	scheduledDate: string;
+	completedAt: string | null;
+}
+
+function isCompletionHistoryArray(
+	data: unknown,
+): data is CompletionHistoryEntry[] {
+	if (!Array.isArray(data)) return false;
+	return data.every(
+		(item) =>
+			typeof item === "object" &&
+			item !== null &&
+			typeof item.todoId === "string" &&
+			typeof item.scheduledDate === "string" &&
+			(item.completedAt === null || typeof item.completedAt === "string"),
+	);
+}
+
+export function getCompletionHistory(): CompletionHistoryEntry[] {
+	if (typeof window === "undefined") return [];
+
+	try {
+		const stored = localStorage.getItem(COMPLETION_HISTORY_KEY);
+		if (!stored) return [];
+
+		const parsed: unknown = JSON.parse(stored);
+		if (!isCompletionHistoryArray(parsed)) {
+			return [];
+		}
+		return parsed;
+	} catch {
+		return [];
+	}
+}
+
+export function addCompletionHistoryEntry(
+	entry: Omit<CompletionHistoryEntry, "completedAt"> & {
+		completedAt?: string | null;
+	},
+): CompletionHistoryEntry {
+	const history = getCompletionHistory();
+	const newEntry: CompletionHistoryEntry = {
+		completedAt: entry.completedAt ?? new Date().toISOString(),
+		todoId: entry.todoId,
+		scheduledDate: entry.scheduledDate,
+	};
+	history.push(newEntry);
+	localStorage.setItem(COMPLETION_HISTORY_KEY, JSON.stringify(history));
+	return newEntry;
+}
+
+export function updateCompletionHistoryEntry(
+	todoId: string,
+	scheduledDate: string,
+	updates: Partial<Pick<CompletionHistoryEntry, "completedAt">>,
+): CompletionHistoryEntry | null {
+	const history = getCompletionHistory();
+	const entry = history.find(
+		(e) => e.todoId === todoId && e.scheduledDate === scheduledDate,
+	);
+	if (!entry) return null;
+
+	if (updates.completedAt !== undefined) {
+		entry.completedAt = updates.completedAt;
+	}
+
+	localStorage.setItem(COMPLETION_HISTORY_KEY, JSON.stringify(history));
+	return entry;
+}
+
+export function deleteCompletionHistoryEntry(
+	todoId: string,
+	scheduledDate: string,
+): boolean {
+	const history = getCompletionHistory();
+	const index = history.findIndex(
+		(e) => e.todoId === todoId && e.scheduledDate === scheduledDate,
+	);
+	if (index === -1) return false;
+
+	history.splice(index, 1);
+	localStorage.setItem(COMPLETION_HISTORY_KEY, JSON.stringify(history));
+	return true;
+}
+
+export function deleteCompletionHistoryByTodoId(todoId: string): number {
+	const history = getCompletionHistory();
+	const initialLength = history.length;
+	const filtered = history.filter((e) => e.todoId !== todoId);
+
+	if (filtered.length < initialLength) {
+		localStorage.setItem(COMPLETION_HISTORY_KEY, JSON.stringify(filtered));
+	}
+
+	return initialLength - filtered.length;
+}
+
+export function clearCompletionHistory(): void {
+	if (typeof window === "undefined") return;
+	localStorage.removeItem(COMPLETION_HISTORY_KEY);
 }

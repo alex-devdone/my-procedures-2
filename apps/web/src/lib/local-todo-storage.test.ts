@@ -1222,4 +1222,395 @@ describe("local-todo-storage", () => {
 			});
 		});
 	});
+
+	describe("Completion History", () => {
+		const COMPLETION_HISTORY_KEY = "completion_history";
+
+		describe("getCompletionHistory", () => {
+			it("should return empty array when no history exists", () => {
+				const history = localTodoStorage.getCompletionHistory();
+				expect(history).toEqual([]);
+			});
+
+			it("should return empty array when localStorage has invalid data", () => {
+				localStorageMock.setItem(COMPLETION_HISTORY_KEY, "invalid json");
+				const history = localTodoStorage.getCompletionHistory();
+				expect(history).toEqual([]);
+			});
+
+			it("should return empty array when localStorage has non-array data", () => {
+				localStorageMock.setItem(
+					COMPLETION_HISTORY_KEY,
+					JSON.stringify({ not: "an array" }),
+				);
+				const history = localTodoStorage.getCompletionHistory();
+				expect(history).toEqual([]);
+			});
+
+			it("should return empty array when array contains invalid entries", () => {
+				localStorageMock.setItem(
+					COMPLETION_HISTORY_KEY,
+					JSON.stringify([
+						{
+							todoId: "1",
+							scheduledDate: "2024-01-01",
+							completedAt: null,
+						},
+						{ invalid: "entry" },
+					]),
+				);
+				const history = localTodoStorage.getCompletionHistory();
+				expect(history).toEqual([]);
+			});
+
+			it("should return valid completion history entries", () => {
+				const mockHistory = [
+					{
+						todoId: "todo-1",
+						scheduledDate: "2024-01-01T00:00:00.000Z",
+						completedAt: "2024-01-01T10:00:00.000Z",
+					},
+					{
+						todoId: "todo-2",
+						scheduledDate: "2024-01-02T00:00:00.000Z",
+						completedAt: null,
+					},
+				];
+				localStorageMock.setItem(
+					COMPLETION_HISTORY_KEY,
+					JSON.stringify(mockHistory),
+				);
+
+				const history = localTodoStorage.getCompletionHistory();
+				expect(history).toEqual(mockHistory);
+			});
+		});
+
+		describe("addCompletionHistoryEntry", () => {
+			it("should add a new entry with default completedAt timestamp", () => {
+				const beforeTime = Date.now();
+				const entry = localTodoStorage.addCompletionHistoryEntry({
+					todoId: "todo-1",
+					scheduledDate: "2024-01-01T00:00:00.000Z",
+				});
+				const afterTime = Date.now();
+
+				expect(entry).toEqual({
+					todoId: "todo-1",
+					scheduledDate: "2024-01-01T00:00:00.000Z",
+					completedAt: entry.completedAt,
+				});
+				expect(entry.completedAt).not.toBeNull();
+				expect(
+					new Date(entry.completedAt as string).getTime(),
+				).toBeGreaterThanOrEqual(beforeTime);
+				expect(
+					new Date(entry.completedAt as string).getTime(),
+				).toBeLessThanOrEqual(afterTime);
+
+				const history = localTodoStorage.getCompletionHistory();
+				expect(history).toHaveLength(1);
+				expect(history[0]).toEqual(entry);
+			});
+
+			it("should add a new entry with custom completedAt timestamp", () => {
+				const customCompletedAt = "2024-01-01T10:00:00.000Z";
+				const entry = localTodoStorage.addCompletionHistoryEntry({
+					todoId: "todo-1",
+					scheduledDate: "2024-01-01T00:00:00.000Z",
+					completedAt: customCompletedAt,
+				});
+
+				expect(entry.completedAt).toBe(customCompletedAt);
+
+				const history = localTodoStorage.getCompletionHistory();
+				expect(history).toHaveLength(1);
+				expect(history[0].completedAt).toBe(customCompletedAt);
+			});
+
+			it("should add entry with null completedAt when explicitly set", () => {
+				const entry = localTodoStorage.addCompletionHistoryEntry({
+					todoId: "todo-1",
+					scheduledDate: "2024-01-01T00:00:00.000Z",
+					completedAt: null,
+				});
+
+				expect(entry.completedAt).toBeNull();
+
+				const history = localTodoStorage.getCompletionHistory();
+				expect(history[0].completedAt).toBeNull();
+			});
+
+			it("should append to existing history", () => {
+				const entry1 = localTodoStorage.addCompletionHistoryEntry({
+					todoId: "todo-1",
+					scheduledDate: "2024-01-01T00:00:00.000Z",
+					completedAt: "2024-01-01T10:00:00.000Z",
+				});
+
+				const entry2 = localTodoStorage.addCompletionHistoryEntry({
+					todoId: "todo-2",
+					scheduledDate: "2024-01-02T00:00:00.000Z",
+					completedAt: "2024-01-02T10:00:00.000Z",
+				});
+
+				const history = localTodoStorage.getCompletionHistory();
+				expect(history).toHaveLength(2);
+				expect(history[0]).toEqual(entry1);
+				expect(history[1]).toEqual(entry2);
+			});
+		});
+
+		describe("updateCompletionHistoryEntry", () => {
+			beforeEach(() => {
+				localTodoStorage.addCompletionHistoryEntry({
+					todoId: "todo-1",
+					scheduledDate: "2024-01-01T00:00:00.000Z",
+					completedAt: null,
+				});
+			});
+
+			it("should update completedAt of an existing entry", () => {
+				const updatedEntry = localTodoStorage.updateCompletionHistoryEntry(
+					"todo-1",
+					"2024-01-01T00:00:00.000Z",
+					{ completedAt: "2024-01-01T10:00:00.000Z" },
+				);
+
+				expect(updatedEntry).not.toBeNull();
+				expect(updatedEntry?.completedAt).toBe("2024-01-01T10:00:00.000Z");
+
+				const history = localTodoStorage.getCompletionHistory();
+				expect(history[0].completedAt).toBe("2024-01-01T10:00:00.000Z");
+			});
+
+			it("should return null when entry not found", () => {
+				const result = localTodoStorage.updateCompletionHistoryEntry(
+					"non-existent",
+					"2024-01-01T00:00:00.000Z",
+					{ completedAt: "2024-01-01T10:00:00.000Z" },
+				);
+
+				expect(result).toBeNull();
+			});
+
+			it("should update completedAt to null", () => {
+				localTodoStorage.updateCompletionHistoryEntry(
+					"todo-1",
+					"2024-01-01T00:00:00.000Z",
+					{ completedAt: "2024-01-01T10:00:00.000Z" },
+				);
+
+				const updatedEntry = localTodoStorage.updateCompletionHistoryEntry(
+					"todo-1",
+					"2024-01-01T00:00:00.000Z",
+					{ completedAt: null },
+				);
+
+				expect(updatedEntry?.completedAt).toBeNull();
+			});
+
+			it("should only update the matching entry", () => {
+				localTodoStorage.addCompletionHistoryEntry({
+					todoId: "todo-1",
+					scheduledDate: "2024-01-02T00:00:00.000Z",
+					completedAt: null,
+				});
+
+				localTodoStorage.updateCompletionHistoryEntry(
+					"todo-1",
+					"2024-01-01T00:00:00.000Z",
+					{ completedAt: "2024-01-01T10:00:00.000Z" },
+				);
+
+				const history = localTodoStorage.getCompletionHistory();
+				expect(history).toHaveLength(2);
+				expect(history[0].completedAt).toBe("2024-01-01T10:00:00.000Z");
+				expect(history[1].completedAt).toBeNull();
+			});
+		});
+
+		describe("deleteCompletionHistoryEntry", () => {
+			beforeEach(() => {
+				localTodoStorage.addCompletionHistoryEntry({
+					todoId: "todo-1",
+					scheduledDate: "2024-01-01T00:00:00.000Z",
+					completedAt: null,
+				});
+			});
+
+			it("should delete an existing entry", () => {
+				const result = localTodoStorage.deleteCompletionHistoryEntry(
+					"todo-1",
+					"2024-01-01T00:00:00.000Z",
+				);
+
+				expect(result).toBe(true);
+				expect(localTodoStorage.getCompletionHistory()).toHaveLength(0);
+			});
+
+			it("should return false when entry not found", () => {
+				const result = localTodoStorage.deleteCompletionHistoryEntry(
+					"non-existent",
+					"2024-01-01T00:00:00.000Z",
+				);
+
+				expect(result).toBe(false);
+			});
+
+			it("should only delete the matching entry", () => {
+				localTodoStorage.addCompletionHistoryEntry({
+					todoId: "todo-2",
+					scheduledDate: "2024-01-02T00:00:00.000Z",
+					completedAt: null,
+				});
+
+				localTodoStorage.deleteCompletionHistoryEntry(
+					"todo-1",
+					"2024-01-01T00:00:00.000Z",
+				);
+
+				const history = localTodoStorage.getCompletionHistory();
+				expect(history).toHaveLength(1);
+				expect(history[0].todoId).toBe("todo-2");
+			});
+		});
+
+		describe("deleteCompletionHistoryByTodoId", () => {
+			beforeEach(() => {
+				localTodoStorage.addCompletionHistoryEntry({
+					todoId: "todo-1",
+					scheduledDate: "2024-01-01T00:00:00.000Z",
+					completedAt: null,
+				});
+				localTodoStorage.addCompletionHistoryEntry({
+					todoId: "todo-1",
+					scheduledDate: "2024-01-02T00:00:00.000Z",
+					completedAt: null,
+				});
+				localTodoStorage.addCompletionHistoryEntry({
+					todoId: "todo-2",
+					scheduledDate: "2024-01-03T00:00:00.000Z",
+					completedAt: null,
+				});
+			});
+
+			it("should delete all entries for a specific todoId", () => {
+				const deletedCount =
+					localTodoStorage.deleteCompletionHistoryByTodoId("todo-1");
+
+				expect(deletedCount).toBe(2);
+
+				const history = localTodoStorage.getCompletionHistory();
+				expect(history).toHaveLength(1);
+				expect(history[0].todoId).toBe("todo-2");
+			});
+
+			it("should return 0 when no entries found for todoId", () => {
+				const deletedCount =
+					localTodoStorage.deleteCompletionHistoryByTodoId("non-existent");
+
+				expect(deletedCount).toBe(0);
+			});
+		});
+
+		describe("clearCompletionHistory", () => {
+			beforeEach(() => {
+				localTodoStorage.addCompletionHistoryEntry({
+					todoId: "todo-1",
+					scheduledDate: "2024-01-01T00:00:00.000Z",
+					completedAt: null,
+				});
+				localTodoStorage.addCompletionHistoryEntry({
+					todoId: "todo-2",
+					scheduledDate: "2024-01-02T00:00:00.000Z",
+					completedAt: null,
+				});
+			});
+
+			it("should clear all completion history", () => {
+				localTodoStorage.clearCompletionHistory();
+
+				expect(localTodoStorage.getCompletionHistory()).toHaveLength(0);
+				expect(localStorageMock.removeItem).toHaveBeenCalledWith(
+					COMPLETION_HISTORY_KEY,
+				);
+			});
+
+			it("should do nothing when history is already empty", () => {
+				localTodoStorage.clearCompletionHistory();
+				localTodoStorage.clearCompletionHistory();
+
+				expect(localTodoStorage.getCompletionHistory()).toHaveLength(0);
+			});
+		});
+
+		describe("Type validation", () => {
+			it("should accept valid entry with all required fields", () => {
+				const entry = {
+					todoId: "todo-1",
+					scheduledDate: "2024-01-01T00:00:00.000Z",
+					completedAt: "2024-01-01T10:00:00.000Z",
+				};
+
+				localTodoStorage.addCompletionHistoryEntry(entry);
+
+				const history = localTodoStorage.getCompletionHistory();
+				expect(history[0]).toEqual(entry);
+			});
+
+			it("should accept entry with null completedAt", () => {
+				const entry = {
+					todoId: "todo-1",
+					scheduledDate: "2024-01-01T00:00:00.000Z",
+					completedAt: null,
+				};
+
+				localTodoStorage.addCompletionHistoryEntry(entry);
+
+				const history = localTodoStorage.getCompletionHistory();
+				expect(history[0].completedAt).toBeNull();
+			});
+
+			it("should reject entry with missing todoId", () => {
+				const invalidEntry = {
+					scheduledDate: "2024-01-01T00:00:00.000Z",
+					completedAt: null,
+				};
+				localStorageMock.setItem(
+					COMPLETION_HISTORY_KEY,
+					JSON.stringify([invalidEntry]),
+				);
+
+				expect(localTodoStorage.getCompletionHistory()).toEqual([]);
+			});
+
+			it("should reject entry with missing scheduledDate", () => {
+				const invalidEntry = {
+					todoId: "todo-1",
+					completedAt: null,
+				};
+				localStorageMock.setItem(
+					COMPLETION_HISTORY_KEY,
+					JSON.stringify([invalidEntry]),
+				);
+
+				expect(localTodoStorage.getCompletionHistory()).toEqual([]);
+			});
+
+			it("should reject entry with number completedAt", () => {
+				const invalidEntry = {
+					todoId: "todo-1",
+					scheduledDate: "2024-01-01T00:00:00.000Z",
+					completedAt: 1234567890,
+				};
+				localStorageMock.setItem(
+					COMPLETION_HISTORY_KEY,
+					JSON.stringify([invalidEntry]),
+				);
+
+				expect(localTodoStorage.getCompletionHistory()).toEqual([]);
+			});
+		});
+	});
 });
