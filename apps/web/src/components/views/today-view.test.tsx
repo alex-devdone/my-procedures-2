@@ -57,6 +57,11 @@ vi.mock("@/components/notifications/reminder-provider", () => ({
 	}),
 }));
 
+// Mock the completion realtime hook
+vi.mock("@/hooks/use-completion-realtime", () => ({
+	useCompletionRealtimeWithAuth: () => undefined,
+}));
+
 // Import after mocks
 import {
 	getTodosDueToday,

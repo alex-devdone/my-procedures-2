@@ -7,10 +7,10 @@ import * as localTodoStorage from "@/lib/local-todo-storage";
 import { queryClient } from "@/utils/trpc";
 import {
 	getAnalyticsQueryOptions,
-	getCompletionHistoryQueryOptions,
 	getRecurringOccurrencesQueryOptions,
 	getUpdatePastCompletionMutationOptions,
 } from "./analytics.api";
+import { getCompletionHistorySupabase } from "./analytics.supabase";
 import type {
 	AnalyticsData,
 	CompletionHistoryRecord,
@@ -134,7 +134,7 @@ const emptyLocalCompletionHistory: LocalCompletionHistoryMapped[] = [];
 
 /**
  * Hook for fetching completion history for a date range.
- * Uses local storage for unauthenticated users, remote API for authenticated users.
+ * Uses local storage for unauthenticated users, Supabase for authenticated users.
  *
  * @param startDate - Start of date range (ISO datetime string)
  * @param endDate - End of date range (ISO datetime string)
@@ -143,10 +143,28 @@ const emptyLocalCompletionHistory: LocalCompletionHistoryMapped[] = [];
 export function useCompletionHistory(startDate: string, endDate: string) {
 	const { data: session, isPending: isSessionPending } = useSession();
 	const isAuthenticated = !!session?.user;
+	const userId = session?.user?.id;
 
+	// Use Supabase for fetching completion history (instead of tRPC)
+	// This allows us to subscribe to Realtime updates
 	const query = useQuery({
-		...getCompletionHistoryQueryOptions({ startDate, endDate }),
-		enabled: isAuthenticated,
+		queryKey: ["completionHistory", userId, startDate, endDate],
+		queryFn: async () => {
+			if (!userId) throw new Error("User ID is required");
+			const data = await getCompletionHistorySupabase(
+				userId,
+				startDate,
+				endDate,
+			);
+			// Map snake_case to camelCase
+			return data.map((record) => ({
+				id: record.id,
+				todoId: record.todo_id,
+				scheduledDate: record.scheduled_date,
+				completedAt: record.completed_at,
+			}));
+		},
+		enabled: isAuthenticated && !!userId,
 	});
 
 	// For unauthenticated users, use local storage with useSyncExternalStore
@@ -550,6 +568,7 @@ export function useRecurringOccurrencesWithStatus(
 ) {
 	const { data: session, isPending: isSessionPending } = useSession();
 	const isAuthenticated = !!session?.user;
+	const userId = session?.user?.id;
 
 	// Fetch expected occurrences from recurring patterns
 	const recurringQuery = useQuery({
@@ -557,10 +576,25 @@ export function useRecurringOccurrencesWithStatus(
 		enabled: isAuthenticated,
 	});
 
-	// Fetch actual completion records
+	// Fetch actual completion records using Supabase
 	const completionQuery = useQuery({
-		...getCompletionHistoryQueryOptions({ startDate, endDate }),
-		enabled: isAuthenticated,
+		queryKey: ["completionHistory", userId, startDate, endDate],
+		queryFn: async () => {
+			if (!userId) throw new Error("User ID is required");
+			const data = await getCompletionHistorySupabase(
+				userId,
+				startDate,
+				endDate,
+			);
+			// Map snake_case to camelCase
+			return data.map((record) => ({
+				id: record.id,
+				todoId: record.todo_id,
+				scheduledDate: record.scheduled_date,
+				completedAt: record.completed_at,
+			}));
+		},
+		enabled: isAuthenticated && !!userId,
 	});
 
 	// For local storage (unauthenticated users), we need to generate occurrences manually

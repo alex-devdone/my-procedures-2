@@ -313,13 +313,14 @@ export function useTodoStorage(): UseTodoStorageReturn {
 		mutationFn: getUpdatePastCompletionMutationOptions().mutationFn,
 		onMutate: async ({
 			todoId,
-			scheduledDate: _scheduledDate,
+			scheduledDate,
 			completed,
 		}: {
 			todoId: number;
 			scheduledDate: string;
 			completed: boolean;
 		}) => {
+			// Cancel outgoing refetches for todos
 			await queryClient.cancelQueries({ queryKey });
 
 			const previousTodos = queryClient.getQueryData<RemoteTodo[]>(queryKey);
@@ -331,15 +332,98 @@ export function useTodoStorage(): UseTodoStorageReturn {
 				),
 			);
 
-			return { previousTodos };
+			// Cancel and snapshot all completion history queries (Supabase-based)
+			await queryClient.cancelQueries({ queryKey: ["completionHistory"] });
+
+			const previousCompletionHistories = queryClient.getQueriesData<
+				Array<{
+					id: number;
+					todoId: number;
+					scheduledDate: string;
+					completedAt: string | null;
+				}>
+			>({
+				queryKey: ["completionHistory"],
+			});
+
+			// Normalize scheduled date for comparison (YYYY-MM-DD)
+			const scheduledDateKey = new Date(scheduledDate)
+				.toISOString()
+				.split("T")[0];
+
+			// Optimistically update all completion history queries
+			queryClient.setQueriesData(
+				{ queryKey: ["completionHistory"] },
+				(
+					old:
+						| Array<{
+								id: number;
+								todoId: number;
+								scheduledDate: string;
+								completedAt: string | null;
+						  }>
+						| undefined,
+				) => {
+					if (!old) return old;
+
+					// Check if a record exists for this todoId and scheduledDate
+					const existingIndex = old.findIndex((record) => {
+						const recordDateKey = new Date(record.scheduledDate)
+							.toISOString()
+							.split("T")[0];
+						return (
+							record.todoId === todoId && recordDateKey === scheduledDateKey
+						);
+					});
+
+					if (existingIndex >= 0) {
+						// Update existing record
+						const updated = [...old];
+						updated[existingIndex] = {
+							...updated[existingIndex],
+							completedAt: completed ? new Date().toISOString() : null,
+						};
+						return updated;
+					}
+
+					// If completing and no record exists, add a new one (optimistic)
+					if (completed) {
+						return [
+							...old,
+							{
+								id: -Date.now(), // Temporary optimistic ID
+								todoId,
+								scheduledDate,
+								completedAt: new Date().toISOString(),
+							},
+						];
+					}
+
+					return old;
+				},
+			);
+
+			return { previousTodos, previousCompletionHistories };
 		},
 		onError: (_err, _variables, context) => {
+			// Rollback todos
 			if (context?.previousTodos) {
 				queryClient.setQueryData(queryKey, context.previousTodos);
+			}
+
+			// Rollback all completion history queries
+			if (context?.previousCompletionHistories) {
+				for (const [key, data] of context.previousCompletionHistories) {
+					queryClient.setQueryData(key, data);
+				}
 			}
 		},
 		onSettled: () => {
 			refetchRemoteTodos();
+			// Invalidate all completion history queries to refresh from server
+			queryClient.invalidateQueries({
+				queryKey: ["completionHistory"],
+			});
 		},
 	});
 
@@ -405,28 +489,20 @@ export function useTodoStorage(): UseTodoStorageReturn {
 					const isCurrentOccurrence =
 						options?.virtualDate && todoDateKey === options.virtualDate;
 
-					// Check if the virtualDate is in the past (overdue)
-					const today = new Date();
-					today.setHours(0, 0, 0, 0);
-					const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-					const isOverdueOccurrence =
-						options?.virtualDate && options.virtualDate < todayKey;
-
 					// If virtualDate is provided but does NOT match the todo's dueDate,
 					// use updatePastCompletion for pattern-generated virtual occurrences
 					if (options?.virtualDate && !isCurrentOccurrence) {
+						// Convert YYYY-MM-DD to ISO datetime format (YYYY-MM-DDTHH:mm:ssZ)
+						const scheduledDateTime = `${options.virtualDate}T00:00:00Z`;
 						await updatePastCompletionMutation.mutateAsync({
 							todoId: id as number,
-							scheduledDate: options.virtualDate,
+							scheduledDate: scheduledDateTime,
 							completed,
 						});
-						// For overdue occurrences, also advance the recurring pattern
-						// by calling completeRecurring to create the next occurrence
-						if (isOverdueOccurrence && completed) {
-							await completeRecurringMutation.mutateAsync({
-								id: id as number,
-							});
-						}
+						// Note: We do NOT call completeRecurring for past occurrences
+						// because completing a past missed occurrence should NOT:
+						// 1. Mark the original todo as completed
+						// 2. Create a new occurrence (the pattern should continue as-is)
 						return;
 					}
 

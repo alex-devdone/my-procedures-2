@@ -57,6 +57,11 @@ vi.mock("@/components/notifications/reminder-provider", () => ({
 	}),
 }));
 
+// Mock the completion realtime hook
+vi.mock("@/hooks/use-completion-realtime", () => ({
+	useCompletionRealtimeWithAuth: () => undefined,
+}));
+
 // Import after mocks
 import { getTodosOverdue, OverdueView } from "./overdue-view";
 
@@ -488,9 +493,9 @@ describe("OverdueView", () => {
 			const todoList = screen.getByTestId("overdue-todo-list");
 			const items = within(todoList).getAllByTestId(/todo-item-/);
 
-			// Two Days Ago should come first (more overdue)
-			expect(items[0]).toHaveAttribute("data-testid", "todo-item-2");
-			expect(items[1]).toHaveAttribute("data-testid", "todo-item-1");
+			// Yesterday should come first (newest overdue dates first - descending order)
+			expect(items[0]).toHaveAttribute("data-testid", "todo-item-1");
+			expect(items[1]).toHaveAttribute("data-testid", "todo-item-2");
 		});
 
 		it("sorts active before completed", () => {
@@ -1078,7 +1083,7 @@ describe("OverdueView", () => {
 			);
 
 			const list = screen.getByTestId("overdue-todo-list");
-			expect(list.tagName).toBe("UL");
+			expect(list.tagName).toBe("DIV");
 		});
 	});
 });

@@ -17,6 +17,7 @@ import { TodoExpandableItem } from "@/components/todos";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useCompletionRealtimeWithAuth } from "@/hooks/use-completion-realtime";
 import { isDateMatchingPattern } from "@/lib/recurring-utils";
 import { cn } from "@/lib/utils";
 
@@ -215,6 +216,10 @@ export function TodayView({
 	const { folders } = useFolderStorage();
 	const { getProgress } = useAllSubtasksProgress();
 
+	// Enable realtime sync for completion history
+	// This automatically invalidates and refetches when completion records change
+	useCompletionRealtimeWithAuth();
+
 	// Calculate date range for completion history (today only)
 	const dateRange = useMemo(() => {
 		const today = new Date();
@@ -265,17 +270,10 @@ export function TodayView({
 		});
 	}, [todayTodos, filter, searchQuery]);
 
-	// Sort todos: active first, then by time (tasks without time at the end)
+	// Sort todos: by time in descending order (latest first, no separation by completion status)
 	const sortedTodos = useMemo(() => {
 		return [...filteredTodos].sort((a, b) => {
-			// First, sort by completion status (active first)
-			const aCompleted = isEntryCompleted(a);
-			const bCompleted = isEntryCompleted(b);
-			if (aCompleted !== bCompleted) {
-				return aCompleted ? 1 : -1;
-			}
-
-			// Then sort by time
+			// Sort by time
 			const getTime = (todo: typeof a): number | null => {
 				// Check recurring pattern notifyAt first (e.g., "09:00", "21:00")
 				if (todo.recurringPattern?.notifyAt) {
@@ -304,9 +302,9 @@ export function TodayView({
 			const aTime = getTime(a);
 			const bTime = getTime(b);
 
-			// Both have time: sort by time ascending (earliest first)
+			// Both have time: sort by time descending (latest first)
 			if (aTime !== null && bTime !== null) {
-				return aTime - bTime;
+				return bTime - aTime;
 			}
 
 			// Only a has time: a comes first

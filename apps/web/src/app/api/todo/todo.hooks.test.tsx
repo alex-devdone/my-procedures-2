@@ -84,6 +84,8 @@ vi.mock("@/utils/trpc", () => ({
 		cancelQueries: vi.fn().mockResolvedValue(undefined),
 		getQueryData: vi.fn(),
 		setQueryData: vi.fn(),
+		getQueriesData: vi.fn().mockReturnValue([]),
+		setQueriesData: vi.fn(),
 		invalidateQueries: vi.fn().mockResolvedValue(undefined),
 	},
 }));

@@ -57,6 +57,11 @@ vi.mock("@/app/api/analytics", () => ({
 	}),
 }));
 
+// Mock the completion realtime hook
+vi.mock("@/hooks/use-completion-realtime", () => ({
+	useCompletionRealtimeWithAuth: vi.fn(),
+}));
+
 // Import after mocks
 import {
 	type CompletionRecord,

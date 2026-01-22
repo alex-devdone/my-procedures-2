@@ -17,6 +17,7 @@ import { TodoExpandableItem } from "@/components/todos";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useCompletionRealtimeWithAuth } from "@/hooks/use-completion-realtime";
 import { isDateMatchingPattern } from "@/lib/recurring-utils";
 import { cn } from "@/lib/utils";
 
@@ -346,6 +347,10 @@ export function UpcomingView({
 
 	const { folders } = useFolderStorage();
 	const { getProgress } = useAllSubtasksProgress();
+
+	// Enable realtime sync for completion history
+	// This automatically invalidates and refetches when completion records change
+	useCompletionRealtimeWithAuth();
 
 	// Calculate date range for completion history (today to 7 days from now)
 	const dateRange = useMemo(() => {

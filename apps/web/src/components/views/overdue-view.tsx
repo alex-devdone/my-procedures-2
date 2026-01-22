@@ -17,6 +17,7 @@ import { TodoExpandableItem } from "@/components/todos";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useCompletionRealtimeWithAuth } from "@/hooks/use-completion-realtime";
 import { isDateMatchingPattern } from "@/lib/recurring-utils";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +25,18 @@ type FilterType = "all" | "active" | "completed";
 
 /** A todo entry that may be a regular todo or a virtual recurring instance */
 export type OverdueTodoEntry = Todo | VirtualTodo;
+
+/**
+ * Represents a group of overdue todos for a specific date.
+ */
+export interface OverdueDateGroup {
+	/** ISO date string (YYYY-MM-DD) */
+	dateKey: string;
+	/** Human-readable label for the date */
+	label: string;
+	/** Todos due on this date (may include virtual recurring instances) */
+	todos: OverdueTodoEntry[];
+}
 
 /**
  * Type guard to check if a todo entry is a virtual recurring instance.
@@ -88,6 +101,115 @@ const folderColorBgClasses: Record<FolderColor, string> = {
 	rose: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
 };
 
+/**
+ * Extracts time in minutes from a todo entry for sorting.
+ * Checks recurringPattern.notifyAt, reminderAt, and dueDate in that order.
+ * @returns Time in minutes from midnight (0-1439), or null if no time is set
+ */
+export function getTodoTime(todo: OverdueTodoEntry): number | null {
+	// Check recurring pattern notifyAt first (e.g., "09:00", "21:00")
+	if (todo.recurringPattern?.notifyAt) {
+		const [hours, minutes] = todo.recurringPattern.notifyAt
+			.split(":")
+			.map(Number);
+		return hours * 60 + minutes;
+	}
+	// Check reminderAt (it has explicit time)
+	if (todo.reminderAt) {
+		const date = new Date(todo.reminderAt);
+		return date.getHours() * 60 + date.getMinutes();
+	}
+	// Check if dueDate has a time component (not midnight)
+	if (todo.dueDate) {
+		const date = new Date(todo.dueDate);
+		const minutes = date.getHours() * 60 + date.getMinutes();
+		// If it's not midnight (00:00), consider it has a time
+		if (minutes > 0) {
+			return minutes;
+		}
+	}
+	return null;
+}
+
+/**
+ * Sorts todos by time in descending order (latest time first).
+ * Todos with time are placed before todos without time.
+ */
+export function sortTodosByTimeDesc(
+	todos: OverdueTodoEntry[],
+): OverdueTodoEntry[] {
+	return [...todos].sort((a, b) => {
+		const aTime = getTodoTime(a);
+		const bTime = getTodoTime(b);
+
+		// Both have time: sort by time descending
+		if (aTime !== null && bTime !== null) {
+			return bTime - aTime;
+		}
+
+		// Only a has time: a comes first
+		if (aTime !== null) {
+			return -1;
+		}
+
+		// Only b has time: b comes first
+		if (bTime !== null) {
+			return 1;
+		}
+
+		// Neither has time: maintain original order
+		return 0;
+	});
+}
+
+/**
+ * Custom hook to filter and sort todo groups for overdue view.
+ * Handles status filtering, search filtering, and time-based sorting.
+ * @param dateGroups - Todo groups organized by date
+ * @param filter - Status filter (all/active/completed)
+ * @param searchQuery - Search query to filter by todo text
+ * @returns Filtered and sorted todo groups
+ */
+export function useFilteredAndSortedTodoGroups(
+	dateGroups: OverdueDateGroup[],
+	filter: FilterType,
+	searchQuery: string,
+): OverdueDateGroup[] {
+	return useMemo(() => {
+		return dateGroups
+			.map((group) => {
+				// Apply filters
+				const filtered = group.todos.filter((todo) => {
+					const isCompleted = isEntryCompleted(todo);
+					const matchesFilter =
+						filter === "all" ||
+						(filter === "active" && !isCompleted) ||
+						(filter === "completed" && isCompleted);
+
+					const matchesSearch =
+						!searchQuery ||
+						todo.text.toLowerCase().includes(searchQuery.toLowerCase());
+
+					return matchesFilter && matchesSearch;
+				});
+
+				// Separate active and completed todos
+				const active = filtered.filter((t) => !isEntryCompleted(t));
+				const completed = filtered.filter((t) => isEntryCompleted(t));
+
+				// Sort both by time descending
+				const sortedActive = sortTodosByTimeDesc(active);
+				const sortedCompleted = sortTodosByTimeDesc(completed);
+
+				// Active todos first, then completed
+				const sorted = [...sortedActive, ...sortedCompleted];
+
+				return { ...group, todos: sorted };
+			})
+			.filter((group) => group.todos.length > 0);
+	}, [dateGroups, filter, searchQuery]);
+}
+
 export interface OverdueViewProps {
 	/** All todos from the todo storage */
 	todos: Todo[];
@@ -130,6 +252,34 @@ export interface CompletionRecord {
 function getDateKey(date: Date | string): string {
 	const d = typeof date === "string" ? new Date(date) : date;
 	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/**
+ * Formats a date as a human-readable label for the overdue view.
+ * Returns "Yesterday" or formatted date (e.g., "Mon, Jan 20").
+ */
+export function formatOverdueDateLabel(date: Date | string): string {
+	const d = typeof date === "string" ? new Date(date) : date;
+	const yesterday = new Date();
+	yesterday.setDate(yesterday.getDate() - 1);
+	yesterday.setHours(0, 0, 0, 0);
+
+	const dNormalized = new Date(d);
+	dNormalized.setHours(0, 0, 0, 0);
+
+	if (
+		dNormalized.getFullYear() === yesterday.getFullYear() &&
+		dNormalized.getMonth() === yesterday.getMonth() &&
+		dNormalized.getDate() === yesterday.getDate()
+	) {
+		return "Yesterday";
+	}
+
+	return d.toLocaleDateString("en-US", {
+		weekday: "short",
+		month: "short",
+		day: "numeric",
+	});
 }
 
 /**
@@ -212,6 +362,48 @@ export function getTodosOverdue(
 }
 
 /**
+ * Filters todos to return only those that are overdue, grouped by date.
+ * @param todos - All todos to filter
+ * @param now - The current date
+ * @param completionHistory - Optional completion history for recurring todos
+ */
+export function getTodosOverdueGrouped(
+	todos: Todo[],
+	now: Date = new Date(),
+	completionHistory?: CompletionRecord[],
+): OverdueDateGroup[] {
+	const entries = getTodosOverdue(todos, now, completionHistory);
+
+	// Group by date
+	const groupMap = new Map<string, OverdueTodoEntry[]>();
+	for (const entry of entries) {
+		const dateKey = isVirtualTodo(entry)
+			? entry.virtualDate
+			: entry.dueDate
+				? getDateKey(entry.dueDate)
+				: "";
+
+		if (!dateKey) continue;
+
+		const group = groupMap.get(dateKey);
+		if (group) {
+			group.push(entry);
+		} else {
+			groupMap.set(dateKey, [entry]);
+		}
+	}
+
+	// Convert to array and sort by date (newest first)
+	return Array.from(groupMap.entries())
+		.sort(([a], [b]) => new Date(b).getTime() - new Date(a).getTime())
+		.map(([dateKey, todos]) => ({
+			dateKey,
+			label: formatOverdueDateLabel(dateKey),
+			todos,
+		}));
+}
+
+/**
  * OverdueView component showing overdue todos.
  *
  * Features:
@@ -235,6 +427,10 @@ export function OverdueView({
 
 	const { folders } = useFolderStorage();
 	const { getProgress } = useAllSubtasksProgress();
+
+	// Enable realtime sync for completion history
+	// This automatically invalidates and refetches when completion records change
+	useCompletionRealtimeWithAuth();
 
 	// Calculate date range for completion history (last 7 days up to yesterday)
 	const dateRange = useMemo(() => {
@@ -266,140 +462,30 @@ export function OverdueView({
 		}));
 	}, [completionHistoryData]);
 
-	// Filter overdue todos
-	const overdueTodos = useMemo(() => {
-		return getTodosOverdue(todos, new Date(), completionHistory);
+	// Get todos grouped by date
+	const dateGroups = useMemo(() => {
+		return getTodosOverdueGrouped(todos, new Date(), completionHistory);
 	}, [todos, completionHistory]);
 
-	// Apply status and search filters
-	const filteredTodos = useMemo(() => {
-		return overdueTodos.filter((todo) => {
-			const isCompleted = isEntryCompleted(todo);
-			const matchesFilter =
-				filter === "all" ||
-				(filter === "active" && !isCompleted) ||
-				(filter === "completed" && isCompleted);
+	// Flatten all overdue todos for statistics
+	const allOverdueTodos = useMemo(() => {
+		return dateGroups.flatMap((g) => g.todos);
+	}, [dateGroups]);
 
-			const matchesSearch =
-				!searchQuery ||
-				todo.text.toLowerCase().includes(searchQuery.toLowerCase());
-
-			return matchesFilter && matchesSearch;
-		});
-	}, [overdueTodos, filter, searchQuery]);
-
-	// Sort overdue todos: active first (by due date, then by time), then completed
-	const sortedTodos = useMemo(() => {
-		const getTime = (todo: OverdueTodoEntry): number | null => {
-			// Check recurring pattern notifyAt first (e.g., "09:00", "21:00")
-			if (todo.recurringPattern?.notifyAt) {
-				const [hours, minutes] = todo.recurringPattern.notifyAt
-					.split(":")
-					.map(Number);
-				return hours * 60 + minutes;
-			}
-			// Check reminderAt (it has explicit time)
-			if (todo.reminderAt) {
-				const date = new Date(todo.reminderAt);
-				return date.getHours() * 60 + date.getMinutes();
-			}
-			// Check if dueDate has a time component (not midnight)
-			if (todo.dueDate) {
-				const date = new Date(todo.dueDate);
-				const minutes = date.getHours() * 60 + date.getMinutes();
-				// If it's not midnight (00:00), consider it has a time
-				if (minutes > 0) {
-					return minutes;
-				}
-			}
-			return null;
-		};
-
-		const active = filteredTodos.filter((t) => !isEntryCompleted(t));
-		const completed = filteredTodos.filter((t) => isEntryCompleted(t));
-
-		// Sort active by virtualDate (for recurring instances) or dueDate (oldest first = most overdue), then by time
-		const sortedActive = [...active].sort((a, b) => {
-			// First sort by date
-			const dateA = new Date(
-				isVirtualTodo(a) ? a.virtualDate : (a.dueDate as string),
-			).getTime();
-			const dateB = new Date(
-				isVirtualTodo(b) ? b.virtualDate : (b.dueDate as string),
-			).getTime();
-			if (dateA !== dateB) {
-				return dateA - dateB;
-			}
-
-			// Same date: sort by time
-			const aTime = getTime(a);
-			const bTime = getTime(b);
-
-			// Both have time: sort by time ascending
-			if (aTime !== null && bTime !== null) {
-				return aTime - bTime;
-			}
-
-			// Only a has time: a comes first
-			if (aTime !== null) {
-				return -1;
-			}
-
-			// Only b has time: b comes first
-			if (bTime !== null) {
-				return 1;
-			}
-
-			// Neither has time: maintain original order
-			return 0;
-		});
-
-		// Sort completed by virtualDate (for recurring instances) or dueDate (newest first = recently completed), then by time
-		const sortedCompleted = [...completed].sort((a, b) => {
-			// First sort by date (newest first)
-			const dateA = new Date(
-				isVirtualTodo(a) ? a.virtualDate : (a.dueDate as string),
-			).getTime();
-			const dateB = new Date(
-				isVirtualTodo(b) ? b.virtualDate : (b.dueDate as string),
-			).getTime();
-			if (dateA !== dateB) {
-				return dateB - dateA;
-			}
-
-			// Same date: sort by time
-			const aTime = getTime(a);
-			const bTime = getTime(b);
-
-			// Both have time: sort by time ascending
-			if (aTime !== null && bTime !== null) {
-				return aTime - bTime;
-			}
-
-			// Only a has time: a comes first
-			if (aTime !== null) {
-				return -1;
-			}
-
-			// Only b has time: b comes first
-			if (bTime !== null) {
-				return 1;
-			}
-
-			// Neither has time: maintain original order
-			return 0;
-		});
-
-		return [...sortedActive, ...sortedCompleted];
-	}, [filteredTodos]);
+	// Apply status and search filters to groups, then sort todos within each group
+	const filteredGroups = useFilteredAndSortedTodoGroups(
+		dateGroups,
+		filter,
+		searchQuery,
+	);
 
 	// Stats for overdue todos
 	const stats = useMemo(() => {
-		const total = overdueTodos.length;
-		const completed = overdueTodos.filter((t) => isEntryCompleted(t)).length;
+		const total = allOverdueTodos.length;
+		const completed = allOverdueTodos.filter((t) => isEntryCompleted(t)).length;
 		const active = total - completed;
 		return { total, completed, active };
-	}, [overdueTodos]);
+	}, [allOverdueTodos]);
 
 	// Helper function to get folder for a todo
 	const getFolderForTodo = (folderId: number | string | null | undefined) => {
@@ -511,52 +597,75 @@ export function OverdueView({
 								</div>
 							))}
 						</div>
-					) : sortedTodos.length === 0 ? (
+					) : filteredGroups.length === 0 ? (
 						<OverdueEmptyState
 							filter={filter}
 							searchQuery={searchQuery}
-							hasAnyTodos={overdueTodos.length > 0}
+							hasAnyTodos={allOverdueTodos.length > 0}
 						/>
 					) : (
-						<ul className="space-y-2" data-testid="overdue-todo-list">
-							{sortedTodos.map((todo, index) => {
-								const todoFolder = getFolderForTodo(todo.folderId);
-								// Use virtualKey for recurring instances, otherwise use id
-								const itemKey = isVirtualTodo(todo) ? todo.virtualKey : todo.id;
-								// For virtual todos, use occurrenceCompleted for display
-								const displayCompleted = isEntryCompleted(todo);
-								return (
-									<TodoExpandableItem
-										key={itemKey}
-										todo={{
-											...todo,
-											// Override completed with the effective completion status
-											completed: displayCompleted,
-										}}
-										subtaskProgress={getProgress(todo.id)}
-										onToggle={(_id, completed) =>
-											handleToggleTodo(todo, completed)
-										}
-										onDelete={onDelete}
-										onScheduleChange={onScheduleChange}
-										folder={todoFolder}
-										showFolderBadge={true}
-										folderColorBgClasses={folderColorBgClasses}
-										animationDelay={`${index * 0.03}s`}
-										isRecurringInstance={isVirtualTodo(todo)}
-										virtualDate={
-											isVirtualTodo(todo) ? todo.virtualDate : undefined
-										}
-									/>
-								);
-							})}
-						</ul>
+						<div className="space-y-6" data-testid="overdue-todo-list">
+							{filteredGroups.map((group) => (
+								<div
+									key={group.dateKey}
+									data-testid={`date-group-${group.dateKey}`}
+								>
+									{/* Date Header */}
+									<div
+										className="mb-3 flex items-center gap-2"
+										data-testid={`date-header-${group.dateKey}`}
+									>
+										<span className="font-semibold text-sm">{group.label}</span>
+										<span className="text-muted-foreground text-xs">
+											({group.todos.length})
+										</span>
+									</div>
+
+									{/* Todos for this date */}
+									<ul className="space-y-2">
+										{group.todos.map((todo, index) => {
+											const todoFolder = getFolderForTodo(todo.folderId);
+											// Use virtualKey for recurring instances, otherwise use id
+											const itemKey = isVirtualTodo(todo)
+												? todo.virtualKey
+												: todo.id;
+											// For virtual todos, use occurrenceCompleted for display
+											const displayCompleted = isEntryCompleted(todo);
+											return (
+												<TodoExpandableItem
+													key={itemKey}
+													todo={{
+														...todo,
+														// Override completed with the effective completion status
+														completed: displayCompleted,
+													}}
+													subtaskProgress={getProgress(todo.id)}
+													onToggle={(_id, completed) =>
+														handleToggleTodo(todo, completed)
+													}
+													onDelete={onDelete}
+													onScheduleChange={onScheduleChange}
+													folder={todoFolder}
+													showFolderBadge={true}
+													folderColorBgClasses={folderColorBgClasses}
+													animationDelay={`${index * 0.03}s`}
+													isRecurringInstance={isVirtualTodo(todo)}
+													virtualDate={
+														isVirtualTodo(todo) ? todo.virtualDate : undefined
+													}
+												/>
+											);
+										})}
+									</ul>
+								</div>
+							))}
+						</div>
 					)}
 				</CardContent>
 			</Card>
 
 			{/* Summary Footer */}
-			{overdueTodos.length > 0 && (
+			{allOverdueTodos.length > 0 && (
 				<div className="stagger-3 mt-4 flex animate-fade-up items-center justify-between text-muted-foreground text-sm opacity-0">
 					<span data-testid="active-count">
 						{stats.active} task{stats.active !== 1 ? "s" : ""} remaining
