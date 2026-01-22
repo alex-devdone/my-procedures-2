@@ -1989,6 +1989,147 @@ describe("local-todo-storage", () => {
 			});
 		});
 
+		describe("updateLocalPastCompletion", () => {
+			beforeEach(() => {
+				// Add an entry with null completedAt (missed) to start with
+				localTodoStorage.addCompletionHistoryEntry({
+					todoId: "todo-1",
+					scheduledDate: "2024-01-15T00:00:00.000Z",
+					completedAt: null,
+				});
+			});
+
+			it("should update completedAt when setting completed to true", () => {
+				const beforeTime = Date.now();
+				const result = localTodoStorage.updateLocalPastCompletion(
+					"todo-1",
+					"2024-01-15T00:00:00.000Z",
+					true,
+				);
+				const afterTime = Date.now();
+
+				expect(result).not.toBeNull();
+				expect(result?.completedAt).not.toBeNull();
+
+				const completedAtTime = new Date(
+					result?.completedAt as string,
+				).getTime();
+				expect(completedAtTime).toBeGreaterThanOrEqual(beforeTime);
+				expect(completedAtTime).toBeLessThanOrEqual(afterTime);
+			});
+
+			it("should set completedAt to null when setting completed to false", () => {
+				// First mark as completed
+				localTodoStorage.updateCompletionHistoryEntry(
+					"todo-1",
+					"2024-01-15T00:00:00.000Z",
+					{ completedAt: "2024-01-15T10:00:00.000Z" },
+				);
+
+				// Then mark as not completed
+				const result = localTodoStorage.updateLocalPastCompletion(
+					"todo-1",
+					"2024-01-15T00:00:00.000Z",
+					false,
+				);
+
+				expect(result).not.toBeNull();
+				expect(result?.completedAt).toBeNull();
+			});
+
+			it("should return null when entry not found", () => {
+				const result = localTodoStorage.updateLocalPastCompletion(
+					"non-existent",
+					"2024-01-15T00:00:00.000Z",
+					true,
+				);
+
+				expect(result).toBeNull();
+			});
+
+			it("should return null when scheduledDate does not match", () => {
+				const result = localTodoStorage.updateLocalPastCompletion(
+					"todo-1",
+					"2024-01-16T00:00:00.000Z", // different date
+					true,
+				);
+
+				expect(result).toBeNull();
+			});
+
+			it("should only update the matching entry", () => {
+				// Add another entry for the same todo but different date
+				localTodoStorage.addCompletionHistoryEntry({
+					todoId: "todo-1",
+					scheduledDate: "2024-01-16T00:00:00.000Z",
+					completedAt: null,
+				});
+
+				localTodoStorage.updateLocalPastCompletion(
+					"todo-1",
+					"2024-01-15T00:00:00.000Z",
+					true,
+				);
+
+				const history = localTodoStorage.getCompletionHistory();
+				expect(history).toHaveLength(2);
+
+				const entry1 = history.find(
+					(e) =>
+						e.todoId === "todo-1" &&
+						e.scheduledDate === "2024-01-15T00:00:00.000Z",
+				);
+				const entry2 = history.find(
+					(e) =>
+						e.todoId === "todo-1" &&
+						e.scheduledDate === "2024-01-16T00:00:00.000Z",
+				);
+
+				expect(entry1?.completedAt).not.toBeNull();
+				expect(entry2?.completedAt).toBeNull();
+			});
+
+			it("should handle multiple entries with same todoId correctly", () => {
+				// Add multiple entries with same todoId
+				localTodoStorage.addCompletionHistoryEntry({
+					todoId: "todo-1",
+					scheduledDate: "2024-01-16T00:00:00.000Z",
+					completedAt: null,
+				});
+				localTodoStorage.addCompletionHistoryEntry({
+					todoId: "todo-1",
+					scheduledDate: "2024-01-17T00:00:00.000Z",
+					completedAt: null,
+				});
+
+				// Update the middle entry
+				const result = localTodoStorage.updateLocalPastCompletion(
+					"todo-1",
+					"2024-01-16T00:00:00.000Z",
+					true,
+				);
+
+				expect(result).not.toBeNull();
+				expect(result?.scheduledDate).toBe("2024-01-16T00:00:00.000Z");
+
+				const history = localTodoStorage.getCompletionHistory();
+				const completed = history.filter((e) => e.completedAt !== null);
+				expect(completed).toHaveLength(1);
+				expect(completed[0].scheduledDate).toBe("2024-01-16T00:00:00.000Z");
+			});
+
+			it("should persist changes to localStorage", () => {
+				localTodoStorage.updateLocalPastCompletion(
+					"todo-1",
+					"2024-01-15T00:00:00.000Z",
+					true,
+				);
+
+				const history = localTodoStorage.getCompletionHistory();
+				expect(history[0].completedAt).not.toBeNull();
+			});
+		});
+
 		describe("Type validation", () => {
 			it("should accept valid entry with all required fields", () => {
 				const entry = {

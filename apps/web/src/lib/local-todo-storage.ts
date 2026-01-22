@@ -574,6 +574,25 @@ export function clearCompletionHistory(): void {
 	localStorage.removeItem(COMPLETION_HISTORY_KEY);
 }
 
+/**
+ * Update the completedAt timestamp for a past completion history entry.
+ * This is used to mark a past scheduled occurrence as completed retroactively.
+ *
+ * @param todoId - The ID of the todo
+ * @param scheduledDate - The scheduled date of the occurrence (ISO string)
+ * @param completed - Whether the todo is completed (true) or not (false)
+ * @returns The updated entry if found, null otherwise
+ */
+export function updateLocalPastCompletion(
+	todoId: string,
+	scheduledDate: string,
+	completed: boolean,
+): CompletionHistoryEntry | null {
+	return updateCompletionHistoryEntry(todoId, scheduledDate, {
+		completedAt: completed ? new Date().toISOString() : null,
+	});
+}
+
 export function getLocalCompletionHistory(
 	startDate: string,
 	endDate: string,
