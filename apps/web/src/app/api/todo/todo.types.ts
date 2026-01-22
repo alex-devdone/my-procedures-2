@@ -294,6 +294,11 @@ export interface UseTodoStorageReturn {
 			recurringPattern?: RecurringPattern | null;
 		},
 	) => Promise<void>;
+	updatePastCompletion: (
+		todoId: number | string,
+		scheduledDate: string,
+		completed: boolean,
+	) => Promise<void>;
 	isLoading: boolean;
 	isAuthenticated: boolean;
 	selectedFolderId: SelectedFolderId;

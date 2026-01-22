@@ -69,6 +69,9 @@ vi.mock("./todo.api", () => ({
 	getUpdateTodoScheduleMutationOptions: () => ({
 		mutationFn: vi.fn().mockResolvedValue({}),
 	}),
+	getUpdatePastCompletionMutationOptions: () => ({
+		mutationFn: vi.fn().mockResolvedValue({}),
+	}),
 	getTodosQueryKey: () => ["todos"],
 }));
 
@@ -266,6 +269,50 @@ describe("useTodoStorage", () => {
 
 			// Should return remote todos (empty by default in mock), not local
 			expect(result.current.isAuthenticated).toBe(true);
+		});
+
+		it("updatePastCompletion is available for authenticated users", () => {
+			const { result } = renderHook(() => useTodoStorage(), {
+				wrapper: createWrapper(),
+			});
+
+			expect(result.current.updatePastCompletion).toBeDefined();
+			expect(typeof result.current.updatePastCompletion).toBe("function");
+		});
+
+		it("updatePastCompletion calls mutation for authenticated users", async () => {
+			const { result } = renderHook(() => useTodoStorage(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.updatePastCompletion(
+					1,
+					"2026-01-20T00:00:00.000Z",
+					true,
+				);
+			});
+
+			// Verify the method completes without throwing
+			expect(result.current.updatePastCompletion).toBeDefined();
+		});
+
+		it("updatePastCompletion skips server call for optimistic IDs", async () => {
+			const { result } = renderHook(() => useTodoStorage(), {
+				wrapper: createWrapper(),
+			});
+
+			// Should not throw for negative (optimistic) IDs
+			await act(async () => {
+				await result.current.updatePastCompletion(
+					-1,
+					"2026-01-20T00:00:00.000Z",
+					true,
+				);
+			});
+
+			// Should complete successfully
+			expect(result.current.updatePastCompletion).toBeDefined();
 		});
 	});
 

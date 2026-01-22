@@ -21,6 +21,7 @@ import {
 	getDeleteTodoMutationOptions,
 	getTodosQueryKey,
 	getToggleTodoMutationOptions,
+	getUpdatePastCompletionMutationOptions,
 	getUpdateTodoFolderMutationOptions,
 	getUpdateTodoScheduleMutationOptions,
 } from "./todo.api";
@@ -306,6 +307,41 @@ export function useTodoStorage(): UseTodoStorageReturn {
 		},
 	});
 
+	// Update past completion mutation with optimistic updates
+	const updatePastCompletionMutation = useMutation({
+		mutationFn: getUpdatePastCompletionMutationOptions().mutationFn,
+		onMutate: async ({
+			todoId,
+			scheduledDate: _scheduledDate,
+			completed,
+		}: {
+			todoId: number;
+			scheduledDate: string;
+			completed: boolean;
+		}) => {
+			await queryClient.cancelQueries({ queryKey });
+
+			const previousTodos = queryClient.getQueryData<RemoteTodo[]>(queryKey);
+
+			// Optimistically update the todo's completed status for past occurrences
+			queryClient.setQueryData<RemoteTodo[]>(queryKey, (old) =>
+				old?.map((todo) =>
+					todo.id === todoId ? { ...todo, completed } : todo,
+				),
+			);
+
+			return { previousTodos };
+		},
+		onError: (_err, _variables, context) => {
+			if (context?.previousTodos) {
+				queryClient.setQueryData(queryKey, context.previousTodos);
+			}
+		},
+		onSettled: () => {
+			refetchRemoteTodos();
+		},
+	});
+
 	const create = useCallback(
 		async (
 			text: string,
@@ -453,6 +489,29 @@ export function useTodoStorage(): UseTodoStorageReturn {
 		[isAuthenticated, updateScheduleMutation],
 	);
 
+	const updatePastCompletion = useCallback(
+		async (
+			todoId: number | string,
+			scheduledDate: string,
+			completed: boolean,
+		) => {
+			if (isAuthenticated) {
+				// Skip server call for optimistic (negative) IDs - they haven't been created yet
+				if (typeof todoId === "number" && todoId < 0) {
+					return;
+				}
+				await updatePastCompletionMutation.mutateAsync({
+					todoId: todoId as number,
+					scheduledDate,
+					completed,
+				});
+			}
+			// Note: Local storage does not support past completion updates
+			// This feature is only available for authenticated users
+		},
+		[isAuthenticated, updatePastCompletionMutation],
+	);
+
 	const todos: Todo[] = useMemo(() => {
 		if (isAuthenticated) {
 			return (remoteTodos ?? []).map((t) => ({
@@ -506,6 +565,7 @@ export function useTodoStorage(): UseTodoStorageReturn {
 		deleteTodo,
 		updateFolder,
 		updateSchedule,
+		updatePastCompletion,
 		isLoading,
 		isAuthenticated,
 		selectedFolderId,
