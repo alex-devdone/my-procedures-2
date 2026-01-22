@@ -53,6 +53,7 @@ describe("FolderSidebar", () => {
 			expect(screen.getByTestId("smart-view-today")).toBeInTheDocument();
 			expect(screen.getByTestId("smart-view-upcoming")).toBeInTheDocument();
 			expect(screen.getByTestId("smart-view-overdue")).toBeInTheDocument();
+			expect(screen.getByTestId("smart-view-analytics")).toBeInTheDocument();
 		});
 
 		it("renders smart view labels", () => {
@@ -61,6 +62,7 @@ describe("FolderSidebar", () => {
 			expect(screen.getByText("Today")).toBeInTheDocument();
 			expect(screen.getByText("Upcoming")).toBeInTheDocument();
 			expect(screen.getByText("Overdue")).toBeInTheDocument();
+			expect(screen.getByText("Analytics")).toBeInTheDocument();
 		});
 
 		it("renders divider between smart views and folders", () => {
@@ -379,7 +381,12 @@ describe("FolderSidebar", () => {
 
 	describe("Smart Views", () => {
 		describe("Selection", () => {
-			const smartViewTypes: SmartViewType[] = ["today", "upcoming", "overdue"];
+			const smartViewTypes: SmartViewType[] = [
+				"today",
+				"upcoming",
+				"overdue",
+				"analytics",
+			];
 
 			it.each(smartViewTypes)("highlights selected %s view", (viewType) => {
 				render(<FolderSidebar selectedFolderId={viewType} />);
@@ -438,6 +445,7 @@ describe("FolderSidebar", () => {
 					{ viewType: "today", label: "Today's todos" },
 					{ viewType: "upcoming", label: "Upcoming todos" },
 					{ viewType: "overdue", label: "Overdue todos" },
+					{ viewType: "analytics", label: "Analytics dashboard" },
 				];
 
 			it.each(
@@ -472,10 +480,12 @@ describe("FolderSidebar", () => {
 				const todayView = screen.getByTestId("smart-view-today");
 				const upcomingView = screen.getByTestId("smart-view-upcoming");
 				const overdueView = screen.getByTestId("smart-view-overdue");
+				const analyticsView = screen.getByTestId("smart-view-analytics");
 
 				expect(todayView.querySelector("svg")).toBeInTheDocument();
 				expect(upcomingView.querySelector("svg")).toBeInTheDocument();
 				expect(overdueView.querySelector("svg")).toBeInTheDocument();
+				expect(analyticsView.querySelector("svg")).toBeInTheDocument();
 			});
 
 			it("applies active styling when smart view is selected", () => {
