@@ -12,6 +12,7 @@ import { TodoExpandableItem } from "@/components/todos";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { isDateMatchingPattern } from "@/lib/recurring-utils";
 import { cn } from "@/lib/utils";
 
 type FilterType = "all" | "active" | "completed";
@@ -118,27 +119,71 @@ export function formatDateLabel(date: Date | string): string {
 }
 
 /**
+ * Get an array of dates for the next N days (including today).
+ */
+function getNextDays(days: number): Date[] {
+	const dates: Date[] = [];
+	const today = new Date();
+	today.setHours(0, 0, 0, 0);
+
+	for (let i = 0; i <= days; i++) {
+		const date = new Date(today);
+		date.setDate(date.getDate() + i);
+		dates.push(date);
+	}
+
+	return dates;
+}
+
+/**
+ * Check if a recurring pattern matches any date in the next N days.
+ * Returns the matching dates for the pattern.
+ */
+export function getRecurringMatchingDates(
+	pattern: RecurringPattern,
+	days: number,
+): Date[] {
+	const nextDays = getNextDays(days);
+	return nextDays.filter((date) => isDateMatchingPattern(pattern, date));
+}
+
+/**
  * Filters todos to return only those due within the next 7 days, grouped by date.
+ * Also includes recurring todos that match dates in the next 7 days.
  */
 export function getTodosUpcoming(todos: Todo[]): TodoDateGroup[] {
-	const upcomingTodos = todos.filter((todo) => {
-		if (!todo.dueDate) return false;
-		return isWithinDays(todo.dueDate, 7);
-	});
-
 	// Group by date
 	const groups = new Map<string, { label: string; todos: Todo[] }>();
 
-	for (const todo of upcomingTodos) {
-		const dateKey = getDateKey(todo.dueDate as string);
-		const label = formatDateLabel(todo.dueDate as string);
+	// Helper to add a todo to a specific date group
+	const addTodoToGroup = (todo: Todo, date: Date | string) => {
+		const dateKey = getDateKey(date);
+		const label = formatDateLabel(date);
 
 		if (!groups.has(dateKey)) {
 			groups.set(dateKey, { label, todos: [] });
 		}
 		const group = groups.get(dateKey);
 		if (group) {
-			group.todos.push(todo);
+			// Avoid adding duplicates (same todo id in same group)
+			if (!group.todos.some((t) => t.id === todo.id)) {
+				group.todos.push(todo);
+			}
+		}
+	};
+
+	for (const todo of todos) {
+		// Case 1: Todo has a due date within the next 7 days
+		if (todo.dueDate && isWithinDays(todo.dueDate, 7)) {
+			addTodoToGroup(todo, todo.dueDate);
+		}
+
+		// Case 2: Todo has a recurring pattern (add to all matching dates in next 7 days)
+		if (todo.recurringPattern) {
+			const matchingDates = getRecurringMatchingDates(todo.recurringPattern, 7);
+			for (const date of matchingDates) {
+				addTodoToGroup(todo, date);
+			}
 		}
 	}
 
