@@ -7,7 +7,11 @@ import { useCompletionHistory } from "@/app/api/analytics";
 import type { FolderColor } from "@/app/api/folder";
 import { useFolderStorage } from "@/app/api/folder";
 import { useAllSubtasksProgress } from "@/app/api/subtask";
-import type { RecurringPattern, Todo } from "@/app/api/todo/todo.types";
+import type {
+	RecurringPattern,
+	Todo,
+	VirtualTodo,
+} from "@/app/api/todo/todo.types";
 import { isOverdue } from "@/components/scheduling/due-date-badge";
 import { TodoExpandableItem } from "@/components/todos";
 import { Card, CardContent } from "@/components/ui/card";
@@ -17,6 +21,48 @@ import { isDateMatchingPattern } from "@/lib/recurring-utils";
 import { cn } from "@/lib/utils";
 
 type FilterType = "all" | "active" | "completed";
+
+/** A todo entry that may be a regular todo or a virtual recurring instance */
+export type OverdueTodoEntry = Todo | VirtualTodo;
+
+/**
+ * Type guard to check if a todo entry is a virtual recurring instance.
+ */
+export function isVirtualTodo(todo: OverdueTodoEntry): todo is VirtualTodo {
+	return "isRecurringInstance" in todo && todo.isRecurringInstance === true;
+}
+
+/**
+ * Helper to check if a todo entry is effectively completed.
+ * For virtual todos, checks occurrenceCompleted; for regular todos, checks completed.
+ */
+export function isEntryCompleted(entry: OverdueTodoEntry): boolean {
+	if (isVirtualTodo(entry)) {
+		return entry.occurrenceCompleted === true;
+	}
+	return entry.completed;
+}
+
+/**
+ * Creates a virtual todo entry for a recurring pattern on a specific date.
+ * @param todo - The original recurring todo
+ * @param date - The date for this virtual instance
+ * @param occurrenceCompleted - Whether this specific occurrence was completed
+ */
+function createVirtualTodo(
+	todo: Todo,
+	date: Date,
+	occurrenceCompleted?: boolean,
+): VirtualTodo {
+	const dateKey = getDateKey(date);
+	return {
+		...todo,
+		isRecurringInstance: true,
+		virtualDate: dateKey,
+		virtualKey: `${todo.id}-${dateKey}`,
+		occurrenceCompleted,
+	};
+}
 
 /**
  * Maps folder colors to Tailwind CSS classes for badges.
@@ -70,9 +116,10 @@ export interface OverdueViewProps {
 
 /**
  * Completion record for a recurring todo occurrence.
+ * todoId can be string (local storage) or number (remote).
  */
 export interface CompletionRecord {
-	todoId: number;
+	todoId: string | number;
 	scheduledDate: Date;
 	completedAt: Date | null;
 }
@@ -88,7 +135,7 @@ function getDateKey(date: Date | string): string {
 /**
  * Filters todos to return only those that are overdue (past due date).
  * Includes both active and completed todos with past due dates.
- * For recurring todos, checks if there are uncompleted past occurrences.
+ * For recurring todos, creates virtual entries for each missed occurrence.
  * @param todos - All todos to filter
  * @param now - The current date
  * @param completionHistory - Optional completion history for recurring todos
@@ -97,7 +144,9 @@ export function getTodosOverdue(
 	todos: Todo[],
 	now: Date = new Date(),
 	completionHistory?: CompletionRecord[],
-): Todo[] {
+): OverdueTodoEntry[] {
+	const result: OverdueTodoEntry[] = [];
+
 	// Create a map for quick lookup of completion status by todoId and date
 	const completionMap = new Map<string, boolean>();
 	if (completionHistory) {
@@ -111,14 +160,17 @@ export function getTodosOverdue(
 	const today = new Date(now);
 	today.setHours(0, 0, 0, 0);
 
-	return todos.filter((todo) => {
+	for (const todo of todos) {
 		// For non-recurring todos, check if they have an overdue dueDate
 		if (!todo.recurringPattern) {
-			if (!todo.dueDate) return false;
-			return isOverdue(todo.dueDate, false);
+			if (!todo.dueDate) continue;
+			if (isOverdue(todo.dueDate, false)) {
+				result.push(todo);
+			}
+			continue;
 		}
 
-		// For recurring todos, check if there are any uncompleted past occurrences
+		// For recurring todos, create virtual entries for each uncompleted past occurrence
 		// Start from 7 days ago (reasonable window for overdue tracking)
 		const sevenDaysAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
 		sevenDaysAgo.setHours(0, 0, 0, 0);
@@ -129,7 +181,7 @@ export function getTodosOverdue(
 			endDate.setHours(0, 0, 0, 0);
 			if (endDate < today) {
 				// Pattern ended before today, no future occurrences possible
-				return false;
+				continue;
 			}
 		}
 
@@ -146,17 +198,17 @@ export function getTodosOverdue(
 				const completionKey = `${todo.id}-${dateKey}`;
 				const wasCompleted = completionMap.get(completionKey);
 
-				// If we found an uncompleted past occurrence, this todo is overdue
-				if (!wasCompleted) {
-					return true;
-				}
+				// Add virtual entry for this occurrence (whether completed or not)
+				result.push(
+					createVirtualTodo(todo, new Date(currentDate), wasCompleted),
+				);
 			}
 
 			currentDate.setDate(currentDate.getDate() + 1);
 		}
+	}
 
-		return false;
-	});
+	return result;
 }
 
 /**
@@ -222,10 +274,11 @@ export function OverdueView({
 	// Apply status and search filters
 	const filteredTodos = useMemo(() => {
 		return overdueTodos.filter((todo) => {
+			const isCompleted = isEntryCompleted(todo);
 			const matchesFilter =
 				filter === "all" ||
-				(filter === "active" && !todo.completed) ||
-				(filter === "completed" && todo.completed);
+				(filter === "active" && !isCompleted) ||
+				(filter === "completed" && isCompleted);
 
 			const matchesSearch =
 				!searchQuery ||
@@ -237,7 +290,7 @@ export function OverdueView({
 
 	// Sort overdue todos: active first (by due date, then by time), then completed
 	const sortedTodos = useMemo(() => {
-		const getTime = (todo: Todo): number | null => {
+		const getTime = (todo: OverdueTodoEntry): number | null => {
 			// Check recurring pattern notifyAt first (e.g., "09:00", "21:00")
 			if (todo.recurringPattern?.notifyAt) {
 				const [hours, minutes] = todo.recurringPattern.notifyAt
@@ -262,14 +315,18 @@ export function OverdueView({
 			return null;
 		};
 
-		const active = filteredTodos.filter((t) => !t.completed);
-		const completed = filteredTodos.filter((t) => t.completed);
+		const active = filteredTodos.filter((t) => !isEntryCompleted(t));
+		const completed = filteredTodos.filter((t) => isEntryCompleted(t));
 
-		// Sort active by due date (oldest first = most overdue), then by time
+		// Sort active by virtualDate (for recurring instances) or dueDate (oldest first = most overdue), then by time
 		const sortedActive = [...active].sort((a, b) => {
 			// First sort by date
-			const dateA = new Date(a.dueDate as string).getTime();
-			const dateB = new Date(b.dueDate as string).getTime();
+			const dateA = new Date(
+				isVirtualTodo(a) ? a.virtualDate : (a.dueDate as string),
+			).getTime();
+			const dateB = new Date(
+				isVirtualTodo(b) ? b.virtualDate : (b.dueDate as string),
+			).getTime();
 			if (dateA !== dateB) {
 				return dateA - dateB;
 			}
@@ -297,11 +354,15 @@ export function OverdueView({
 			return 0;
 		});
 
-		// Sort completed by due date (newest first = recently completed), then by time
+		// Sort completed by virtualDate (for recurring instances) or dueDate (newest first = recently completed), then by time
 		const sortedCompleted = [...completed].sort((a, b) => {
 			// First sort by date (newest first)
-			const dateA = new Date(a.dueDate as string).getTime();
-			const dateB = new Date(b.dueDate as string).getTime();
+			const dateA = new Date(
+				isVirtualTodo(a) ? a.virtualDate : (a.dueDate as string),
+			).getTime();
+			const dateB = new Date(
+				isVirtualTodo(b) ? b.virtualDate : (b.dueDate as string),
+			).getTime();
 			if (dateA !== dateB) {
 				return dateB - dateA;
 			}
@@ -335,7 +396,7 @@ export function OverdueView({
 	// Stats for overdue todos
 	const stats = useMemo(() => {
 		const total = overdueTodos.length;
-		const completed = overdueTodos.filter((t) => t.completed).length;
+		const completed = overdueTodos.filter((t) => isEntryCompleted(t)).length;
 		const active = total - completed;
 		return { total, completed, active };
 	}, [overdueTodos]);
@@ -346,14 +407,14 @@ export function OverdueView({
 		return folders.find((f) => f.id === folderId) ?? null;
 	};
 
-	const handleToggleTodo = (
-		id: number | string,
-		completed: boolean,
-		options?: { virtualDate?: string },
-	) => {
-		// Pass through - TodoExpandableItem already passes current state,
-		// parent will invert to get desired state
-		onToggle(id, completed, options);
+	const handleToggleTodo = (entry: OverdueTodoEntry, completed: boolean) => {
+		const id = entry.id;
+		// Detect virtual recurring instances and pass virtualDate option
+		if (isVirtualTodo(entry)) {
+			onToggle(id, completed, { virtualDate: entry.virtualDate });
+		} else {
+			onToggle(id, completed);
+		}
 	};
 
 	return (
@@ -460,18 +521,32 @@ export function OverdueView({
 						<ul className="space-y-2" data-testid="overdue-todo-list">
 							{sortedTodos.map((todo, index) => {
 								const todoFolder = getFolderForTodo(todo.folderId);
+								// Use virtualKey for recurring instances, otherwise use id
+								const itemKey = isVirtualTodo(todo) ? todo.virtualKey : todo.id;
+								// For virtual todos, use occurrenceCompleted for display
+								const displayCompleted = isEntryCompleted(todo);
 								return (
 									<TodoExpandableItem
-										key={todo.id}
-										todo={todo}
+										key={itemKey}
+										todo={{
+											...todo,
+											// Override completed with the effective completion status
+											completed: displayCompleted,
+										}}
 										subtaskProgress={getProgress(todo.id)}
-										onToggle={handleToggleTodo}
+										onToggle={(_id, completed) =>
+											handleToggleTodo(todo, completed)
+										}
 										onDelete={onDelete}
 										onScheduleChange={onScheduleChange}
 										folder={todoFolder}
 										showFolderBadge={true}
 										folderColorBgClasses={folderColorBgClasses}
 										animationDelay={`${index * 0.03}s`}
+										isRecurringInstance={isVirtualTodo(todo)}
+										virtualDate={
+											isVirtualTodo(todo) ? todo.virtualDate : undefined
+										}
 									/>
 								);
 							})}
