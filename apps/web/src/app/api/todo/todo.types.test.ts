@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { UseTodoStorageReturn } from "./todo.types";
 import {
 	bulkCreateTodosInputSchema,
 	completeRecurringInputSchema,
@@ -1031,6 +1032,89 @@ describe("Local Update Todo Schedule Input Schema", () => {
 				recurringPattern: { type: "invalid" },
 			});
 			expect(result.success).toBe(false);
+		});
+	});
+});
+
+// ============================================================================
+// Hook Return Type Tests
+// ============================================================================
+
+describe("UseTodoStorageReturn", () => {
+	describe("toggle method signature", () => {
+		it("accepts numeric id and completed boolean without options", () => {
+			// Type test: ensure the signature accepts id and completed parameters
+			const mockToggle: UseTodoStorageReturn["toggle"] = async (
+				_id,
+				_completed,
+			) => {
+				// Mock implementation
+				return Promise.resolve();
+			};
+
+			// This should compile without errors
+			mockToggle(1, true);
+			mockToggle(123, false);
+
+			expect(true).toBe(true);
+		});
+
+		it("accepts string id and completed boolean without options", () => {
+			const mockToggle: UseTodoStorageReturn["toggle"] = async (
+				_id,
+				_completed,
+			) => {
+				return Promise.resolve();
+			};
+
+			// This should compile without errors
+			mockToggle("uuid-123", true);
+			mockToggle("local-id", false);
+
+			expect(true).toBe(true);
+		});
+
+		it("accepts optional options parameter with virtualDate", () => {
+			const mockToggle: UseTodoStorageReturn["toggle"] = async (
+				_id,
+				_completed,
+				_options,
+			) => {
+				return Promise.resolve();
+			};
+
+			// This should compile without errors
+			mockToggle(1, true, { virtualDate: "2026-01-25" });
+			mockToggle("uuid-123", false, { virtualDate: "2026-02-01" });
+
+			expect(true).toBe(true);
+		});
+
+		it("accepts options with undefined virtualDate", () => {
+			const mockToggle: UseTodoStorageReturn["toggle"] = async (
+				_id,
+				_completed,
+				_options,
+			) => {
+				return Promise.resolve();
+			};
+
+			// This should compile without errors
+			mockToggle(1, true, { virtualDate: undefined });
+			mockToggle("uuid-123", false, {});
+
+			expect(true).toBe(true);
+		});
+
+		it("returns Promise<void>", async () => {
+			const mockToggle: UseTodoStorageReturn["toggle"] = async () => {
+				return Promise.resolve();
+			};
+
+			const result = mockToggle(1, true);
+			expect(result).toBeInstanceOf(Promise);
+			await result;
+			expect(true).toBe(true);
 		});
 	});
 });

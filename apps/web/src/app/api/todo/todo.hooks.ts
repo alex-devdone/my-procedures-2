@@ -346,7 +346,11 @@ export function useTodoStorage(): UseTodoStorageReturn {
 	);
 
 	const toggle = useCallback(
-		async (id: number | string, completed: boolean) => {
+		async (
+			id: number | string,
+			completed: boolean,
+			_options?: { virtualDate?: string },
+		) => {
 			if (isAuthenticated) {
 				// Skip server call for optimistic (negative) IDs - they haven't been created yet
 				if (typeof id === "number" && id < 0) {

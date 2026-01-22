@@ -267,7 +267,11 @@ export interface UseTodoStorageReturn {
 			recurringPattern?: RecurringPattern | null;
 		},
 	) => Promise<void>;
-	toggle: (id: number | string, completed: boolean) => Promise<void>;
+	toggle: (
+		id: number | string,
+		completed: boolean,
+		options?: { virtualDate?: string },
+	) => Promise<void>;
 	deleteTodo: (id: number | string) => Promise<void>;
 	updateFolder: (
 		id: number | string,
