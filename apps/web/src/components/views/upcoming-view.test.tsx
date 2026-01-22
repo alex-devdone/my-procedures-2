@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Folder, UseFolderStorageReturn } from "@/app/api/folder";
 import type { SubtaskProgress } from "@/app/api/subtask";
-import type { Todo, VirtualTodo } from "@/app/api/todo/todo.types";
+import type { Todo } from "@/app/api/todo/todo.types";
 
 // Mock the folder hooks
 const mockUseFolderStorage = vi.fn<() => UseFolderStorageReturn>();
@@ -40,8 +40,26 @@ vi.mock("@/components/notifications/reminder-provider", () => ({
 	}),
 }));
 
+// Mock the completion history hook
+const mockCompletionHistoryData: Array<{
+	id: number;
+	todoId: number;
+	scheduledDate: Date;
+	completedAt: Date | null;
+	createdAt: Date;
+	todoText: string;
+}> = [];
+vi.mock("@/app/api/analytics", () => ({
+	useCompletionHistory: () => ({
+		data: mockCompletionHistoryData,
+		isLoading: false,
+		error: null,
+	}),
+}));
+
 // Import after mocks
 import {
+	type CompletionRecord,
 	createVirtualTodo,
 	flattenDateGroups,
 	formatDateLabel,
@@ -512,7 +530,10 @@ describe("getTodosUpcoming", () => {
 		expect(todayGroup).toBeDefined();
 		expect(todayGroup?.todos).toHaveLength(1);
 		const todayTodo = todayGroup?.todos[0];
-		expect(isVirtualTodo(todayTodo!)).toBe(false);
+		expect(todayTodo).toBeDefined();
+		if (todayTodo) {
+			expect(isVirtualTodo(todayTodo)).toBe(false);
+		}
 
 		// Other days should have virtual entries
 		const otherGroups = result.filter((g) => g.label !== "Today");
@@ -520,6 +541,105 @@ describe("getTodosUpcoming", () => {
 			for (const todo of group.todos) {
 				expect(isVirtualTodo(todo)).toBe(true);
 			}
+		}
+	});
+
+	it("marks virtual entries as completed when completion history indicates so", () => {
+		const today = new Date();
+		const tomorrow = new Date(today);
+		tomorrow.setDate(tomorrow.getDate() + 1);
+
+		const todos = [
+			createMockTodo({
+				id: 1, // Use number ID to match completion history
+				text: "Daily task",
+				recurringPattern: { type: "daily" },
+			}),
+		];
+
+		const todayKey = getDateKey(today);
+		const tomorrowKey = getDateKey(tomorrow);
+
+		// Completion history shows today's occurrence was completed
+		const completionHistory: CompletionRecord[] = [
+			{
+				todoId: 1,
+				scheduledDate: today,
+				completedAt: new Date(),
+			},
+		];
+
+		const result = getTodosUpcoming(todos, completionHistory);
+
+		// Find today's entry
+		const todayGroup = result.find((g) => g.dateKey === todayKey);
+		expect(todayGroup).toBeDefined();
+		const todayTodo = todayGroup?.todos[0];
+		expect(todayTodo).toBeDefined();
+		if (todayTodo && isVirtualTodo(todayTodo)) {
+			expect(todayTodo.occurrenceCompleted).toBe(true);
+		}
+
+		// Find tomorrow's entry - should not be completed
+		const tomorrowGroup = result.find((g) => g.dateKey === tomorrowKey);
+		expect(tomorrowGroup).toBeDefined();
+		const tomorrowTodo = tomorrowGroup?.todos[0];
+		expect(tomorrowTodo).toBeDefined();
+		if (tomorrowTodo && isVirtualTodo(tomorrowTodo)) {
+			expect(tomorrowTodo.occurrenceCompleted).toBeUndefined();
+		}
+	});
+
+	it("does not mark virtual entries as completed without completion history", () => {
+		const todos = [
+			createMockTodo({
+				id: 1,
+				text: "Daily task",
+				recurringPattern: { type: "daily" },
+			}),
+		];
+
+		// No completion history provided
+		const result = getTodosUpcoming(todos);
+
+		for (const group of result) {
+			for (const todo of group.todos) {
+				if (isVirtualTodo(todo)) {
+					expect(todo.occurrenceCompleted).toBeUndefined();
+				}
+			}
+		}
+	});
+
+	it("marks virtual entries as not completed when completedAt is null", () => {
+		const today = new Date();
+
+		const todos = [
+			createMockTodo({
+				id: 1,
+				text: "Daily task",
+				recurringPattern: { type: "daily" },
+			}),
+		];
+
+		// Completion history shows record exists but completedAt is null (missed)
+		const completionHistory: CompletionRecord[] = [
+			{
+				todoId: 1,
+				scheduledDate: today,
+				completedAt: null,
+			},
+		];
+
+		const result = getTodosUpcoming(todos, completionHistory);
+		const todayKey = getDateKey(today);
+
+		const todayGroup = result.find((g) => g.dateKey === todayKey);
+		expect(todayGroup).toBeDefined();
+		const todayTodo = todayGroup?.todos[0];
+		expect(todayTodo).toBeDefined();
+		if (todayTodo && isVirtualTodo(todayTodo)) {
+			expect(todayTodo.occurrenceCompleted).toBe(false);
 		}
 	});
 });
@@ -558,6 +678,24 @@ describe("createVirtualTodo", () => {
 		expect(virtual.completed).toBe(true);
 		expect(virtual.folderId).toBe("folder-1");
 		expect(virtual.recurringPattern).toEqual({ type: "daily" });
+	});
+
+	it("sets occurrenceCompleted when provided", () => {
+		const todo = createMockTodo({
+			id: "1",
+			text: "Test",
+			recurringPattern: { type: "daily" },
+		});
+		const date = new Date(2024, 5, 15);
+
+		const completedVirtual = createVirtualTodo(todo, date, true);
+		expect(completedVirtual.occurrenceCompleted).toBe(true);
+
+		const incompleteVirtual = createVirtualTodo(todo, date, false);
+		expect(incompleteVirtual.occurrenceCompleted).toBe(false);
+
+		const undefinedVirtual = createVirtualTodo(todo, date);
+		expect(undefinedVirtual.occurrenceCompleted).toBeUndefined();
 	});
 });
 

@@ -70,6 +70,8 @@ export interface VirtualTodo extends Todo {
 	virtualDate: string;
 	/** Unique key for this virtual instance (originalId-virtualDate) */
 	virtualKey: string;
+	/** Whether this specific occurrence was completed (from completion history) */
+	occurrenceCompleted?: boolean;
 }
 
 /**
