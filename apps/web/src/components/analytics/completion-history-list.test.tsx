@@ -1,6 +1,9 @@
 import { render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { CompletionHistoryRecord } from "@/app/api/analytics/analytics.types";
+import type {
+	CompletionHistoryRecord,
+	RecurringOccurrenceWithStatus,
+} from "@/app/api/analytics/analytics.types";
 import { CompletionHistoryList } from "./completion-history-list";
 
 // Mock the analytics hooks
@@ -160,7 +163,7 @@ describe("CompletionHistoryList", () => {
 		render(<CompletionHistoryList history={undefined} />);
 
 		expect(
-			screen.getByText("No completion history available"),
+			screen.getByText("No recurring occurrences in this period"),
 		).toBeInTheDocument();
 	});
 
@@ -168,7 +171,7 @@ describe("CompletionHistoryList", () => {
 		render(<CompletionHistoryList history={[]} />);
 
 		expect(
-			screen.getByText("No completion history available"),
+			screen.getByText("No recurring occurrences in this period"),
 		).toBeInTheDocument();
 	});
 
@@ -239,5 +242,206 @@ describe("CompletionHistoryList", () => {
 		const missButton = within(secondRow).getByText("Miss");
 
 		expect(missButton).toHaveClass("border-border");
+	});
+});
+
+// ============================================================================
+// Tests for RecurringOccurrenceWithStatus (new prop)
+// ============================================================================
+
+const mockOccurrences: RecurringOccurrenceWithStatus[] = [
+	{
+		id: "101-2024-01-15",
+		todoId: 101,
+		todoText: "Morning meditation",
+		scheduledDate: new Date("2024-01-15T09:00:00Z"),
+		completedAt: new Date("2024-01-15T10:30:00Z"),
+		status: "completed",
+		hasCompletionRecord: true,
+	},
+	{
+		id: "102-2024-01-15",
+		todoId: 102,
+		todoText: "Evening exercise",
+		scheduledDate: new Date("2024-01-15T09:00:00Z"),
+		completedAt: null,
+		status: "missed",
+		hasCompletionRecord: false,
+	},
+	{
+		id: "103-2024-01-20",
+		todoId: 103,
+		todoText: "Weekly review",
+		scheduledDate: new Date("2024-01-20T09:00:00Z"),
+		completedAt: null,
+		status: "pending",
+		hasCompletionRecord: false,
+	},
+];
+
+describe("CompletionHistoryList with occurrences prop", () => {
+	it("renders the card title", () => {
+		render(<CompletionHistoryList occurrences={mockOccurrences} />);
+
+		expect(screen.getByText("Completion History")).toBeInTheDocument();
+	});
+
+	it("renders all occurrence rows", () => {
+		render(<CompletionHistoryList occurrences={mockOccurrences} />);
+
+		const rows = screen.getAllByTestId("completion-row");
+		expect(rows).toHaveLength(3);
+	});
+
+	it("renders completed status with timestamp", () => {
+		render(<CompletionHistoryList occurrences={mockOccurrences} />);
+
+		// The first item shows completion time
+		const times = screen.getAllByText(/\d{1,2}:\d{2} [AP]M/);
+		expect(times.length).toBeGreaterThan(0);
+	});
+
+	it("renders missed status", () => {
+		render(<CompletionHistoryList occurrences={mockOccurrences} />);
+
+		expect(screen.getByText("Missed")).toBeInTheDocument();
+	});
+
+	it("renders pending status", () => {
+		render(<CompletionHistoryList occurrences={mockOccurrences} />);
+
+		expect(screen.getByText("Pending")).toBeInTheDocument();
+	});
+
+	it("renders todo text for all occurrences", () => {
+		render(<CompletionHistoryList occurrences={mockOccurrences} />);
+
+		expect(screen.getByText("Morning meditation")).toBeInTheDocument();
+		expect(screen.getByText("Evening exercise")).toBeInTheDocument();
+		expect(screen.getByText("Weekly review")).toBeInTheDocument();
+	});
+
+	it("renders scheduled dates", () => {
+		render(<CompletionHistoryList occurrences={mockOccurrences} />);
+
+		// Should show dates formatted like "Jan 15, 2024"
+		const dates = screen.getAllByText(/[A-Z][a-z]{2} \d{1,2}, \d{4}/);
+		expect(dates.length).toBeGreaterThan(0);
+	});
+
+	it("renders toggle buttons", () => {
+		render(<CompletionHistoryList occurrences={mockOccurrences} />);
+
+		// Should have "Done" button for completed item
+		const doneButtons = screen.getAllByText("Done");
+		expect(doneButtons).toHaveLength(1);
+
+		// Should have "Miss" buttons for missed and pending items
+		const missButtons = screen.getAllByText("Miss");
+		expect(missButtons).toHaveLength(2);
+	});
+
+	it("shows empty state when occurrences is empty array", () => {
+		render(<CompletionHistoryList occurrences={[]} />);
+
+		expect(
+			screen.getByText("No recurring occurrences in this period"),
+		).toBeInTheDocument();
+	});
+
+	it("shows empty state when occurrences is undefined", () => {
+		render(<CompletionHistoryList occurrences={undefined} />);
+
+		expect(
+			screen.getByText("No recurring occurrences in this period"),
+		).toBeInTheDocument();
+	});
+
+	it("assigns correct data attributes including status", () => {
+		render(<CompletionHistoryList occurrences={mockOccurrences} />);
+
+		const rows = screen.getAllByTestId("completion-row");
+		expect(rows[0]).toHaveAttribute("data-todo-id", "101");
+		expect(rows[0]).toHaveAttribute("data-status", "completed");
+		expect(rows[1]).toHaveAttribute("data-todo-id", "102");
+		expect(rows[1]).toHaveAttribute("data-status", "missed");
+		expect(rows[2]).toHaveAttribute("data-todo-id", "103");
+		expect(rows[2]).toHaveAttribute("data-status", "pending");
+	});
+
+	it("renders completed items with green styling", () => {
+		render(<CompletionHistoryList occurrences={mockOccurrences} />);
+
+		const rows = screen.getAllByTestId("completion-row");
+		const completedRow = rows[0];
+		const doneButton = within(completedRow).getByText("Done");
+
+		expect(doneButton).toHaveClass("border-green-600/30");
+	});
+
+	it("renders pending items with neutral styling", () => {
+		render(<CompletionHistoryList occurrences={mockOccurrences} />);
+
+		// Find the pending row (third row)
+		const rows = screen.getAllByTestId("completion-row");
+		const pendingRow = rows[2];
+		const missButton = within(pendingRow).getByText("Miss");
+
+		expect(missButton).toHaveClass("border-border");
+	});
+
+	it("prefers occurrences over history when both are provided", () => {
+		const singleOccurrence: RecurringOccurrenceWithStatus[] = [
+			{
+				id: "999-2024-01-01",
+				todoId: 999,
+				todoText: "Occurrence from occurrences prop",
+				scheduledDate: new Date("2024-01-01T09:00:00Z"),
+				completedAt: null,
+				status: "pending",
+				hasCompletionRecord: false,
+			},
+		];
+
+		// When both are provided, occurrences should be preferred
+		render(
+			<CompletionHistoryList
+				occurrences={singleOccurrence}
+				history={mockHistory}
+			/>,
+		);
+
+		// Should show the occurrence, not the history
+		expect(
+			screen.getByText("Occurrence from occurrences prop"),
+		).toBeInTheDocument();
+		expect(screen.queryByText("Morning meditation")).not.toBeInTheDocument();
+	});
+
+	it("falls back to history when occurrences is undefined", () => {
+		render(
+			<CompletionHistoryList occurrences={undefined} history={mockHistory} />,
+		);
+
+		// Should show history items
+		expect(screen.getByText("Morning meditation")).toBeInTheDocument();
+	});
+
+	it("shows loading skeleton when isLoading is true and no data", () => {
+		render(<CompletionHistoryList occurrences={undefined} isLoading={true} />);
+
+		const skeletons = screen.getAllByTestId("loading-row");
+		expect(skeletons).toHaveLength(5);
+	});
+
+	it("prioritizes data display over loading state when data exists", () => {
+		render(
+			<CompletionHistoryList occurrences={mockOccurrences} isLoading={true} />,
+		);
+
+		// Should show actual data, not loading skeleton
+		const rows = screen.getAllByTestId("completion-row");
+		expect(rows.length).toBeGreaterThan(0);
+		expect(screen.queryByTestId("loading-row")).not.toBeInTheDocument();
 	});
 });

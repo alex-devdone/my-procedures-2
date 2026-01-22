@@ -8,15 +8,17 @@ const mockUseAnalytics = vi.fn(() => ({
 	isLoading: false,
 	error: null,
 }));
-const mockUseCompletionHistory = vi.fn(() => ({
-	data: undefined,
+const mockUseRecurringOccurrencesWithStatus = vi.fn(() => ({
+	data: [],
 	isLoading: false,
+	isError: false,
 	error: null,
 }));
 
 vi.mock("@/app/api/analytics", () => ({
 	useAnalytics: () => mockUseAnalytics(),
-	useCompletionHistory: () => mockUseCompletionHistory(),
+	useRecurringOccurrencesWithStatus: () =>
+		mockUseRecurringOccurrencesWithStatus(),
 }));
 
 // Mock lucide-react icons
@@ -126,9 +128,10 @@ describe("AnalyticsDashboard", () => {
 			isLoading: true,
 			error: null,
 		});
-		mockUseCompletionHistory.mockReturnValue({
-			data: undefined,
+		mockUseRecurringOccurrencesWithStatus.mockReturnValue({
+			data: [],
 			isLoading: true,
+			isError: false,
 			error: null,
 		});
 
@@ -144,9 +147,10 @@ describe("AnalyticsDashboard", () => {
 			isLoading: false,
 			error: new Error("Failed to fetch"),
 		});
-		mockUseCompletionHistory.mockReturnValue({
-			data: undefined,
+		mockUseRecurringOccurrencesWithStatus.mockReturnValue({
+			data: [],
 			isLoading: false,
+			isError: false,
 			error: null,
 		});
 
@@ -158,15 +162,16 @@ describe("AnalyticsDashboard", () => {
 		).toBeInTheDocument();
 	});
 
-	it("displays error state when history query fails", () => {
+	it("displays error state when occurrences query fails", () => {
 		mockUseAnalytics.mockReturnValue({
 			data: undefined,
 			isLoading: false,
 			error: null,
 		});
-		mockUseCompletionHistory.mockReturnValue({
-			data: undefined,
+		mockUseRecurringOccurrencesWithStatus.mockReturnValue({
+			data: [],
 			isLoading: false,
+			isError: true,
 			error: new Error("Failed to fetch"),
 		});
 
@@ -181,9 +186,10 @@ describe("AnalyticsDashboard", () => {
 			isLoading: false,
 			error: new Error("Failed to fetch"),
 		});
-		mockUseCompletionHistory.mockReturnValue({
-			data: undefined,
+		mockUseRecurringOccurrencesWithStatus.mockReturnValue({
+			data: [],
 			isLoading: false,
+			isError: false,
 			error: null,
 		});
 
@@ -200,11 +206,11 @@ describe("AnalyticsDashboard", () => {
 		expect(screen.getByTestId("chevron-right")).toBeInTheDocument();
 	});
 
-	it("calls analytics and completion history hooks", () => {
+	it("calls analytics and recurring occurrences hooks", () => {
 		render(<AnalyticsDashboard />);
 
 		expect(mockUseAnalytics).toHaveBeenCalled();
-		expect(mockUseCompletionHistory).toHaveBeenCalled();
+		expect(mockUseRecurringOccurrencesWithStatus).toHaveBeenCalled();
 	});
 
 	it("shows non-loading state when data is loaded", () => {
@@ -220,9 +226,10 @@ describe("AnalyticsDashboard", () => {
 			isLoading: false,
 			error: null,
 		});
-		mockUseCompletionHistory.mockReturnValue({
+		mockUseRecurringOccurrencesWithStatus.mockReturnValue({
 			data: [],
 			isLoading: false,
+			isError: false,
 			error: null,
 		});
 

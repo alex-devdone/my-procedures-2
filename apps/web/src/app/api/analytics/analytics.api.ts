@@ -3,6 +3,7 @@ import { trpc } from "@/utils/trpc";
 import type {
 	GetAnalyticsInput,
 	GetCompletionHistoryInput,
+	GetRecurringOccurrencesInput,
 } from "./analytics.types";
 
 // ============================================================================
@@ -37,6 +38,28 @@ export function getCompletionHistoryQueryOptions(
  */
 export function getCompletionHistoryQueryKey(input: GetCompletionHistoryInput) {
 	return trpc.todo.getCompletionHistory.queryKey(input);
+}
+
+// ============================================================================
+// Mutation Options
+// ============================================================================
+
+/**
+ * Get query options for fetching recurring todos with matching dates for a date range.
+ */
+export function getRecurringOccurrencesQueryOptions(
+	input: GetRecurringOccurrencesInput,
+) {
+	return trpc.todo.getRecurringTodosForDateRange.queryOptions(input);
+}
+
+/**
+ * Get query key for recurring occurrences.
+ */
+export function getRecurringOccurrencesQueryKey(
+	input: GetRecurringOccurrencesInput,
+) {
+	return trpc.todo.getRecurringTodosForDateRange.queryKey(input);
 }
 
 // ============================================================================

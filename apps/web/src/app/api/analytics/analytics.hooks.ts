@@ -8,11 +8,13 @@ import { queryClient } from "@/utils/trpc";
 import {
 	getAnalyticsQueryOptions,
 	getCompletionHistoryQueryOptions,
+	getRecurringOccurrencesQueryOptions,
 	getUpdatePastCompletionMutationOptions,
 } from "./analytics.api";
 import type {
 	AnalyticsData,
 	CompletionHistoryRecord,
+	RecurringOccurrenceWithStatus,
 	UnifiedCompletionHistoryRecord,
 	UpdatePastCompletionInput,
 	UpdatePastCompletionInputLocal,
@@ -458,4 +460,298 @@ export function useUpdatePastCompletion() {
 		error: remoteMutation.error,
 		reset: remoteMutation.reset,
 	};
+}
+
+// ============================================================================
+// useRecurringOccurrencesWithStatus Hook
+// ============================================================================
+
+/**
+ * Determine the status of a recurring occurrence based on its completion record
+ * and scheduled date relative to today.
+ */
+function getOccurrenceStatus(
+	completedAt: Date | null,
+	scheduledDate: Date,
+	today: Date,
+): RecurringOccurrenceWithStatus["status"] {
+	if (completedAt) {
+		return "completed";
+	}
+
+	// Normalize dates to start of day for comparison
+	const scheduledDay = new Date(scheduledDate);
+	scheduledDay.setHours(0, 0, 0, 0);
+
+	const todayDay = new Date(today);
+	todayDay.setHours(0, 0, 0, 0);
+
+	if (scheduledDay < todayDay) {
+		return "missed";
+	}
+
+	return "pending";
+}
+
+/**
+ * Hook for fetching all recurring todo occurrences with their completion status
+ * for a date range. This merges expected occurrences (from pattern matching) with
+ * actual completion records to show a complete history.
+ *
+ * @param startDate - Start of date range (ISO datetime string)
+ * @param endDate - End of date range (ISO datetime string)
+ * @returns Query result with recurring occurrences and their status
+ */
+export function useRecurringOccurrencesWithStatus(
+	startDate: string,
+	endDate: string,
+) {
+	const { data: session, isPending: isSessionPending } = useSession();
+	const isAuthenticated = !!session?.user;
+
+	// Fetch expected occurrences from recurring patterns
+	const recurringQuery = useQuery({
+		...getRecurringOccurrencesQueryOptions({ startDate, endDate }),
+		enabled: isAuthenticated,
+	});
+
+	// Fetch actual completion records
+	const completionQuery = useQuery({
+		...getCompletionHistoryQueryOptions({ startDate, endDate }),
+		enabled: isAuthenticated,
+	});
+
+	// For local storage (unauthenticated users), we need to generate occurrences manually
+	const getLocalOccurrencesSnapshot =
+		useCallback((): RecurringOccurrenceWithStatus[] => {
+			if (isAuthenticated) return [];
+
+			const todos = localTodoStorage.getAll();
+			const history = localTodoStorage.getLocalCompletionHistory(
+				startDate,
+				endDate,
+			);
+			const today = new Date();
+			const start = new Date(startDate);
+			const end = new Date(endDate);
+
+			// Get all recurring todos
+			const recurringTodos = todos.filter((t) => t.recurringPattern);
+			const occurrences: RecurringOccurrenceWithStatus[] = [];
+
+			// Create a map of completion records for fast lookup
+			const completionMap = new Map<
+				string,
+				localTodoStorage.CompletionHistoryEntry
+			>();
+			for (const record of history) {
+				const key = `${record.todoId}-${new Date(record.scheduledDate).toISOString().split("T")[0]}`;
+				completionMap.set(key, record);
+			}
+
+			// Generate occurrences for each recurring todo
+			for (const todo of recurringTodos) {
+				if (!todo.recurringPattern) continue;
+
+				const pattern = todo.recurringPattern;
+				const todoStartDate = todo.dueDate ? new Date(todo.dueDate) : null;
+
+				// Iterate through each date in the range
+				const currentDate = new Date(start);
+				currentDate.setHours(0, 0, 0, 0);
+
+				while (currentDate <= end) {
+					// Skip dates before the todo's start date
+					if (todoStartDate) {
+						const normalizedTodoStart = new Date(todoStartDate);
+						normalizedTodoStart.setHours(0, 0, 0, 0);
+						if (currentDate < normalizedTodoStart) {
+							currentDate.setDate(currentDate.getDate() + 1);
+							continue;
+						}
+					}
+
+					// Check if pattern has expired
+					if (pattern.endDate) {
+						const patternEndDate = new Date(pattern.endDate);
+						if (currentDate > patternEndDate) {
+							break;
+						}
+					}
+
+					// Check if the current date matches the pattern using local isDateMatchingPattern
+					if (isDateMatchingPatternLocal(pattern, currentDate)) {
+						const scheduledDate = new Date(currentDate);
+						const dateKey = scheduledDate.toISOString().split("T")[0];
+						const lookupKey = `${todo.id}-${dateKey}`;
+						const completionRecord = completionMap.get(lookupKey);
+						const completedAt = completionRecord?.completedAt
+							? new Date(completionRecord.completedAt)
+							: null;
+
+						occurrences.push({
+							id: lookupKey,
+							todoId: todo.id,
+							todoText: todo.text,
+							scheduledDate,
+							completedAt,
+							status: getOccurrenceStatus(completedAt, scheduledDate, today),
+							hasCompletionRecord: !!completionRecord,
+						});
+					}
+
+					currentDate.setDate(currentDate.getDate() + 1);
+				}
+			}
+
+			// Sort by scheduled date (newest first)
+			return occurrences.sort(
+				(a, b) => b.scheduledDate.getTime() - a.scheduledDate.getTime(),
+			);
+		}, [isAuthenticated, startDate, endDate]);
+
+	const localOccurrences = useSyncExternalStore(
+		subscribeToLocalAnalytics,
+		getLocalOccurrencesSnapshot,
+		() => [] as RecurringOccurrenceWithStatus[],
+	);
+
+	// Merge remote data when authenticated
+	const mergedData = useMemo((): RecurringOccurrenceWithStatus[] => {
+		if (!isAuthenticated) {
+			return localOccurrences;
+		}
+
+		if (!recurringQuery.data) {
+			return [];
+		}
+
+		const today = new Date();
+		const occurrences: RecurringOccurrenceWithStatus[] = [];
+
+		// Create a map of completion records for fast lookup
+		const completionMap = new Map<string, CompletionHistoryRecord>();
+		if (completionQuery.data) {
+			for (const record of completionQuery.data) {
+				const dateKey = new Date(record.scheduledDate)
+					.toISOString()
+					.split("T")[0];
+				const key = `${record.todoId}-${dateKey}`;
+				completionMap.set(key, record);
+			}
+		}
+
+		// Process each recurring todo and its matching dates
+		for (const { todo, matchingDates } of recurringQuery.data) {
+			for (const date of matchingDates) {
+				const scheduledDate = new Date(date);
+				const dateKey = scheduledDate.toISOString().split("T")[0];
+				const lookupKey = `${todo.id}-${dateKey}`;
+				const completionRecord = completionMap.get(lookupKey);
+				const completedAt = completionRecord?.completedAt
+					? new Date(completionRecord.completedAt)
+					: null;
+
+				occurrences.push({
+					id: lookupKey,
+					todoId: todo.id,
+					todoText: todo.text,
+					scheduledDate,
+					completedAt,
+					status: getOccurrenceStatus(completedAt, scheduledDate, today),
+					hasCompletionRecord: !!completionRecord,
+				});
+			}
+		}
+
+		// Sort by scheduled date (newest first)
+		return occurrences.sort(
+			(a, b) => b.scheduledDate.getTime() - a.scheduledDate.getTime(),
+		);
+	}, [
+		isAuthenticated,
+		localOccurrences,
+		recurringQuery.data,
+		completionQuery.data,
+	]);
+
+	const isLoading =
+		isSessionPending ||
+		(isAuthenticated &&
+			(recurringQuery.isLoading || completionQuery.isLoading));
+	const isPending =
+		isSessionPending ||
+		(isAuthenticated &&
+			(recurringQuery.isPending || completionQuery.isPending));
+	const isError =
+		isAuthenticated && (recurringQuery.isError || completionQuery.isError);
+	const error = recurringQuery.error || completionQuery.error;
+
+	return {
+		data: mergedData,
+		isLoading,
+		isPending,
+		isError,
+		error,
+	};
+}
+
+/**
+ * Local pattern matching function (simplified version for client-side use)
+ */
+function isDateMatchingPatternLocal(
+	pattern: {
+		type?: string;
+		daysOfWeek?: number[];
+		dayOfMonth?: number;
+		monthOfYear?: number;
+	},
+	date: Date,
+): boolean {
+	const dayOfWeek = date.getDay();
+	const dayOfMonth = date.getDate();
+	const month = date.getMonth() + 1; // 1-indexed
+
+	switch (pattern.type) {
+		case "daily":
+			return true;
+
+		case "weekly":
+			if (pattern.daysOfWeek && pattern.daysOfWeek.length > 0) {
+				return pattern.daysOfWeek.includes(dayOfWeek);
+			}
+			return true;
+
+		case "monthly":
+			if (pattern.dayOfMonth !== undefined) {
+				return dayOfMonth === pattern.dayOfMonth;
+			}
+			return true;
+
+		case "yearly":
+			if (
+				pattern.monthOfYear !== undefined &&
+				pattern.dayOfMonth !== undefined
+			) {
+				return (
+					month === pattern.monthOfYear && dayOfMonth === pattern.dayOfMonth
+				);
+			}
+			if (pattern.monthOfYear !== undefined) {
+				return month === pattern.monthOfYear;
+			}
+			if (pattern.dayOfMonth !== undefined) {
+				return dayOfMonth === pattern.dayOfMonth;
+			}
+			return true;
+
+		case "custom":
+			if (pattern.daysOfWeek && pattern.daysOfWeek.length > 0) {
+				return pattern.daysOfWeek.includes(dayOfWeek);
+			}
+			return true;
+
+		default:
+			return true;
+	}
 }

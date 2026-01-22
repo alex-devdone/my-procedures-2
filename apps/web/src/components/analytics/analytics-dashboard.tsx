@@ -2,7 +2,10 @@
 
 import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import { useMemo, useState } from "react";
-import { useAnalytics, useCompletionHistory } from "@/app/api/analytics";
+import {
+	useAnalytics,
+	useRecurringOccurrencesWithStatus,
+} from "@/app/api/analytics";
 import { CalendarHeatmap } from "@/components/analytics/calendar-heatmap";
 import { CompletionChart } from "@/components/analytics/completion-chart";
 import { CompletionHistoryList } from "@/components/analytics/completion-history-list";
@@ -214,13 +217,13 @@ export function AnalyticsDashboard({
 	} = useAnalytics(dateRange.startDate, dateRange.endDate);
 
 	const {
-		data: history,
-		isLoading: historyLoading,
-		error: historyError,
-	} = useCompletionHistory(dateRange.startDate, dateRange.endDate);
+		data: occurrences,
+		isLoading: occurrencesLoading,
+		isError: occurrencesError,
+	} = useRecurringOccurrencesWithStatus(dateRange.startDate, dateRange.endDate);
 
-	const isLoading = analyticsLoading || historyLoading;
-	const hasError = analyticsError || historyError;
+	const isLoading = analyticsLoading || occurrencesLoading;
+	const hasError = analyticsError || occurrencesError;
 
 	return (
 		<div className="space-y-6">
@@ -312,7 +315,7 @@ export function AnalyticsDashboard({
 							{/* Completion History List */}
 							<div className="stagger-4 animate-fade-up opacity-0 lg:col-span-1">
 								<CompletionHistoryList
-									history={history}
+									occurrences={occurrences}
 									isLoading={isLoading}
 								/>
 							</div>
