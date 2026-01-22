@@ -511,7 +511,10 @@ export function addCompletionHistoryEntry(
 ): CompletionHistoryEntry {
 	const history = getCompletionHistory();
 	const newEntry: CompletionHistoryEntry = {
-		completedAt: entry.completedAt ?? new Date().toISOString(),
+		completedAt:
+			entry.completedAt !== undefined
+				? entry.completedAt
+				: new Date().toISOString(),
 		todoId: entry.todoId,
 		scheduledDate: entry.scheduledDate,
 	};
@@ -583,4 +586,242 @@ export function getLocalCompletionHistory(
 		const entryDate = new Date(entry.scheduledDate);
 		return entryDate >= start && entryDate <= end;
 	});
+}
+
+// ============================================================================
+// Analytics
+// ============================================================================
+
+export interface DailyStats {
+	date: string;
+	regularCompleted: number;
+	recurringCompleted: number;
+	recurringMissed: number;
+}
+
+export interface LocalAnalyticsData {
+	totalRegularCompleted: number;
+	totalRecurringCompleted: number;
+	totalRecurringMissed: number;
+	completionRate: number;
+	currentStreak: number;
+	dailyBreakdown: DailyStats[];
+}
+
+/**
+ * Get analytics for local todos within a date range.
+ *
+ * Calculates:
+ * - Total regular (non-recurring) todos completed
+ * - Total recurring occurrences completed
+ * - Total recurring occurrences missed (scheduled before today with no completedAt)
+ * - Completion rate % (completed / total expected * 100)
+ * - Current streak (consecutive days with at least one completion)
+ * - Daily breakdown (regular completed, recurring completed, recurring missed per day)
+ *
+ * @param startDate - Start of date range (ISO string)
+ * @param endDate - End of date range (ISO string)
+ * @returns Analytics data for the date range
+ */
+export function getLocalAnalytics(
+	startDate: string,
+	endDate: string,
+): LocalAnalyticsData {
+	const todos = getAll();
+	const history = getCompletionHistory();
+	const start = new Date(startDate);
+	const end = new Date(endDate);
+
+	// Get "today" at midnight for proper date comparisons
+	const now = new Date();
+	const today = new Date(
+		Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+	);
+
+	// Get regular (non-recurring) todos completed in the date range
+	const regularCompletedInDateRange = todos.filter(
+		(t) =>
+			!t.recurringPattern &&
+			t.completed &&
+			t.dueDate &&
+			new Date(t.dueDate) >= start &&
+			new Date(t.dueDate) <= end,
+	);
+
+	const totalRegularCompleted = regularCompletedInDateRange.length;
+
+	// Get recurring completion stats from completion history
+	const historyInDateRange = history.filter((entry) => {
+		const entryDate = new Date(entry.scheduledDate);
+		return entryDate >= start && entryDate <= end;
+	});
+
+	const recurringCompletedInDateRange = historyInDateRange.filter(
+		(entry) => entry.completedAt !== null,
+	);
+	const totalRecurringCompleted = recurringCompletedInDateRange.length;
+
+	// Get recurring missed: scheduled date before today (and within range) with no completedAt
+	const recurringMissedInDateRange = historyInDateRange.filter((entry) => {
+		if (entry.completedAt !== null) return false;
+		// Normalize scheduledDate to midnight UTC for comparison
+		const scheduledDate = new Date(entry.scheduledDate);
+		const scheduledDateMidnight = new Date(
+			Date.UTC(
+				scheduledDate.getUTCFullYear(),
+				scheduledDate.getUTCMonth(),
+				scheduledDate.getUTCDate(),
+			),
+		);
+		return scheduledDateMidnight.getTime() < today.getTime();
+	});
+	const totalRecurringMissed = recurringMissedInDateRange.length;
+
+	// Total expected recurring = completed + missed
+	const totalRecurringExpected = totalRecurringCompleted + totalRecurringMissed;
+
+	// Calculate completion rate
+	const totalCompleted = totalRegularCompleted + totalRecurringCompleted;
+	const totalExpected = totalRegularCompleted + totalRecurringExpected;
+	const completionRate =
+		totalExpected > 0
+			? Math.round((totalCompleted / totalExpected) * 100)
+			: 100;
+
+	// Calculate current streak (consecutive days with at least one completion)
+	const allCompletionDatesSet = new Set<string>();
+
+	// Add recurring todo completion dates
+	for (const entry of history) {
+		if (entry.completedAt) {
+			const dateStr = new Date(entry.completedAt).toISOString().split("T")[0];
+			if (dateStr) {
+				allCompletionDatesSet.add(dateStr);
+			}
+		}
+	}
+
+	// Add regular todo completion dates (using dueDate as proxy)
+	for (const todo of todos) {
+		if (todo.completed && !todo.recurringPattern && todo.dueDate) {
+			const dateStr = new Date(todo.dueDate).toISOString().split("T")[0];
+			if (dateStr) {
+				allCompletionDatesSet.add(dateStr);
+			}
+		}
+	}
+
+	const allCompletionDates = Array.from(allCompletionDatesSet).sort(
+		(a, b) => new Date(b).getTime() - new Date(a).getTime(),
+	);
+
+	let currentStreak = 0;
+	const todayStr = today.toISOString().split("T")[0] ?? "";
+	// Calculate yesterday in UTC
+	const yesterday = new Date(
+		Date.UTC(
+			today.getUTCFullYear(),
+			today.getUTCMonth(),
+			today.getUTCDate() - 1,
+		),
+	);
+	const yesterdayStr = yesterday.toISOString().split("T")[0] ?? "";
+
+	// Start checking from today or yesterday
+	let checkDate = todayStr;
+	if (
+		allCompletionDates.length > 0 &&
+		allCompletionDates[0] !== todayStr &&
+		allCompletionDates[0] === yesterdayStr
+	) {
+		// If no completion today but there's one yesterday, start from yesterday
+		checkDate = yesterdayStr;
+	}
+
+	for (const dateStr of allCompletionDates) {
+		if (dateStr === checkDate) {
+			currentStreak++;
+			// Decrement checkDate by one day (in UTC)
+			const checkDateObj = new Date(`${checkDate}T00:00:00.000Z`);
+			const nextCheckDate = new Date(
+				Date.UTC(
+					checkDateObj.getUTCFullYear(),
+					checkDateObj.getUTCMonth(),
+					checkDateObj.getUTCDate() - 1,
+				),
+			);
+			const newCheckDate = nextCheckDate.toISOString().split("T")[0];
+			checkDate = newCheckDate ?? "";
+		} else if (
+			new Date(`${dateStr}T00:00:00.000Z`) <
+			new Date(`${checkDate}T00:00:00.000Z`)
+		) {
+			// Gap in dates, streak broken
+			break;
+		}
+	}
+
+	// Build daily breakdown map
+	const dailyBreakdownMap = new Map<string, DailyStats>();
+
+	// Initialize all dates in range
+	const currentDate = new Date(start);
+	while (currentDate <= end) {
+		const dateStr = currentDate.toISOString().split("T")[0] ?? "";
+		dailyBreakdownMap.set(dateStr, {
+			date: dateStr,
+			regularCompleted: 0,
+			recurringCompleted: 0,
+			recurringMissed: 0,
+		});
+		currentDate.setDate(currentDate.getDate() + 1);
+	}
+
+	// Fill in regular completed counts
+	for (const todo of regularCompletedInDateRange) {
+		if (todo.dueDate) {
+			const dateStr = new Date(todo.dueDate).toISOString().split("T")[0];
+			if (dateStr) {
+				const entry = dailyBreakdownMap.get(dateStr);
+				if (entry) {
+					entry.regularCompleted++;
+				}
+			}
+		}
+	}
+
+	// Fill in recurring completed counts
+	for (const entry of recurringCompletedInDateRange) {
+		const dateStr = new Date(entry.scheduledDate).toISOString().split("T")[0];
+		if (dateStr) {
+			const mapEntry = dailyBreakdownMap.get(dateStr);
+			if (mapEntry) {
+				mapEntry.recurringCompleted++;
+			}
+		}
+	}
+
+	// Fill in recurring missed counts
+	for (const entry of recurringMissedInDateRange) {
+		const dateStr = new Date(entry.scheduledDate).toISOString().split("T")[0];
+		if (dateStr) {
+			const mapEntry = dailyBreakdownMap.get(dateStr);
+			if (mapEntry) {
+				mapEntry.recurringMissed++;
+			}
+		}
+	}
+
+	const dailyBreakdown = Array.from(dailyBreakdownMap.values()).sort((a, b) =>
+		a.date.localeCompare(b.date),
+	);
+
+	return {
+		totalRegularCompleted,
+		totalRecurringCompleted,
+		totalRecurringMissed,
+		completionRate,
+		currentStreak,
+		dailyBreakdown,
+	};
 }
