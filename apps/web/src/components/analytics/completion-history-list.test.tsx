@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
 	CompletionHistoryRecord,
@@ -6,10 +6,13 @@ import type {
 } from "@/app/api/analytics/analytics.types";
 import { CompletionHistoryList } from "./completion-history-list";
 
+// Create a mock mutate function we can track
+const mockMutate = vi.fn();
+
 // Mock the analytics hooks
 vi.mock("@/app/api/analytics", () => ({
 	useUpdatePastCompletion: () => ({
-		mutate: vi.fn(),
+		mutate: mockMutate,
 		isPending: false,
 	}),
 }));
@@ -19,6 +22,8 @@ const originalToLocaleTimeString = Date.prototype.toLocaleTimeString;
 const originalToLocaleDateString = Date.prototype.toLocaleDateString;
 
 beforeEach(() => {
+	mockMutate.mockClear();
+
 	Date.prototype.toLocaleTimeString = vi.fn(function (this: Date) {
 		const hour = this.getHours();
 		const minute = this.getMinutes();
@@ -443,5 +448,163 @@ describe("CompletionHistoryList with occurrences prop", () => {
 		const rows = screen.getAllByTestId("completion-row");
 		expect(rows.length).toBeGreaterThan(0);
 		expect(screen.queryByTestId("loading-row")).not.toBeInTheDocument();
+	});
+});
+
+// ============================================================================
+// Tests for toggling past occurrence completion status
+// ============================================================================
+
+describe("CompletionHistoryList toggle functionality", () => {
+	it("calls mutate when toggling a completed occurrence to missed", () => {
+		const completedOccurrence: RecurringOccurrenceWithStatus[] = [
+			{
+				id: "101-2024-01-15",
+				todoId: 101,
+				todoText: "Morning meditation",
+				scheduledDate: new Date("2024-01-15T09:00:00Z"),
+				completedAt: new Date("2024-01-15T10:30:00Z"),
+				status: "completed",
+				hasCompletionRecord: true,
+			},
+		];
+
+		render(<CompletionHistoryList occurrences={completedOccurrence} />);
+
+		// Find the "Done" button and click it to toggle to missed
+		const doneButton = screen.getByText("Done");
+		fireEvent.click(doneButton);
+
+		// Verify mutation was called with correct parameters
+		expect(mockMutate).toHaveBeenCalledTimes(1);
+		expect(mockMutate).toHaveBeenCalledWith({
+			todoId: 101,
+			scheduledDate: expect.stringContaining("2024-01-15"),
+			completed: false, // Toggling from completed to not completed
+		});
+	});
+
+	it("calls mutate when toggling a missed occurrence to completed", () => {
+		const missedOccurrence: RecurringOccurrenceWithStatus[] = [
+			{
+				id: "102-2024-01-15",
+				todoId: 102,
+				todoText: "Evening exercise",
+				scheduledDate: new Date("2024-01-15T09:00:00Z"),
+				completedAt: null,
+				status: "missed",
+				hasCompletionRecord: false,
+			},
+		];
+
+		render(<CompletionHistoryList occurrences={missedOccurrence} />);
+
+		// Find the "Miss" button and click it to toggle to completed
+		const missButton = screen.getByText("Miss");
+		fireEvent.click(missButton);
+
+		// Verify mutation was called with correct parameters
+		expect(mockMutate).toHaveBeenCalledTimes(1);
+		expect(mockMutate).toHaveBeenCalledWith({
+			todoId: 102,
+			scheduledDate: expect.stringContaining("2024-01-15"),
+			completed: true, // Toggling from missed to completed
+		});
+	});
+
+	it("calls mutate when toggling a pending occurrence to completed", () => {
+		const pendingOccurrence: RecurringOccurrenceWithStatus[] = [
+			{
+				id: "103-2024-01-20",
+				todoId: 103,
+				todoText: "Weekly review",
+				scheduledDate: new Date("2024-01-20T09:00:00Z"),
+				completedAt: null,
+				status: "pending",
+				hasCompletionRecord: false,
+			},
+		];
+
+		render(<CompletionHistoryList occurrences={pendingOccurrence} />);
+
+		// Find the "Miss" button (pending items show "Miss" since they're not completed)
+		const missButton = screen.getByText("Miss");
+		fireEvent.click(missButton);
+
+		// Verify mutation was called with correct parameters
+		expect(mockMutate).toHaveBeenCalledTimes(1);
+		expect(mockMutate).toHaveBeenCalledWith({
+			todoId: 103,
+			scheduledDate: expect.stringContaining("2024-01-20"),
+			completed: true, // Toggling to completed
+		});
+	});
+
+	it("calls mutate with string todoId for local storage occurrences", () => {
+		const localOccurrence: RecurringOccurrenceWithStatus[] = [
+			{
+				id: "local-abc123-2024-01-15",
+				todoId: "local-abc123", // String ID for local storage
+				todoText: "Local todo",
+				scheduledDate: new Date("2024-01-15T09:00:00Z"),
+				completedAt: null,
+				status: "missed",
+				hasCompletionRecord: false,
+			},
+		];
+
+		render(<CompletionHistoryList occurrences={localOccurrence} />);
+
+		const missButton = screen.getByText("Miss");
+		fireEvent.click(missButton);
+
+		expect(mockMutate).toHaveBeenCalledWith({
+			todoId: "local-abc123",
+			scheduledDate: expect.stringContaining("2024-01-15"),
+			completed: true,
+		});
+	});
+
+	it("toggles correct item when multiple occurrences exist", () => {
+		render(<CompletionHistoryList occurrences={mockOccurrences} />);
+
+		const rows = screen.getAllByTestId("completion-row");
+
+		// Click the toggle button in the second row (missed occurrence)
+		const secondRow = rows[1];
+		const missButton = within(secondRow).getByText("Miss");
+		fireEvent.click(missButton);
+
+		// Should only call mutate once with the correct todoId
+		expect(mockMutate).toHaveBeenCalledTimes(1);
+		expect(mockMutate).toHaveBeenCalledWith({
+			todoId: 102, // The todoId of the second occurrence
+			scheduledDate: expect.stringContaining("2024-01-15"),
+			completed: true,
+		});
+	});
+
+	it("works with legacy history prop", () => {
+		const historyWithToggle: CompletionHistoryRecord[] = [
+			{
+				id: 1,
+				todoId: 201,
+				scheduledDate: new Date("2024-02-10T09:00:00Z"),
+				completedAt: new Date("2024-02-10T11:00:00Z"),
+				createdAt: new Date("2024-02-09T08:00:00Z"),
+				todoText: "Legacy completed todo",
+			},
+		];
+
+		render(<CompletionHistoryList history={historyWithToggle} />);
+
+		const doneButton = screen.getByText("Done");
+		fireEvent.click(doneButton);
+
+		expect(mockMutate).toHaveBeenCalledWith({
+			todoId: 201,
+			scheduledDate: expect.stringContaining("2024-02-10"),
+			completed: false,
+		});
 	});
 });
