@@ -52,7 +52,11 @@ export interface UpcomingViewProps {
 	/** Whether todos are loading */
 	isLoading?: boolean;
 	/** Callback when a todo is toggled */
-	onToggle: (id: number | string, completed: boolean) => void;
+	onToggle: (
+		id: number | string,
+		completed: boolean,
+		options?: { virtualDate?: string },
+	) => void;
 	/** Callback when a todo is deleted */
 	onDelete: (id: number | string) => void;
 	/** Callback when a todo's schedule is updated */
@@ -466,10 +470,13 @@ export function UpcomingView({
 		return folders.find((f) => f.id === folderId) ?? null;
 	};
 
-	const handleToggleTodo = (id: number | string, completed: boolean) => {
-		// Pass through - TodoExpandableItem already passes current state,
-		// parent will invert to get desired state
-		onToggle(id, completed);
+	const handleToggleTodo = (
+		id: number | string,
+		completed: boolean,
+		options?: { virtualDate?: string },
+	) => {
+		// Pass through - TodoExpandableItem will pass options for virtual instances
+		onToggle(id, completed, options);
 	};
 
 	return (

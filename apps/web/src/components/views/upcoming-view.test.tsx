@@ -1503,8 +1503,49 @@ describe("UpcomingView", () => {
 			const toggleButton = screen.getByTestId("todo-toggle");
 			fireEvent.click(toggleButton);
 
-			// The handler inverts completed (false -> true)
-			expect(mockOnToggle).toHaveBeenCalledWith("1", true);
+			// onToggle receives current state (false), parent will invert to true
+			// For regular todos, options is undefined
+			expect(mockOnToggle).toHaveBeenCalledTimes(1);
+			expect(mockOnToggle.mock.calls[0]).toEqual(["1", false, undefined]);
+		});
+
+		it("calls onToggle with virtualDate when virtual recurring instance is toggled", () => {
+			const today = new Date();
+			const dayOfWeek = today.getDay();
+
+			const todos = [
+				createMockTodo({
+					id: "1",
+					text: "Recurring Task",
+					recurringPattern: {
+						type: "weekly",
+						daysOfWeek: [dayOfWeek],
+					},
+					completed: false,
+				}),
+			];
+
+			render(
+				<UpcomingView
+					todos={todos}
+					onToggle={mockOnToggle}
+					onDelete={mockOnDelete}
+				/>,
+			);
+
+			// Get all toggle buttons (there will be multiple for recurring instances)
+			const toggleButtons = screen.getAllByTestId("todo-toggle");
+			// Click the first one (today's instance)
+			fireEvent.click(toggleButtons[0]);
+
+			// onToggle receives current state (false) and virtualDate for virtual instances
+			const todayKey = getDateKey(today);
+			expect(mockOnToggle).toHaveBeenCalledTimes(1);
+			expect(mockOnToggle.mock.calls[0]).toEqual([
+				"1",
+				false,
+				{ virtualDate: todayKey },
+			]);
 		});
 
 		it("calls onDelete when todo is deleted", () => {

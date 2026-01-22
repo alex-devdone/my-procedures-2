@@ -23,8 +23,12 @@ export default function UpcomingPage() {
 		navigateToFolder(folderId);
 	};
 
-	const handleToggleTodo = (id: number | string, completed: boolean) => {
-		toggle(id, !completed);
+	const handleToggleTodo = (
+		id: number | string,
+		completed: boolean,
+		options?: { virtualDate?: string },
+	) => {
+		toggle(id, !completed, options);
 	};
 
 	const handleDeleteTodo = (id: number | string) => {
