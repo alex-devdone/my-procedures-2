@@ -881,6 +881,97 @@ describe("TodoExpandableItem", () => {
 		});
 	});
 
+	describe("Recurring Todo Indicator", () => {
+		it("shows recurring icon next to todo text when recurringPattern is set", () => {
+			render(
+				<TodoExpandableItem
+					todo={createMockTodo({
+						recurringPattern: { type: "daily" },
+					})}
+					onToggle={mockOnToggle}
+					onDelete={mockOnDelete}
+				/>,
+			);
+
+			const recurringIcon = screen.getByTestId("todo-recurring-indicator");
+			expect(recurringIcon).toBeInTheDocument();
+			expect(recurringIcon).toHaveAttribute("aria-label", "Recurring todo");
+		});
+
+		it("does not show recurring icon when recurringPattern is null", () => {
+			render(
+				<TodoExpandableItem
+					todo={createMockTodo({
+						recurringPattern: null,
+					})}
+					onToggle={mockOnToggle}
+					onDelete={mockOnDelete}
+				/>,
+			);
+
+			expect(
+				screen.queryByTestId("todo-recurring-indicator"),
+			).not.toBeInTheDocument();
+		});
+
+		it("shows recurring icon for weekly pattern", () => {
+			render(
+				<TodoExpandableItem
+					todo={createMockTodo({
+						recurringPattern: { type: "weekly", daysOfWeek: [1, 3, 5] },
+					})}
+					onToggle={mockOnToggle}
+					onDelete={mockOnDelete}
+				/>,
+			);
+
+			expect(
+				screen.getByTestId("todo-recurring-indicator"),
+			).toBeInTheDocument();
+		});
+
+		it("shows recurring icon for monthly pattern", () => {
+			render(
+				<TodoExpandableItem
+					todo={createMockTodo({
+						recurringPattern: { type: "monthly", dayOfMonth: 15 },
+					})}
+					onToggle={mockOnToggle}
+					onDelete={mockOnDelete}
+				/>,
+			);
+
+			expect(
+				screen.getByTestId("todo-recurring-indicator"),
+			).toBeInTheDocument();
+		});
+
+		it("shows recurring icon alongside reminder bell when both are present", () => {
+			// Mock the reminder provider to show due reminder
+			vi.mock("@/components/notifications/reminder-provider", () => ({
+				useDueReminders: () => ({
+					dueReminderIds: new Set(["todo-reminder"]),
+				}),
+			}));
+
+			render(
+				<TodoExpandableItem
+					todo={createMockTodo({
+						id: "todo-reminder",
+						recurringPattern: { type: "daily" },
+					})}
+					onToggle={mockOnToggle}
+					onDelete={mockOnDelete}
+				/>,
+			);
+
+			// The recurring indicator should still be present
+			expect(
+				screen.getByTestId("todo-recurring-indicator"),
+			).toBeInTheDocument();
+		});
+	});
+
 	describe("Edge Cases", () => {
 		it("handles empty todo text", () => {
 			render(

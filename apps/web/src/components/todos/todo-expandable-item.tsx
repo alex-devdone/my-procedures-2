@@ -5,6 +5,7 @@ import {
 	CheckCircle2,
 	ChevronDown,
 	FolderIcon,
+	Repeat,
 	Trash2,
 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
@@ -219,6 +220,14 @@ export function TodoExpandableItem({
 				{/* Todo content */}
 				<div className="flex flex-1 flex-col gap-1">
 					<div className="flex items-center gap-2">
+						{/* Recurring indicator */}
+						{todo.recurringPattern && (
+							<Repeat
+								className="h-4 w-4 shrink-0 text-blue-500"
+								data-testid="todo-recurring-indicator"
+								aria-label="Recurring todo"
+							/>
+						)}
 						{/* Bouncing bell for due reminders */}
 						{hasDueReminder && (
 							<Bell
