@@ -57,7 +57,10 @@ function getIntensityClasses(level: IntensityLevel): string {
  * Format a date string to a human-readable format
  */
 function formatDisplayDate(dateString: string): string {
-	const date = new Date(dateString);
+	// Parse as local date to avoid timezone shifts
+	// dateString format is "YYYY-MM-DD"
+	const [year, month, day] = dateString.split("-").map(Number);
+	const date = new Date(year, month - 1, day);
 	return date.toLocaleDateString("en-US", {
 		weekday: "short",
 		month: "short",
@@ -71,13 +74,13 @@ function formatDisplayDate(dateString: string): string {
  */
 function generateDateRange(startDate: string, endDate: string): Date[] {
 	const dates: Date[] = [];
-	const start = new Date(startDate);
-	const end = new Date(endDate);
+	// Parse as local dates to avoid timezone shifts
+	const [startYear, startMonth, startDay] = startDate.split("-").map(Number);
+	const [endYear, endMonth, endDay] = endDate.split("-").map(Number);
+	const start = new Date(startYear, startMonth - 1, startDay);
+	const end = new Date(endYear, endMonth - 1, endDay);
 
-	// Reset to start of day in local timezone
-	start.setHours(0, 0, 0, 0);
-	end.setHours(0, 0, 0, 0);
-
+	// Already at start of day in local timezone
 	const current = new Date(start);
 	while (current <= end) {
 		dates.push(new Date(current));

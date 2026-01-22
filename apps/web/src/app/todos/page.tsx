@@ -15,7 +15,8 @@ import {
 	X,
 } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 
 import type {
 	Folder,
@@ -41,6 +42,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { OverdueView } from "@/components/views/overdue-view";
 import { TodayView } from "@/components/views/today-view";
 import { UpcomingView } from "@/components/views/upcoming-view";
+import { useFolderNavigation } from "@/hooks/use-folder-navigation";
 import type { SelectedFolderId } from "@/hooks/use-todo-storage";
 import { useTodoStorage } from "@/hooks/use-todo-storage";
 import { cn } from "@/lib/utils";
@@ -96,12 +98,14 @@ const folderColorIconClasses: Record<FolderColor, string> = {
 };
 
 export default function TodosPage() {
+	const searchParams = useSearchParams();
 	const [newTodoText, setNewTodoText] = useState("");
 	const [searchQuery, setSearchQuery] = useState("");
 	const [filter, setFilter] = useState<FilterType>("all");
 	const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 	const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 	const [editingFolder, setEditingFolder] = useState<Folder | null>(null);
+	const { navigateToFolder } = useFolderNavigation();
 
 	const {
 		create,
@@ -115,6 +119,21 @@ export default function TodosPage() {
 		filteredTodos: folderFilteredTodos,
 		todos: allTodos,
 	} = useTodoStorage();
+
+	// Read folder from query parameter and update selected folder
+	useEffect(() => {
+		const folderParam = searchParams.get("folder");
+		if (folderParam) {
+			// Convert string to number if it's a numeric ID
+			const folderId = Number.isNaN(Number(folderParam))
+				? folderParam
+				: Number(folderParam);
+			setSelectedFolderId(folderId);
+		} else {
+			// No folder param means inbox
+			setSelectedFolderId("inbox");
+		}
+	}, [searchParams, setSelectedFolderId]);
 
 	const {
 		folders,
@@ -159,8 +178,9 @@ export default function TodosPage() {
 	};
 
 	const handleSelectFolder = (folderId: SelectedFolderId) => {
-		setSelectedFolderId(folderId);
 		setIsSidebarOpen(false);
+		// Always navigate to update the URL
+		navigateToFolder(folderId);
 	};
 
 	const handleCreateFolder = async (input: LocalCreateFolderInput) => {
@@ -198,6 +218,63 @@ export default function TodosPage() {
 			return matchesFilter && matchesSearch;
 		});
 	}, [folderFilteredTodos, filter, searchQuery]);
+
+	// Sort todos: active first, then by time (tasks without time at the end)
+	const sortedTodos = useMemo(() => {
+		return [...filteredTodos].sort((a, b) => {
+			// First, sort by completion status (active first)
+			if (a.completed !== b.completed) {
+				return a.completed ? 1 : -1;
+			}
+
+			// Then sort by time
+			const getTime = (todo: typeof a): number | null => {
+				// Check recurring pattern notifyAt first (e.g., "09:00", "21:00")
+				if (todo.recurringPattern?.notifyAt) {
+					const [hours, minutes] = todo.recurringPattern.notifyAt
+						.split(":")
+						.map(Number);
+					return hours * 60 + minutes;
+				}
+				// Check reminderAt (it has explicit time)
+				if (todo.reminderAt) {
+					const date = new Date(todo.reminderAt);
+					return date.getHours() * 60 + date.getMinutes();
+				}
+				// Check if dueDate has a time component (not midnight)
+				if (todo.dueDate) {
+					const date = new Date(todo.dueDate);
+					const minutes = date.getHours() * 60 + date.getMinutes();
+					// If it's not midnight (00:00), consider it has a time
+					if (minutes > 0) {
+						return minutes;
+					}
+				}
+				return null;
+			};
+
+			const aTime = getTime(a);
+			const bTime = getTime(b);
+
+			// Both have time: sort by time ascending (earliest first)
+			if (aTime !== null && bTime !== null) {
+				return aTime - bTime;
+			}
+
+			// Only a has time: a comes first
+			if (aTime !== null) {
+				return -1;
+			}
+
+			// Only b has time: b comes first
+			if (bTime !== null) {
+				return 1;
+			}
+
+			// Neither has time: maintain original order
+			return 0;
+		});
+	}, [filteredTodos]);
 
 	// Stats based on folder-filtered todos
 	const stats = useMemo(() => {
@@ -511,7 +588,7 @@ export default function TodosPage() {
 												</div>
 											))}
 										</div>
-									) : filteredTodos.length === 0 ? (
+									) : sortedTodos.length === 0 ? (
 										<EmptyState
 											filter={filter}
 											searchQuery={searchQuery}
@@ -520,7 +597,7 @@ export default function TodosPage() {
 										/>
 									) : (
 										<ul className="space-y-2" data-testid="todo-list">
-											{filteredTodos.map((todo, index) => {
+											{sortedTodos.map((todo, index) => {
 												const todoFolder = getFolderForTodo(todo.folderId);
 												return (
 													<TodoExpandableItem

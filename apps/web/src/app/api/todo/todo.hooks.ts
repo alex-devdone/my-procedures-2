@@ -16,6 +16,7 @@ import { queryClient } from "@/utils/trpc";
 import {
 	getAllTodosQueryOptions,
 	getBulkCreateTodosMutationOptions,
+	getCompleteRecurringMutationOptions,
 	getCreateTodoMutationOptions,
 	getDeleteTodoMutationOptions,
 	getTodosQueryKey,
@@ -274,6 +275,37 @@ export function useTodoStorage(): UseTodoStorageReturn {
 		},
 	});
 
+	// Complete recurring mutation with optimistic updates
+	const completeRecurringMutation = useMutation({
+		...getCompleteRecurringMutationOptions(),
+		onMutate: async ({ id }: { id: number }) => {
+			// Cancel outgoing refetches
+			await queryClient.cancelQueries({ queryKey });
+
+			// Snapshot previous value
+			const previousTodos = queryClient.getQueryData<RemoteTodo[]>(queryKey);
+
+			// Optimistically mark the todo as completed
+			queryClient.setQueryData<RemoteTodo[]>(queryKey, (old) =>
+				old?.map((todo) =>
+					todo.id === id ? { ...todo, completed: true } : todo,
+				),
+			);
+
+			return { previousTodos };
+		},
+		onError: (_err, _variables, context) => {
+			// Rollback on error
+			if (context?.previousTodos) {
+				queryClient.setQueryData(queryKey, context.previousTodos);
+			}
+		},
+		onSettled: () => {
+			// Refetch to get the new occurrence created by the backend
+			refetchRemoteTodos();
+		},
+	});
+
 	const create = useCallback(
 		async (
 			text: string,
@@ -320,6 +352,20 @@ export function useTodoStorage(): UseTodoStorageReturn {
 				if (typeof id === "number" && id < 0) {
 					return;
 				}
+
+				// For recurring todos being completed, use completeRecurring to create next occurrence
+				if (completed) {
+					const currentTodos = remoteTodos || [];
+					const todo = currentTodos.find((t) => t.id === id);
+
+					if (todo?.recurringPattern) {
+						// Use completeRecurring mutation for recurring todos
+						await completeRecurringMutation.mutateAsync({ id: id as number });
+						return;
+					}
+				}
+
+				// Regular toggle for non-recurring todos or unchecking
 				await toggleMutation.mutateAsync({ id: id as number, completed });
 			} else {
 				// For recurring todos being completed, use completeRecurring to create next occurrence
@@ -336,7 +382,7 @@ export function useTodoStorage(): UseTodoStorageReturn {
 				notifyLocalTodosListeners();
 			}
 		},
-		[isAuthenticated, toggleMutation],
+		[isAuthenticated, toggleMutation, remoteTodos, completeRecurringMutation],
 	);
 
 	const deleteTodo = useCallback(

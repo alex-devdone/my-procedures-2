@@ -367,12 +367,36 @@ export function UpcomingView({
 		return flattenDateGroups(dateGroups);
 	}, [dateGroups]);
 
-	// Apply status and search filters to groups
+	// Apply status and search filters to groups, then sort todos within each group
 	const filteredGroups = useMemo(() => {
+		const getTime = (todo: UpcomingTodoEntry): number | null => {
+			// Check recurring pattern notifyAt first (e.g., "09:00", "21:00")
+			if (todo.recurringPattern?.notifyAt) {
+				const [hours, minutes] = todo.recurringPattern.notifyAt
+					.split(":")
+					.map(Number);
+				return hours * 60 + minutes;
+			}
+			// Check reminderAt (it has explicit time)
+			if (todo.reminderAt) {
+				const date = new Date(todo.reminderAt);
+				return date.getHours() * 60 + date.getMinutes();
+			}
+			// Check if dueDate has a time component (not midnight)
+			if (todo.dueDate) {
+				const date = new Date(todo.dueDate);
+				const minutes = date.getHours() * 60 + date.getMinutes();
+				// If it's not midnight (00:00), consider it has a time
+				if (minutes > 0) {
+					return minutes;
+				}
+			}
+			return null;
+		};
+
 		return dateGroups
-			.map((group) => ({
-				...group,
-				todos: group.todos.filter((todo) => {
+			.map((group) => {
+				const filtered = group.todos.filter((todo) => {
 					const isCompleted = isEntryCompleted(todo);
 					const matchesFilter =
 						filter === "all" ||
@@ -384,8 +408,45 @@ export function UpcomingView({
 						todo.text.toLowerCase().includes(searchQuery.toLowerCase());
 
 					return matchesFilter && matchesSearch;
-				}),
-			}))
+				});
+
+				// Sort todos within the group: active first, then by time
+				const sorted = filtered.sort((a, b) => {
+					// First, sort by completion status (active first)
+					const aCompleted = isEntryCompleted(a);
+					const bCompleted = isEntryCompleted(b);
+					if (aCompleted !== bCompleted) {
+						return aCompleted ? 1 : -1;
+					}
+
+					// Then sort by time
+					const aTime = getTime(a);
+					const bTime = getTime(b);
+
+					// Both have time: sort by time ascending (earliest first)
+					if (aTime !== null && bTime !== null) {
+						return aTime - bTime;
+					}
+
+					// Only a has time: a comes first
+					if (aTime !== null) {
+						return -1;
+					}
+
+					// Only b has time: b comes first
+					if (bTime !== null) {
+						return 1;
+					}
+
+					// Neither has time: maintain original order
+					return 0;
+				});
+
+				return {
+					...group,
+					todos: sorted,
+				};
+			})
 			.filter((group) => group.todos.length > 0);
 	}, [dateGroups, filter, searchQuery]);
 
@@ -406,7 +467,9 @@ export function UpcomingView({
 	};
 
 	const handleToggleTodo = (id: number | string, completed: boolean) => {
-		onToggle(id, !completed);
+		// Pass through - TodoExpandableItem already passes current state,
+		// parent will invert to get desired state
+		onToggle(id, completed);
 	};
 
 	return (

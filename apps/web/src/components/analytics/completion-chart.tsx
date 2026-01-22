@@ -28,7 +28,10 @@ interface ChartDataPoint {
 }
 
 function formatDate(dateString: string): string {
-	const date = new Date(dateString);
+	// Parse as local date to avoid timezone shifts
+	// dateString format is "YYYY-MM-DD"
+	const [year, month, day] = dateString.split("-").map(Number);
+	const date = new Date(year, month - 1, day);
 	return date.toLocaleDateString("en-US", {
 		month: "short",
 		day: "numeric",

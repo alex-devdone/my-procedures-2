@@ -223,7 +223,7 @@ export function useUpdatePastCompletion() {
 			await queryClient.cancelQueries({
 				predicate: (query) => {
 					const key = query.queryKey;
-					// Match both analytics and completion history queries
+					// Match analytics, completion history, and recurring occurrences queries
 					return (
 						Array.isArray(key) &&
 						key.length > 0 &&
@@ -233,7 +233,10 @@ export function useUpdatePastCompletion() {
 						Array.isArray((key[0] as { path: string[] }).path) &&
 						(key[0] as { path: string[] }).path[0] === "todo" &&
 						((key[0] as { path: string[] }).path[1] === "getAnalytics" ||
-							(key[0] as { path: string[] }).path[1] === "getCompletionHistory")
+							(key[0] as { path: string[] }).path[1] ===
+								"getCompletionHistory" ||
+							(key[0] as { path: string[] }).path[1] ===
+								"getRecurringTodosForDateRange")
 					);
 				},
 			});
@@ -242,9 +245,14 @@ export function useUpdatePastCompletion() {
 			const previousData: {
 				analytics: Map<string, AnalyticsData | undefined>;
 				completionHistory: Map<string, CompletionHistoryRecord[] | undefined>;
+				recurringOccurrences: Map<
+					string,
+					{ todo: unknown; matchingDates: string[] }[] | undefined
+				>;
 			} = {
 				analytics: new Map(),
 				completionHistory: new Map(),
+				recurringOccurrences: new Map(),
 			};
 
 			// Get the scheduled date for matching
@@ -383,6 +391,12 @@ export function useUpdatePastCompletion() {
 				}
 			}
 
+			// Update recurring occurrences - this is used by the completion history list
+			// The data structure is an array of { todo, matchingDates }
+			// We don't need to update this because it's just the pattern matches
+			// The actual completion status comes from completionHistory query above
+			// which we already updated optimistically
+
 			return { previousData };
 		},
 		onError: (_err, _input, context) => {
@@ -424,10 +438,11 @@ export function useUpdatePastCompletion() {
 	});
 
 	const updatePastCompletion = useCallback(
-		async (input: UpdatePastCompletionInputLocal) => {
+		(input: UpdatePastCompletionInputLocal) => {
 			if (isAuthenticated) {
-				// For authenticated users, ensure todoId is a number
-				await remoteMutation.mutateAsync({
+				// For authenticated users, ensure todoId is a number and use remoteMutation.mutate
+				// This triggers the optimistic updates in onMutate
+				remoteMutation.mutate({
 					todoId:
 						typeof input.todoId === "number"
 							? input.todoId
@@ -453,7 +468,6 @@ export function useUpdatePastCompletion() {
 
 	return {
 		mutate: updatePastCompletion,
-		mutateAsync: updatePastCompletion,
 		isPending: remoteMutation.isPending,
 		isSuccess: remoteMutation.isSuccess,
 		isError: remoteMutation.isError,
@@ -522,8 +536,9 @@ export function useRecurringOccurrencesWithStatus(
 	});
 
 	// For local storage (unauthenticated users), we need to generate occurrences manually
-	const getLocalOccurrencesSnapshot =
-		useCallback((): RecurringOccurrenceWithStatus[] => {
+	// Cache the snapshot using useMemo instead of useCallback to avoid infinite loop
+	const localOccurrencesSnapshot =
+		useMemo((): RecurringOccurrenceWithStatus[] => {
 			if (isAuthenticated) return [];
 
 			const todos = localTodoStorage.getAll();
@@ -610,10 +625,23 @@ export function useRecurringOccurrencesWithStatus(
 			);
 		}, [isAuthenticated, startDate, endDate]);
 
+	// Create stable snapshot getters
+	const getLocalOccurrencesSnapshot = useCallback(
+		() => localOccurrencesSnapshot,
+		[localOccurrencesSnapshot],
+	);
+
+	// Cache the server snapshot to avoid infinite loop
+	const serverSnapshot = useMemo(
+		() => [] as RecurringOccurrenceWithStatus[],
+		[],
+	);
+	const getServerSnapshot = useCallback(() => serverSnapshot, [serverSnapshot]);
+
 	const localOccurrences = useSyncExternalStore(
 		subscribeToLocalAnalytics,
 		getLocalOccurrencesSnapshot,
-		() => [] as RecurringOccurrenceWithStatus[],
+		getServerSnapshot,
 	);
 
 	// Merge remote data when authenticated

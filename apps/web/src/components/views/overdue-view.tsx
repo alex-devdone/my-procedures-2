@@ -3,6 +3,7 @@
 import { AlertCircle, CheckCircle2, Circle, Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { useCompletionHistory } from "@/app/api/analytics";
 import type { FolderColor } from "@/app/api/folder";
 import { useFolderStorage } from "@/app/api/folder";
 import { useAllSubtasksProgress } from "@/app/api/subtask";
@@ -12,6 +13,7 @@ import { TodoExpandableItem } from "@/components/todos";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { isDateMatchingPattern } from "@/lib/recurring-utils";
 import { cn } from "@/lib/utils";
 
 type FilterType = "all" | "active" | "completed";
@@ -63,14 +65,93 @@ export interface OverdueViewProps {
 }
 
 /**
+ * Completion record for a recurring todo occurrence.
+ */
+export interface CompletionRecord {
+	todoId: number;
+	scheduledDate: Date;
+	completedAt: Date | null;
+}
+
+/**
+ * Helper to get date key for grouping (YYYY-MM-DD).
+ */
+function getDateKey(date: Date | string): string {
+	const d = typeof date === "string" ? new Date(date) : date;
+	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/**
  * Filters todos to return only those that are overdue (past due date).
  * Includes both active and completed todos with past due dates.
+ * For recurring todos, checks if there are uncompleted past occurrences.
+ * @param todos - All todos to filter
+ * @param now - The current date
+ * @param completionHistory - Optional completion history for recurring todos
  */
-export function getTodosOverdue(todos: Todo[]): Todo[] {
+export function getTodosOverdue(
+	todos: Todo[],
+	now: Date = new Date(),
+	completionHistory?: CompletionRecord[],
+): Todo[] {
+	// Create a map for quick lookup of completion status by todoId and date
+	const completionMap = new Map<string, boolean>();
+	if (completionHistory) {
+		for (const record of completionHistory) {
+			const dateKey = getDateKey(record.scheduledDate);
+			const key = `${record.todoId}-${dateKey}`;
+			completionMap.set(key, record.completedAt !== null);
+		}
+	}
+
+	const today = new Date(now);
+	today.setHours(0, 0, 0, 0);
+
 	return todos.filter((todo) => {
-		if (!todo.dueDate) return false;
-		// Check if due date is in the past, regardless of completion status
-		return isOverdue(todo.dueDate, false);
+		// For non-recurring todos, check if they have an overdue dueDate
+		if (!todo.recurringPattern) {
+			if (!todo.dueDate) return false;
+			return isOverdue(todo.dueDate, false);
+		}
+
+		// For recurring todos, check if there are any uncompleted past occurrences
+		// Start from 7 days ago (reasonable window for overdue tracking)
+		const sevenDaysAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+		sevenDaysAgo.setHours(0, 0, 0, 0);
+
+		// Check if the pattern has ended
+		if (todo.recurringPattern.endDate) {
+			const endDate = new Date(todo.recurringPattern.endDate);
+			endDate.setHours(0, 0, 0, 0);
+			if (endDate < today) {
+				// Pattern ended before today, no future occurrences possible
+				return false;
+			}
+		}
+
+		// Check dates from 7 days ago up to yesterday
+		const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+		yesterday.setHours(0, 0, 0, 0);
+
+		const currentDate = new Date(sevenDaysAgo);
+		while (currentDate <= yesterday) {
+			// Check if this date matches the recurring pattern
+			if (isDateMatchingPattern(todo.recurringPattern, currentDate)) {
+				// Check if this occurrence was completed
+				const dateKey = getDateKey(currentDate);
+				const completionKey = `${todo.id}-${dateKey}`;
+				const wasCompleted = completionMap.get(completionKey);
+
+				// If we found an uncompleted past occurrence, this todo is overdue
+				if (!wasCompleted) {
+					return true;
+				}
+			}
+
+			currentDate.setDate(currentDate.getDate() + 1);
+		}
+
+		return false;
 	});
 }
 
@@ -99,10 +180,40 @@ export function OverdueView({
 	const { folders } = useFolderStorage();
 	const { getProgress } = useAllSubtasksProgress();
 
+	// Calculate date range for completion history (last 7 days up to yesterday)
+	const dateRange = useMemo(() => {
+		const today = new Date();
+		today.setHours(0, 0, 0, 0);
+		const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+		yesterday.setHours(23, 59, 59, 999);
+		const sevenDaysAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+		sevenDaysAgo.setHours(0, 0, 0, 0);
+		return {
+			startDate: sevenDaysAgo.toISOString(),
+			endDate: yesterday.toISOString(),
+		};
+	}, []);
+
+	// Fetch completion history for recurring todos
+	const { data: completionHistoryData } = useCompletionHistory(
+		dateRange.startDate,
+		dateRange.endDate,
+	);
+
+	// Convert completion history to the format expected by getTodosOverdue
+	const completionHistory = useMemo(() => {
+		if (!completionHistoryData) return undefined;
+		return completionHistoryData.map((record) => ({
+			todoId: record.todoId,
+			scheduledDate: new Date(record.scheduledDate),
+			completedAt: record.completedAt ? new Date(record.completedAt) : null,
+		}));
+	}, [completionHistoryData]);
+
 	// Filter overdue todos
 	const overdueTodos = useMemo(() => {
-		return getTodosOverdue(todos);
-	}, [todos]);
+		return getTodosOverdue(todos, new Date(), completionHistory);
+	}, [todos, completionHistory]);
 
 	// Apply status and search filters
 	const filteredTodos = useMemo(() => {
@@ -120,23 +231,98 @@ export function OverdueView({
 		});
 	}, [overdueTodos, filter, searchQuery]);
 
-	// Sort overdue todos: active first (by most overdue), then completed
+	// Sort overdue todos: active first (by due date, then by time), then completed
 	const sortedTodos = useMemo(() => {
+		const getTime = (todo: Todo): number | null => {
+			// Check recurring pattern notifyAt first (e.g., "09:00", "21:00")
+			if (todo.recurringPattern?.notifyAt) {
+				const [hours, minutes] = todo.recurringPattern.notifyAt
+					.split(":")
+					.map(Number);
+				return hours * 60 + minutes;
+			}
+			// Check reminderAt (it has explicit time)
+			if (todo.reminderAt) {
+				const date = new Date(todo.reminderAt);
+				return date.getHours() * 60 + date.getMinutes();
+			}
+			// Check if dueDate has a time component (not midnight)
+			if (todo.dueDate) {
+				const date = new Date(todo.dueDate);
+				const minutes = date.getHours() * 60 + date.getMinutes();
+				// If it's not midnight (00:00), consider it has a time
+				if (minutes > 0) {
+					return minutes;
+				}
+			}
+			return null;
+		};
+
 		const active = filteredTodos.filter((t) => !t.completed);
 		const completed = filteredTodos.filter((t) => t.completed);
 
-		// Sort active by due date (oldest first = most overdue)
+		// Sort active by due date (oldest first = most overdue), then by time
 		const sortedActive = [...active].sort((a, b) => {
+			// First sort by date
 			const dateA = new Date(a.dueDate as string).getTime();
 			const dateB = new Date(b.dueDate as string).getTime();
-			return dateA - dateB;
+			if (dateA !== dateB) {
+				return dateA - dateB;
+			}
+
+			// Same date: sort by time
+			const aTime = getTime(a);
+			const bTime = getTime(b);
+
+			// Both have time: sort by time ascending
+			if (aTime !== null && bTime !== null) {
+				return aTime - bTime;
+			}
+
+			// Only a has time: a comes first
+			if (aTime !== null) {
+				return -1;
+			}
+
+			// Only b has time: b comes first
+			if (bTime !== null) {
+				return 1;
+			}
+
+			// Neither has time: maintain original order
+			return 0;
 		});
 
-		// Sort completed by due date (newest first = recently completed)
+		// Sort completed by due date (newest first = recently completed), then by time
 		const sortedCompleted = [...completed].sort((a, b) => {
+			// First sort by date (newest first)
 			const dateA = new Date(a.dueDate as string).getTime();
 			const dateB = new Date(b.dueDate as string).getTime();
-			return dateB - dateA;
+			if (dateA !== dateB) {
+				return dateB - dateA;
+			}
+
+			// Same date: sort by time
+			const aTime = getTime(a);
+			const bTime = getTime(b);
+
+			// Both have time: sort by time ascending
+			if (aTime !== null && bTime !== null) {
+				return aTime - bTime;
+			}
+
+			// Only a has time: a comes first
+			if (aTime !== null) {
+				return -1;
+			}
+
+			// Only b has time: b comes first
+			if (bTime !== null) {
+				return 1;
+			}
+
+			// Neither has time: maintain original order
+			return 0;
 		});
 
 		return [...sortedActive, ...sortedCompleted];
@@ -157,7 +343,9 @@ export function OverdueView({
 	};
 
 	const handleToggleTodo = (id: number | string, completed: boolean) => {
-		onToggle(id, !completed);
+		// Pass through - TodoExpandableItem already passes current state,
+		// parent will invert to get desired state
+		onToggle(id, completed);
 	};
 
 	return (
