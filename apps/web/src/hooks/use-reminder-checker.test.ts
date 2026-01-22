@@ -1,6 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Todo } from "@/app/api/todo";
+import { isDateMatchingPattern } from "@/lib/recurring-utils";
 import {
 	cleanupShownReminders,
 	DEFAULT_CHECK_INTERVAL,
@@ -1676,6 +1677,320 @@ describe("Recurring Notification Integration", () => {
 				expect(result[0].isRecurring).toBe(true);
 				expect(result[0].recurringType).toBe("weekly");
 			}
+		});
+	});
+});
+
+// ============================================================================
+// isDateMatchingPattern Edge Cases
+// ============================================================================
+
+describe("isDateMatchingPattern Edge Cases", () => {
+	describe("Monthly patterns at month boundaries", () => {
+		it("matches day 31 on months that have 31 days", () => {
+			// January 31, 2026
+			const jan31 = new Date(2026, 0, 31, 10, 0, 0);
+			const pattern = { type: "monthly", dayOfMonth: 31 };
+			expect(isDateMatchingPattern(pattern, jan31)).toBe(true);
+		});
+
+		it("does not match day 31 on February (28 days)", () => {
+			// February 28, 2026 (not a leap year)
+			const feb28 = new Date(2026, 1, 28, 10, 0, 0);
+			const pattern = { type: "monthly", dayOfMonth: 31 };
+			expect(isDateMatchingPattern(pattern, feb28)).toBe(false);
+		});
+
+		it("does not match day 31 on months with only 30 days", () => {
+			// April 30, 2026 (April has 30 days)
+			const apr30 = new Date(2026, 3, 30, 10, 0, 0);
+			const pattern = { type: "monthly", dayOfMonth: 31 };
+			expect(isDateMatchingPattern(pattern, apr30)).toBe(false);
+		});
+
+		it("matches day 30 on months that have 30 days", () => {
+			// April 30, 2026
+			const apr30 = new Date(2026, 3, 30, 10, 0, 0);
+			const pattern = { type: "monthly", dayOfMonth: 30 };
+			expect(isDateMatchingPattern(pattern, apr30)).toBe(true);
+		});
+
+		it("does not match day 30 on February", () => {
+			// February 28, 2026
+			const feb28 = new Date(2026, 1, 28, 10, 0, 0);
+			const pattern = { type: "monthly", dayOfMonth: 30 };
+			expect(isDateMatchingPattern(pattern, feb28)).toBe(false);
+		});
+
+		it("matches day 28 on February", () => {
+			// February 28, 2026
+			const feb28 = new Date(2026, 1, 28, 10, 0, 0);
+			const pattern = { type: "monthly", dayOfMonth: 28 };
+			expect(isDateMatchingPattern(pattern, feb28)).toBe(true);
+		});
+
+		it("matches day 1 at the start of any month", () => {
+			// January 1, 2026
+			const jan1 = new Date(2026, 0, 1, 10, 0, 0);
+			const pattern = { type: "monthly", dayOfMonth: 1 };
+			expect(isDateMatchingPattern(pattern, jan1)).toBe(true);
+
+			// February 1, 2026
+			const feb1 = new Date(2026, 1, 1, 10, 0, 0);
+			expect(isDateMatchingPattern(pattern, feb1)).toBe(true);
+
+			// December 1, 2026
+			const dec1 = new Date(2026, 11, 1, 10, 0, 0);
+			expect(isDateMatchingPattern(pattern, dec1)).toBe(true);
+		});
+
+		it("handles last day of month correctly across different months", () => {
+			// March 31 should match dayOfMonth: 31
+			const mar31 = new Date(2026, 2, 31, 10, 0, 0);
+			expect(
+				isDateMatchingPattern({ type: "monthly", dayOfMonth: 31 }, mar31),
+			).toBe(true);
+
+			// June 30 should match dayOfMonth: 30
+			const jun30 = new Date(2026, 5, 30, 10, 0, 0);
+			expect(
+				isDateMatchingPattern({ type: "monthly", dayOfMonth: 30 }, jun30),
+			).toBe(true);
+
+			// September 30 should match dayOfMonth: 30
+			const sep30 = new Date(2026, 8, 30, 10, 0, 0);
+			expect(
+				isDateMatchingPattern({ type: "monthly", dayOfMonth: 30 }, sep30),
+			).toBe(true);
+		});
+	});
+
+	describe("Leap year handling", () => {
+		it("matches day 29 on February in a leap year (2024)", () => {
+			// February 29, 2024 (leap year)
+			const feb29_2024 = new Date(2024, 1, 29, 10, 0, 0);
+			const pattern = { type: "monthly", dayOfMonth: 29 };
+			expect(isDateMatchingPattern(pattern, feb29_2024)).toBe(true);
+		});
+
+		it("does not match day 29 on February 28 in a non-leap year (2026)", () => {
+			// February 28, 2026 (not a leap year)
+			const feb28_2026 = new Date(2026, 1, 28, 10, 0, 0);
+			const pattern = { type: "monthly", dayOfMonth: 29 };
+			expect(isDateMatchingPattern(pattern, feb28_2026)).toBe(false);
+		});
+
+		it("matches yearly pattern on Feb 29 in leap year", () => {
+			// February 29, 2024 (leap year)
+			const feb29_2024 = new Date(2024, 1, 29, 10, 0, 0);
+			const pattern = { type: "yearly", monthOfYear: 2, dayOfMonth: 29 };
+			expect(isDateMatchingPattern(pattern, feb29_2024)).toBe(true);
+		});
+
+		it("does not match yearly Feb 29 pattern on Feb 28 in non-leap year", () => {
+			// February 28, 2026 (not a leap year)
+			const feb28_2026 = new Date(2026, 1, 28, 10, 0, 0);
+			const pattern = { type: "yearly", monthOfYear: 2, dayOfMonth: 29 };
+			expect(isDateMatchingPattern(pattern, feb28_2026)).toBe(false);
+		});
+
+		it("matches Feb 28 pattern on Feb 28 in both leap and non-leap years", () => {
+			const pattern = { type: "yearly", monthOfYear: 2, dayOfMonth: 28 };
+
+			// Non-leap year
+			const feb28_2026 = new Date(2026, 1, 28, 10, 0, 0);
+			expect(isDateMatchingPattern(pattern, feb28_2026)).toBe(true);
+
+			// Leap year
+			const feb28_2024 = new Date(2024, 1, 28, 10, 0, 0);
+			expect(isDateMatchingPattern(pattern, feb28_2024)).toBe(true);
+		});
+
+		it("correctly handles leap year divisible by 100 but not 400 (1900)", () => {
+			// 1900 was NOT a leap year (divisible by 100 but not 400)
+			// February 28, 1900
+			const feb28_1900 = new Date(1900, 1, 28, 10, 0, 0);
+			const pattern = { type: "monthly", dayOfMonth: 29 };
+			expect(isDateMatchingPattern(pattern, feb28_1900)).toBe(false);
+		});
+
+		it("correctly handles leap year divisible by 400 (2000)", () => {
+			// 2000 WAS a leap year (divisible by 400)
+			// February 29, 2000
+			const feb29_2000 = new Date(2000, 1, 29, 10, 0, 0);
+			const pattern = { type: "monthly", dayOfMonth: 29 };
+			expect(isDateMatchingPattern(pattern, feb29_2000)).toBe(true);
+		});
+	});
+
+	describe("Weekly patterns crossing month boundaries", () => {
+		it("matches weekly pattern when week spans end of month", () => {
+			// January 31, 2026 is a Saturday (day 6)
+			const jan31 = new Date(2026, 0, 31, 10, 0, 0);
+			const pattern = { type: "weekly", daysOfWeek: [6] }; // Saturday
+			expect(isDateMatchingPattern(pattern, jan31)).toBe(true);
+		});
+
+		it("matches weekly pattern on first day of new month", () => {
+			// February 1, 2026 is a Sunday (day 0)
+			const feb1 = new Date(2026, 1, 1, 10, 0, 0);
+			const pattern = { type: "weekly", daysOfWeek: [0] }; // Sunday
+			expect(isDateMatchingPattern(pattern, feb1)).toBe(true);
+		});
+
+		it("handles weekly pattern with multiple days crossing month boundary", () => {
+			// January 2026 ends on Saturday (31st)
+			// February 2026 starts on Sunday (1st)
+			const pattern = { type: "weekly", daysOfWeek: [6, 0] }; // Sat and Sun
+
+			// January 31, 2026 (Saturday)
+			const jan31 = new Date(2026, 0, 31, 10, 0, 0);
+			expect(isDateMatchingPattern(pattern, jan31)).toBe(true);
+
+			// February 1, 2026 (Sunday)
+			const feb1 = new Date(2026, 1, 1, 10, 0, 0);
+			expect(isDateMatchingPattern(pattern, feb1)).toBe(true);
+		});
+
+		it("handles weekly pattern crossing from December to January", () => {
+			// December 31, 2025 is Wednesday (day 3)
+			const dec31 = new Date(2025, 11, 31, 10, 0, 0);
+			const pattern = { type: "weekly", daysOfWeek: [3] }; // Wednesday
+			expect(isDateMatchingPattern(pattern, dec31)).toBe(true);
+
+			// January 1, 2026 is Thursday (day 4)
+			const jan1 = new Date(2026, 0, 1, 10, 0, 0);
+			const patternThursday = { type: "weekly", daysOfWeek: [4] }; // Thursday
+			expect(isDateMatchingPattern(patternThursday, jan1)).toBe(true);
+		});
+
+		it("does not match weekly pattern on wrong day at month boundary", () => {
+			// January 31, 2026 is Saturday (day 6)
+			const jan31 = new Date(2026, 0, 31, 10, 0, 0);
+			const pattern = { type: "weekly", daysOfWeek: [1, 3, 5] }; // Mon, Wed, Fri
+			expect(isDateMatchingPattern(pattern, jan31)).toBe(false);
+		});
+
+		it("handles weekly pattern spanning partial week at end of month", () => {
+			// Test a week that starts in one month and ends in another
+			// January 25, 2026 is Sunday
+			// January 26-30 is Mon-Fri
+			// January 31 is Saturday
+			// February 1 is Sunday
+
+			const pattern = { type: "weekly", daysOfWeek: [1, 2, 3, 4, 5] }; // Mon-Fri
+
+			// January 26, 2026 (Monday)
+			const jan26 = new Date(2026, 0, 26, 10, 0, 0);
+			expect(isDateMatchingPattern(pattern, jan26)).toBe(true);
+
+			// January 30, 2026 (Friday)
+			const jan30 = new Date(2026, 0, 30, 10, 0, 0);
+			expect(isDateMatchingPattern(pattern, jan30)).toBe(true);
+
+			// January 31, 2026 (Saturday) - should NOT match
+			const jan31 = new Date(2026, 0, 31, 10, 0, 0);
+			expect(isDateMatchingPattern(pattern, jan31)).toBe(false);
+
+			// February 2, 2026 (Monday)
+			const feb2 = new Date(2026, 1, 2, 10, 0, 0);
+			expect(isDateMatchingPattern(pattern, feb2)).toBe(true);
+		});
+
+		it("handles custom pattern crossing month boundary same as weekly", () => {
+			// January 31, 2026 is Saturday (day 6)
+			const jan31 = new Date(2026, 0, 31, 10, 0, 0);
+			const pattern = { type: "custom", daysOfWeek: [6] }; // Saturday
+			expect(isDateMatchingPattern(pattern, jan31)).toBe(true);
+
+			// February 1, 2026 is Sunday (day 0)
+			const feb1 = new Date(2026, 1, 1, 10, 0, 0);
+			const patternSunday = { type: "custom", daysOfWeek: [0] }; // Sunday
+			expect(isDateMatchingPattern(patternSunday, feb1)).toBe(true);
+		});
+	});
+
+	describe("Year boundary edge cases", () => {
+		it("matches yearly pattern on December 31", () => {
+			const dec31 = new Date(2026, 11, 31, 10, 0, 0);
+			const pattern = { type: "yearly", monthOfYear: 12, dayOfMonth: 31 };
+			expect(isDateMatchingPattern(pattern, dec31)).toBe(true);
+		});
+
+		it("matches yearly pattern on January 1", () => {
+			const jan1 = new Date(2026, 0, 1, 10, 0, 0);
+			const pattern = { type: "yearly", monthOfYear: 1, dayOfMonth: 1 };
+			expect(isDateMatchingPattern(pattern, jan1)).toBe(true);
+		});
+
+		it("does not match yearly Dec 31 pattern on Jan 1", () => {
+			const jan1 = new Date(2026, 0, 1, 10, 0, 0);
+			const pattern = { type: "yearly", monthOfYear: 12, dayOfMonth: 31 };
+			expect(isDateMatchingPattern(pattern, jan1)).toBe(false);
+		});
+	});
+
+	describe("Edge cases with missing pattern fields", () => {
+		it("returns true for monthly pattern without dayOfMonth", () => {
+			const anyDay = new Date(2026, 0, 15, 10, 0, 0);
+			const pattern = { type: "monthly" };
+			expect(isDateMatchingPattern(pattern, anyDay)).toBe(true);
+		});
+
+		it("returns true for weekly pattern without daysOfWeek", () => {
+			const anyDay = new Date(2026, 0, 15, 10, 0, 0);
+			const pattern = { type: "weekly" };
+			expect(isDateMatchingPattern(pattern, anyDay)).toBe(true);
+		});
+
+		it("returns true for weekly pattern with empty daysOfWeek array", () => {
+			const anyDay = new Date(2026, 0, 15, 10, 0, 0);
+			const pattern = { type: "weekly", daysOfWeek: [] };
+			expect(isDateMatchingPattern(pattern, anyDay)).toBe(true);
+		});
+
+		it("returns true for yearly pattern without monthOfYear and dayOfMonth", () => {
+			const anyDay = new Date(2026, 0, 15, 10, 0, 0);
+			const pattern = { type: "yearly" };
+			expect(isDateMatchingPattern(pattern, anyDay)).toBe(true);
+		});
+
+		it("returns true for yearly pattern with only monthOfYear", () => {
+			// January 15, 2026
+			const jan15 = new Date(2026, 0, 15, 10, 0, 0);
+			const pattern = { type: "yearly", monthOfYear: 1 };
+			expect(isDateMatchingPattern(pattern, jan15)).toBe(true);
+
+			// February 15, 2026 - should not match
+			const feb15 = new Date(2026, 1, 15, 10, 0, 0);
+			expect(isDateMatchingPattern(pattern, feb15)).toBe(false);
+		});
+
+		it("returns true for yearly pattern with only dayOfMonth", () => {
+			// January 15, 2026
+			const jan15 = new Date(2026, 0, 15, 10, 0, 0);
+			const pattern = { type: "yearly", dayOfMonth: 15 };
+			expect(isDateMatchingPattern(pattern, jan15)).toBe(true);
+
+			// February 15, 2026 - should also match (any month, same day)
+			const feb15 = new Date(2026, 1, 15, 10, 0, 0);
+			expect(isDateMatchingPattern(pattern, feb15)).toBe(true);
+
+			// February 16, 2026 - should not match
+			const feb16 = new Date(2026, 1, 16, 10, 0, 0);
+			expect(isDateMatchingPattern(pattern, feb16)).toBe(false);
+		});
+
+		it("returns true for unknown pattern type", () => {
+			const anyDay = new Date(2026, 0, 15, 10, 0, 0);
+			const pattern = { type: "unknown" };
+			expect(isDateMatchingPattern(pattern, anyDay)).toBe(true);
+		});
+
+		it("returns true for undefined pattern type", () => {
+			const anyDay = new Date(2026, 0, 15, 10, 0, 0);
+			const pattern = {};
+			expect(isDateMatchingPattern(pattern, anyDay)).toBe(true);
 		});
 	});
 });
