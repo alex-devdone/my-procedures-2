@@ -95,8 +95,8 @@ export function TodoExpandableItem({
 	folderColorBgClasses = {},
 	className,
 	animationDelay,
-	isRecurringInstance = false,
-	virtualDate,
+	isRecurringInstance: _isRecurringInstance = false,
+	virtualDate: _virtualDate,
 }: TodoExpandableItemProps) {
 	const [isExpanded, setIsExpanded] = useState(false);
 	const { create: createSubtask } = useSubtaskStorage(todo.id);
