@@ -2101,4 +2101,99 @@ describe("toggle recurring todo: completeRecurring vs updatePastCompletion (loca
 		expect(entry).toBeDefined();
 		expect(entry.completedAt).not.toBeNull();
 	});
+
+	it("preserves folderId when completing recurring todo in folder view (no virtualDate)", async () => {
+		// Set up a recurring todo in a folder
+		const folderId = "folder-uuid-123";
+		const storedTodos = [
+			{
+				id: "uuid-1",
+				text: "Folder Recurring Task",
+				completed: false,
+				folderId: folderId,
+				dueDate: "2026-01-22T00:00:00.000Z",
+				reminderAt: null,
+				recurringPattern: { type: "daily", interval: 1 },
+			},
+		];
+		mockLocalStorage.todos = JSON.stringify(storedTodos);
+
+		const { result } = renderHook(() => useTodoStorage(), {
+			wrapper: createWrapper(),
+		});
+
+		// Toggle without virtualDate (simulating folder view behavior)
+		await act(async () => {
+			await result.current.toggle("uuid-1", true);
+		});
+
+		// Should use completeRecurring - creates a new todo with next occurrence
+		const stored = JSON.parse(mockLocalStorage.todos);
+
+		// Should have 2 todos now: the completed original and the new occurrence
+		expect(stored.length).toBe(2);
+
+		// Find the completed todo
+		const completedTodo = stored.find(
+			(t: { completed: boolean }) => t.completed === true,
+		);
+		expect(completedTodo).toBeDefined();
+		expect(completedTodo.folderId).toBe(folderId);
+
+		// Find the new occurrence
+		const newTodo = stored.find(
+			(t: { completed: boolean }) => t.completed === false,
+		);
+		expect(newTodo).toBeDefined();
+		expect(newTodo.folderId).toBe(folderId);
+		expect(newTodo.recurringPattern).toBeDefined();
+		expect(newTodo.text).toBe("Folder Recurring Task");
+	});
+
+	it("keeps new occurrence in Inbox when completing recurring todo in Inbox (no virtualDate, null folderId)", async () => {
+		// Set up a recurring todo in Inbox (no folderId)
+		const storedTodos = [
+			{
+				id: "uuid-1",
+				text: "Inbox Recurring Task",
+				completed: false,
+				folderId: null,
+				dueDate: "2026-01-22T00:00:00.000Z",
+				reminderAt: null,
+				recurringPattern: { type: "daily", interval: 1 },
+			},
+		];
+		mockLocalStorage.todos = JSON.stringify(storedTodos);
+
+		const { result } = renderHook(() => useTodoStorage(), {
+			wrapper: createWrapper(),
+		});
+
+		// Toggle without virtualDate (simulating Inbox view behavior)
+		await act(async () => {
+			await result.current.toggle("uuid-1", true);
+		});
+
+		// Should use completeRecurring - creates a new todo with next occurrence
+		const stored = JSON.parse(mockLocalStorage.todos);
+
+		// Should have 2 todos now: the completed original and the new occurrence
+		expect(stored.length).toBe(2);
+
+		// Find the completed todo
+		const completedTodo = stored.find(
+			(t: { completed: boolean }) => t.completed === true,
+		);
+		expect(completedTodo).toBeDefined();
+		expect(completedTodo.folderId).toBeNull();
+
+		// Find the new occurrence - should also be in Inbox
+		const newTodo = stored.find(
+			(t: { completed: boolean }) => t.completed === false,
+		);
+		expect(newTodo).toBeDefined();
+		expect(newTodo.folderId).toBeNull();
+		expect(newTodo.recurringPattern).toBeDefined();
+		expect(newTodo.text).toBe("Inbox Recurring Task");
+	});
 });
