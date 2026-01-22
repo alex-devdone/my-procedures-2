@@ -394,52 +394,54 @@ export function useTodoStorage(): UseTodoStorageReturn {
 					return;
 				}
 
-				// For recurring todos being completed
-				if (completed) {
-					const currentTodos = remoteTodos || [];
-					const todo = currentTodos.find((t) => t.id === id);
+				// For recurring todos, handle special completion/uncompletion logic
+				const currentTodos = remoteTodos || [];
+				const todo = currentTodos.find((t) => t.id === id);
 
-					if (todo?.recurringPattern) {
-						// Check if the virtualDate matches the todo's actual dueDate
-						// If so, we should use completeRecurring to create the next occurrence
-						const todoDateKey = todo.dueDate
-							? todo.dueDate.split("T")[0]
-							: null;
-						const isCurrentOccurrence =
-							options?.virtualDate && todoDateKey === options.virtualDate;
+				if (todo?.recurringPattern) {
+					// Check if the virtualDate matches the todo's actual dueDate
+					// If so, we should use completeRecurring to create the next occurrence
+					const todoDateKey = todo.dueDate ? todo.dueDate.split("T")[0] : null;
+					const isCurrentOccurrence =
+						options?.virtualDate && todoDateKey === options.virtualDate;
 
-						// Check if the virtualDate is in the past (overdue)
-						const today = new Date();
-						today.setHours(0, 0, 0, 0);
-						const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-						const isOverdueOccurrence =
-							options?.virtualDate && options.virtualDate < todayKey;
+					// Check if the virtualDate is in the past (overdue)
+					const today = new Date();
+					today.setHours(0, 0, 0, 0);
+					const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+					const isOverdueOccurrence =
+						options?.virtualDate && options.virtualDate < todayKey;
 
-						// If virtualDate is provided but does NOT match the todo's dueDate,
-						// use updatePastCompletion for pattern-generated virtual occurrences
-						if (options?.virtualDate && !isCurrentOccurrence) {
-							await updatePastCompletionMutation.mutateAsync({
-								todoId: id as number,
-								scheduledDate: options.virtualDate,
-								completed: true,
+					// If virtualDate is provided but does NOT match the todo's dueDate,
+					// use updatePastCompletion for pattern-generated virtual occurrences
+					if (options?.virtualDate && !isCurrentOccurrence) {
+						await updatePastCompletionMutation.mutateAsync({
+							todoId: id as number,
+							scheduledDate: options.virtualDate,
+							completed,
+						});
+						// For overdue occurrences, also advance the recurring pattern
+						// by calling completeRecurring to create the next occurrence
+						if (isOverdueOccurrence && completed) {
+							await completeRecurringMutation.mutateAsync({
+								id: id as number,
 							});
-							// For overdue occurrences, also advance the recurring pattern
-							// by calling completeRecurring to create the next occurrence
-							if (isOverdueOccurrence) {
-								await completeRecurringMutation.mutateAsync({
-									id: id as number,
-								});
-							}
-							return;
 						}
-						// Otherwise use completeRecurring mutation for current occurrence
-						// This creates the next occurrence todo
-						await completeRecurringMutation.mutateAsync({ id: id as number });
 						return;
 					}
+
+					// For current occurrence or no virtualDate
+					if (completed) {
+						// Complete the recurring todo and create next occurrence
+						await completeRecurringMutation.mutateAsync({ id: id as number });
+					} else {
+						// For uncompleting without virtualDate, just toggle normally
+						await toggleMutation.mutateAsync({ id: id as number, completed });
+					}
+					return;
 				}
 
-				// Regular toggle for non-recurring todos or unchecking
+				// Regular toggle for non-recurring todos
 				await toggleMutation.mutateAsync({ id: id as number, completed });
 			} else {
 				// For recurring todos being completed, use completeRecurring to create next occurrence

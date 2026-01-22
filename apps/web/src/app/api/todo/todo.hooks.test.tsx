@@ -2197,3 +2197,157 @@ describe("toggle recurring todo: completeRecurring vs updatePastCompletion (loca
 		expect(newTodo.text).toBe("Inbox Recurring Task");
 	});
 });
+
+describe("toggle recurring todo: uncompleting specific occurrences (local storage)", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		localStorageMock.clear();
+
+		// Use local storage mode (guest mode) for these tests
+		mockUseSession.mockReturnValue({
+			data: null,
+			isPending: false,
+		});
+	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	it("can uncomplete a specific past occurrence using toggleLocalOccurrence", async () => {
+		// Set up a recurring todo with a completed occurrence in history
+		const storedTodos = [
+			{
+				id: "uuid-1",
+				text: "Daily Task",
+				completed: false,
+				folderId: null,
+				dueDate: "2026-01-25T00:00:00.000Z",
+				reminderAt: null,
+				recurringPattern: { type: "daily", interval: 1 },
+			},
+		];
+		mockLocalStorage.todos = JSON.stringify(storedTodos);
+
+		// Pre-populate completion history with a completed occurrence
+		const completionHistory = [
+			{
+				todoId: "uuid-1",
+				scheduledDate: "2026-01-22",
+				completedAt: "2026-01-22T10:30:00.000Z",
+			},
+		];
+		mockLocalStorage.completion_history = JSON.stringify(completionHistory);
+
+		const { result } = renderHook(() => useTodoStorage(), {
+			wrapper: createWrapper(),
+		});
+
+		// Uncomplete the occurrence (completed=false)
+		await act(async () => {
+			await result.current.toggle("uuid-1", false, {
+				virtualDate: "2026-01-22",
+			});
+		});
+
+		// The occurrence should now be marked as not completed
+		const history = JSON.parse(mockLocalStorage.completion_history || "[]");
+		const entry = history.find(
+			(e: { todoId: string; scheduledDate: string }) =>
+				e.todoId === "uuid-1" && e.scheduledDate === "2026-01-22",
+		);
+		expect(entry).toBeDefined();
+		expect(entry.completedAt).toBeNull();
+
+		// The main todo should remain unchanged
+		const stored = JSON.parse(mockLocalStorage.todos);
+		expect(stored.length).toBe(1);
+		expect(stored[0].completed).toBe(false);
+	});
+
+	it("uses regular toggle when uncompleting without virtualDate", async () => {
+		// Set up a recurring todo that is completed
+		const storedTodos = [
+			{
+				id: "uuid-1",
+				text: "Daily Task",
+				completed: true,
+				folderId: null,
+				dueDate: "2026-01-22T00:00:00.000Z",
+				reminderAt: null,
+				recurringPattern: { type: "daily", interval: 1 },
+			},
+		];
+		mockLocalStorage.todos = JSON.stringify(storedTodos);
+
+		const { result } = renderHook(() => useTodoStorage(), {
+			wrapper: createWrapper(),
+		});
+
+		// Uncomplete without virtualDate (like in folder view)
+		await act(async () => {
+			await result.current.toggle("uuid-1", false);
+		});
+
+		// Should just toggle the completed flag
+		const stored = JSON.parse(mockLocalStorage.todos);
+		expect(stored.length).toBe(1);
+		expect(stored[0].completed).toBe(false);
+	});
+
+	it("does not advance recurring pattern when uncompleting an overdue occurrence", async () => {
+		// Set up a recurring todo with dueDate set to today
+		const todayDate = new Date();
+		todayDate.setHours(0, 0, 0, 0);
+		const yesterdayDate = new Date(todayDate.getTime() - 24 * 60 * 60 * 1000);
+		const todayKey = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, "0")}-${String(todayDate.getDate()).padStart(2, "0")}`;
+		const yesterdayKey = `${yesterdayDate.getFullYear()}-${String(yesterdayDate.getMonth() + 1).padStart(2, "0")}-${String(yesterdayDate.getDate()).padStart(2, "0")}`;
+
+		const storedTodos = [
+			{
+				id: "uuid-1",
+				text: "Daily Task",
+				completed: false,
+				folderId: null,
+				dueDate: `${todayKey}T00:00:00.000Z`,
+				reminderAt: null,
+				recurringPattern: { type: "daily", interval: 1 },
+			},
+		];
+		mockLocalStorage.todos = JSON.stringify(storedTodos);
+
+		// Pre-populate completion history with a completed overdue occurrence
+		const completionHistory = [
+			{
+				todoId: "uuid-1",
+				scheduledDate: yesterdayKey,
+				completedAt: "2026-01-21T10:30:00.000Z",
+			},
+		];
+		mockLocalStorage.completion_history = JSON.stringify(completionHistory);
+
+		const { result } = renderHook(() => useTodoStorage(), {
+			wrapper: createWrapper(),
+		});
+
+		// Uncomplete the overdue occurrence
+		await act(async () => {
+			await result.current.toggle("uuid-1", false, {
+				virtualDate: yesterdayKey,
+			});
+		});
+
+		// Should NOT create a new occurrence (no pattern advancement on uncomplete)
+		const stored = JSON.parse(mockLocalStorage.todos);
+		expect(stored.length).toBe(1);
+
+		// The occurrence should be marked as not completed
+		const history = JSON.parse(mockLocalStorage.completion_history || "[]");
+		const entry = history.find(
+			(e: { todoId: string; scheduledDate: string }) =>
+				e.todoId === "uuid-1" && e.scheduledDate === yesterdayKey,
+		);
+		expect(entry).toBeDefined();
+		expect(entry.completedAt).toBeNull();
+	});
+});
