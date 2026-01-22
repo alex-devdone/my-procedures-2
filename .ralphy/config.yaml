@@ -10,10 +10,10 @@ project:
 
 # Commands (auto-detected from package.json/pyproject.toml)
 commands:
-  test: "bun run test"
-  lint: "bun run check"
+  test: "bash .claude/skills/test-runner/scripts/run-unit-tests.sh"
+  lint: "bash .claude/skills/test-runner/scripts/run-lint.sh"
   build: "bun run build"
-  test:e2e: "bun run test:e2e"
+  test:e2e: "bash .claude/skills/test-runner/scripts/run-e2e-tests.sh"
 
 # Rules - instructions the AI MUST follow
 # These are injected into every prompt

@@ -2015,23 +2015,17 @@ describe("toggle recurring todo: completeRecurring vs updatePastCompletion (loca
 
 		// For overdue occurrences:
 		// 1. toggleLocalOccurrence should record the completion in history
-		// 2. completeRecurring should also be called to advance the pattern
+		// 2. completeRecurring should NOT be called (pattern continues as-is)
 
 		const stored = JSON.parse(mockLocalStorage.todos);
 
-		// Should have 2 todos: original marked completed AND new occurrence created
-		expect(stored.length).toBe(2);
+		// Should still have 1 todo: original NOT marked completed
+		expect(stored.length).toBe(1);
 
-		// Find the completed todo and new occurrence
-		const completedTodo = stored.find(
-			(t: { completed: boolean }) => t.completed === true,
-		);
-		const newTodo = stored.find(
-			(t: { completed: boolean }) => t.completed === false,
-		);
-
-		expect(completedTodo).toBeDefined();
-		expect(newTodo).toBeDefined();
+		// The original todo should NOT be marked as completed
+		const todo = stored[0];
+		expect(todo.completed).toBe(false);
+		expect(todo.id).toBe("uuid-1");
 
 		// Check completion history has an entry for the overdue date
 		const completionHistory = JSON.parse(

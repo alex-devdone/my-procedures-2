@@ -1196,3 +1196,45 @@
 - [✓] 2026-01-22 11:19 - Recurring todos have visual indicator (repeat icon) distinguishing them from one-time todos
 - [✓] 2026-01-22 11:25 - New recurring todos default to 09:00 notification time when not explicitly set
 - [✓] 2026-01-22 11:31 - Analytics works in guest mode using localStorage
+- [✓] 2026-01-22 13:38 - Add E2E test in `apps/web/e2e/recurring-views.spec.ts`: "Today view: toggling recurring todo marks occurrence complete without creating new todo" - create daily recurring, toggle in Today, verify no new todo in Inbox, verify occurrence shows completed
+- [✓] 2026-01-22 13:43 - Update `UseTodoStorageReturn.toggle` signature in `apps/web/src/app/api/todo/todo.types.ts` to accept optional `options?: { virtualDate?: string }` parameter
+- [✓] 2026-01-22 13:45 - Add `getUpdatePastCompletionMutationOptions` function to `apps/web/src/app/api/todo/todo.api.ts` if not already present (wraps `trpc.todo.updatePastCompletion`)
+- [✓] 2026-01-22 13:47 - Add `updatePastCompletionMutation` with optimistic updates in `apps/web/src/app/api/todo/todo.hooks.ts` following the pattern of existing mutations (cancel queries, update cache, rollback on error)
+- [✓] 2026-01-22 13:49 - Modify `toggle` function in `apps/web/src/app/api/todo/todo.hooks.ts` (lines 348-386) to check for `options.virtualDate` - if provided with recurring todo, use `updatePastCompletion` instead of `completeRecurring`
+- [✓] 2026-01-22 13:51 - Update local storage toggle logic in `apps/web/src/lib/local-todo-storage.ts` to support `toggleLocalOccurrence(todoId, scheduledDate, completed)` for guest users
+- [✓] 2026-01-22 13:55 - Update `handleToggleTodo` in `apps/web/src/components/views/today-view.tsx` to detect virtual recurring instances and pass `{ virtualDate: entry.virtualDate }` when calling `onToggle`
+- [✓] 2026-01-22 13:59 - Update `handleToggleTodo` in `apps/web/src/components/views/upcoming-view.tsx` to pass `virtualDate` for virtual recurring instances
+- [✓] 2026-01-22 14:05 - Update `handleToggleTodo` in `apps/web/src/components/views/overdue-view.tsx` to pass `virtualDate` for missed recurring occurrences
+- [✗] 2026-01-22 14:12 - Verify folder views (`apps/web/src/components/folders/folder-content.tsx`) continue using existing behavior (no virtualDate = creates next occurrence)
+- [✗] 2026-01-22 14:15 - Verify folder views (`apps/web/src/components/folders/folder-content.tsx`) continue using existing behavior (no virtualDate = creates next occurrence)
+- [✗] 2026-01-22 14:19 - Verify folder views (`apps/web/src/components/folders/folder-content.tsx`) continue using existing behavior (no virtualDate = creates next occurrence)
+- [✓] 2026-01-22 15:26 - Verify folder views (`apps/web/src/components/folders/folder-content.tsx`) continue using existing behavior (no virtualDate = creates next occurrence)
+- [✓] 2026-01-22 15:41 - Add E2E test: "Today view: toggle recurring occurrence back to incomplete" - toggle completed occurrence, verify it shows as active again
+- [✓] 2026-01-22 15:43 - Add E2E test: "Upcoming view: toggling future occurrence marks it complete" - create daily recurring, toggle tomorrow's occurrence, verify shows completed, original todo unchanged
+- [✓] 2026-01-22 16:06 - Add E2E test: "Overdue view: toggling missed occurrence retroactively completes it" - create recurring with past due date, navigate to Overdue, toggle, verify marked completed
+- [✗] 2026-01-22 16:11 - Add E2E test: "Folder view: completing recurring todo creates next occurrence" - create recurring in folder, complete via folder view, verify new todo created (existing Inbox behavior)
+- [✗] 2026-01-22 16:15 - Add E2E test: "Folder view: completing recurring todo creates next occurrence" - create recurring in folder, complete via folder view, verify new todo created (existing Inbox behavior)
+- [✗] 2026-01-22 16:18 - Add E2E test: "Folder view: completing recurring todo creates next occurrence" - create recurring in folder, complete via folder view, verify new todo created (existing Inbox behavior)
+- [✗] 2026-01-22 16:22 - Add E2E test: "Folder view: completing recurring todo creates next occurrence" - create recurring in folder, complete via folder view, verify new todo created (existing Inbox behavior)
+- [✗] 2026-01-22 16:25 - Add E2E test: "Folder view: completing recurring todo creates next occurrence" - create recurring in folder, complete via folder view, verify new todo created (existing Inbox behavior)
+- [✗] 2026-01-22 16:29 - Add E2E test: "Folder view: completing recurring todo creates next occurrence" - create recurring in folder, complete via folder view, verify new todo created (existing Inbox behavior)
+- [✗] 2026-01-22 16:32 - Add E2E test: "Folder view: completing recurring todo creates next occurrence" - create recurring in folder, complete via folder view, verify new todo created (existing Inbox behavior)
+- [✗] 2026-01-22 16:36 - Add E2E test: "Folder view: completing recurring todo creates next occurrence" - create recurring in folder, complete via folder view, verify new todo created (existing Inbox behavior)
+- [✗] 2026-01-22 16:39 - Add E2E test: "Folder view: completing recurring todo creates next occurrence" - create recurring in folder, complete via folder view, verify new todo created (existing Inbox behavior)
+- [✗] 2026-01-22 16:43 - Add E2E test: "Folder view: completing recurring todo creates next occurrence" - create recurring in folder, complete via folder view, verify new todo created (existing Inbox behavior)
+- [✓] 2026-01-22 16:44 - Add E2E test: "Folder view: completing recurring todo creates next occurrence" - create recurring in folder, complete via folder view, verify new todo created (existing Inbox behavior)
+- [✓] 2026-01-22 16:46 - Add E2E test: "Toggle persistence: recurring occurrence completion persists after reload" - toggle occurrence, reload, verify status persisted
+- [✓] 2026-01-22 16:51 - Run `bun run check-types` and fix any TypeScript errors
+- [✓] 2026-01-22 16:51 - Run `bun run check` and fix any Biome linting/formatting issues
+- [✓] 2026-01-22 16:58 - Run `bun run test` and ensure all unit tests pass
+- [✓] 2026-01-22 17:03 - Run `bun run test:e2e` and ensure all E2E tests pass including new toggle tests
+- [✓] 2026-01-22 17:11 - Toggling a recurring todo in Today view only records the occurrence completion (no new todo created)
+- [✓] 2026-01-22 17:16 - Toggling a recurring todo in Upcoming view marks future occurrence as complete
+- [✓] 2026-01-22 17:22 - Toggling a recurring todo in Overdue view retroactively marks missed occurrence as completed
+- [✓] 2026-01-22 17:28 - Toggling in folder/Inbox views maintains existing behavior (creates next occurrence)
+- [✓] 2026-01-22 17:35 - Guest users (localStorage) have same toggle behavior as authenticated users
+- [✓] 2026-01-22 17:36 - All tests pass (`bun run test`)
+- [✓] 2026-01-22 17:36 - No type errors (`bun run check-types`)
+- [✓] 2026-01-22 17:36 - Linting passes (`bun run check`)
+- [✓] 2026-01-22 17:37 - Build succeeds (`bun run build`)
+- [✓] 2026-01-22 17:45 - All new E2E tests pass (`bun run test:e2e`)
