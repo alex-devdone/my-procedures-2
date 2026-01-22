@@ -4980,7 +4980,12 @@ describe("UpdatePastCompletion Procedure", () => {
 		): Date[] => {
 			const pattern = todo.recurringPattern;
 			const matchingDates: Date[] = [];
-			const todoStartDate = todo.dueDate;
+
+			// Normalize todoStartDate to local midnight for consistent interval calculations
+			const todoStartDate = todo.dueDate ? new Date(todo.dueDate) : null;
+			if (todoStartDate) {
+				todoStartDate.setHours(0, 0, 0, 0);
+			}
 
 			const currentDate = new Date(startDate);
 			currentDate.setHours(0, 0, 0, 0);
@@ -4990,9 +4995,7 @@ describe("UpdatePastCompletion Procedure", () => {
 
 			while (currentDate <= normalizedEndDate) {
 				if (todoStartDate) {
-					const normalizedTodoStart = new Date(todoStartDate);
-					normalizedTodoStart.setHours(0, 0, 0, 0);
-					if (currentDate < normalizedTodoStart) {
+					if (currentDate < todoStartDate) {
 						currentDate.setDate(currentDate.getDate() + 1);
 						continue;
 					}
