@@ -1223,6 +1223,249 @@ describe("local-todo-storage", () => {
 		});
 	});
 
+	describe("completeRecurring completion history storage", () => {
+		const COMPLETION_HISTORY_KEY = "completion_history";
+
+		beforeEach(() => {
+			const todos = [
+				{
+					id: "recurring-1",
+					text: "Daily task",
+					completed: false,
+					folderId: null,
+					dueDate: "2024-01-15T09:00:00.000Z",
+					recurringPattern: {
+						type: "daily",
+						interval: 1,
+					},
+				},
+			];
+			localStorageMock.setItem(STORAGE_KEY, JSON.stringify(todos));
+		});
+
+		it("should store completion record when completing recurring todo", () => {
+			localTodoStorage.completeRecurring("recurring-1");
+
+			const history = localTodoStorage.getCompletionHistory();
+			expect(history).toHaveLength(1);
+			expect(history[0].todoId).toBe("recurring-1");
+			expect(history[0].scheduledDate).toBe("2024-01-15T09:00:00.000Z");
+			expect(history[0].completedAt).not.toBeNull();
+		});
+
+		it("should use todo dueDate as scheduledDate in completion history", () => {
+			const dueDate = "2024-01-15T09:00:00.000Z";
+			localTodoStorage.completeRecurring("recurring-1");
+
+			const history = localTodoStorage.getCompletionHistory();
+			expect(history[0].scheduledDate).toBe(dueDate);
+		});
+
+		it("should use current timestamp as completedAt when no dueDate exists", () => {
+			const todos = [
+				{
+					id: "no-due-date",
+					text: "Task without due date",
+					completed: false,
+					folderId: null,
+					recurringPattern: {
+						type: "daily",
+						interval: 1,
+					},
+				},
+			];
+			localStorageMock.setItem(STORAGE_KEY, JSON.stringify(todos));
+
+			const beforeTime = Date.now();
+			localTodoStorage.completeRecurring("no-due-date");
+			const afterTime = Date.now();
+
+			const history = localTodoStorage.getCompletionHistory();
+			const completedAtTime = new Date(
+				history[0].completedAt as string,
+			).getTime();
+			expect(completedAtTime).toBeGreaterThanOrEqual(beforeTime);
+			expect(completedAtTime).toBeLessThanOrEqual(afterTime);
+		});
+
+		it("should use current timestamp as completedAt in completion history", () => {
+			const beforeTime = Date.now();
+			localTodoStorage.completeRecurring("recurring-1");
+			const afterTime = Date.now();
+
+			const history = localTodoStorage.getCompletionHistory();
+			const completedAtTime = new Date(
+				history[0].completedAt as string,
+			).getTime();
+			expect(completedAtTime).toBeGreaterThanOrEqual(beforeTime);
+			expect(completedAtTime).toBeLessThanOrEqual(afterTime);
+		});
+
+		it("should not store completion record when todo is not found", () => {
+			const result = localTodoStorage.completeRecurring("non-existent");
+
+			expect(result.completed).toBe(false);
+			const history = localTodoStorage.getCompletionHistory();
+			expect(history).toHaveLength(0);
+		});
+
+		it("should not store completion record when todo has no recurring pattern", () => {
+			const todos = [
+				{
+					id: "non-recurring",
+					text: "One-time task",
+					completed: false,
+					folderId: null,
+				},
+			];
+			localStorageMock.setItem(STORAGE_KEY, JSON.stringify(todos));
+
+			const result = localTodoStorage.completeRecurring("non-recurring");
+
+			expect(result.completed).toBe(false);
+			const history = localTodoStorage.getCompletionHistory();
+			expect(history).toHaveLength(0);
+		});
+
+		it("should store completion record even when pattern expires", () => {
+			const todos = [
+				{
+					id: "expiring",
+					text: "Expiring task",
+					completed: false,
+					folderId: null,
+					dueDate: "2024-01-30T09:00:00.000Z",
+					recurringPattern: {
+						type: "daily",
+						interval: 1,
+						endDate: "2024-01-30",
+					},
+				},
+			];
+			localStorageMock.setItem(STORAGE_KEY, JSON.stringify(todos));
+
+			const result = localTodoStorage.completeRecurring("expiring");
+
+			expect(result.completed).toBe(true);
+			expect(result.nextTodo).toBeNull();
+			const history = localTodoStorage.getCompletionHistory();
+			expect(history).toHaveLength(1);
+			expect(history[0].todoId).toBe("expiring");
+		});
+
+		it("should append to existing completion history", () => {
+			localTodoStorage.addCompletionHistoryEntry({
+				todoId: "other-todo",
+				scheduledDate: "2024-01-01T00:00:00.000Z",
+				completedAt: "2024-01-01T10:00:00.000Z",
+			});
+
+			localTodoStorage.completeRecurring("recurring-1");
+
+			const history = localTodoStorage.getCompletionHistory();
+			expect(history).toHaveLength(2);
+			expect(history[0].todoId).toBe("other-todo");
+			expect(history[1].todoId).toBe("recurring-1");
+		});
+
+		it("should work with weekly recurring pattern", () => {
+			const todos = [
+				{
+					id: "weekly-1",
+					text: "Weekly task",
+					completed: false,
+					folderId: null,
+					dueDate: "2024-01-15T09:00:00.000Z",
+					recurringPattern: {
+						type: "weekly",
+						interval: 1,
+						daysOfWeek: [1, 3, 5],
+					},
+				},
+			];
+			localStorageMock.setItem(STORAGE_KEY, JSON.stringify(todos));
+
+			localTodoStorage.completeRecurring("weekly-1");
+
+			const history = localTodoStorage.getCompletionHistory();
+			expect(history).toHaveLength(1);
+			expect(history[0].todoId).toBe("weekly-1");
+		});
+
+		it("should work with monthly recurring pattern", () => {
+			const todos = [
+				{
+					id: "monthly-1",
+					text: "Monthly task",
+					completed: false,
+					folderId: null,
+					dueDate: "2024-01-31T09:00:00.000Z",
+					recurringPattern: {
+						type: "monthly",
+						interval: 1,
+						dayOfMonth: 31,
+					},
+				},
+			];
+			localStorageMock.setItem(STORAGE_KEY, JSON.stringify(todos));
+
+			localTodoStorage.completeRecurring("monthly-1");
+
+			const history = localTodoStorage.getCompletionHistory();
+			expect(history).toHaveLength(1);
+			expect(history[0].todoId).toBe("monthly-1");
+		});
+
+		it("should work with yearly recurring pattern", () => {
+			const todos = [
+				{
+					id: "yearly-1",
+					text: "Yearly task",
+					completed: false,
+					folderId: null,
+					dueDate: "2024-06-15T09:00:00.000Z",
+					recurringPattern: {
+						type: "yearly",
+						interval: 1,
+						monthOfYear: 6,
+						dayOfMonth: 15,
+					},
+				},
+			];
+			localStorageMock.setItem(STORAGE_KEY, JSON.stringify(todos));
+
+			localTodoStorage.completeRecurring("yearly-1");
+
+			const history = localTodoStorage.getCompletionHistory();
+			expect(history).toHaveLength(1);
+			expect(history[0].todoId).toBe("yearly-1");
+		});
+
+		it("should work with custom recurring pattern", () => {
+			const todos = [
+				{
+					id: "custom-1",
+					text: "Custom task",
+					completed: false,
+					folderId: null,
+					dueDate: "2024-01-13T10:00:00.000Z",
+					recurringPattern: {
+						type: "custom",
+						interval: 1,
+						daysOfWeek: [0, 6],
+					},
+				},
+			];
+			localStorageMock.setItem(STORAGE_KEY, JSON.stringify(todos));
+
+			localTodoStorage.completeRecurring("custom-1");
+
+			const history = localTodoStorage.getCompletionHistory();
+			expect(history).toHaveLength(1);
+			expect(history[0].todoId).toBe("custom-1");
+		});
+	});
+
 	describe("Completion History", () => {
 		const COMPLETION_HISTORY_KEY = "completion_history";
 

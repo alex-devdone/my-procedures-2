@@ -415,6 +415,14 @@ export function completeRecurring(
 	todo.completed = true;
 	localStorage.setItem(STORAGE_KEY, JSON.stringify(todos));
 
+	// Store completion record
+	const scheduledDate = todo.dueDate ?? new Date().toISOString();
+	addCompletionHistoryEntry({
+		todoId: todo.id,
+		scheduledDate,
+		completedAt: new Date().toISOString(),
+	});
+
 	// Calculate next occurrence
 	const baseDate = todo.dueDate ? new Date(todo.dueDate) : new Date();
 	const nextDueDate = getNextOccurrence(
