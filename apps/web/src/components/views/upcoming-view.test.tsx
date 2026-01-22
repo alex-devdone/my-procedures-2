@@ -1504,9 +1504,9 @@ describe("UpcomingView", () => {
 			fireEvent.click(toggleButton);
 
 			// onToggle receives current state (false), parent will invert to true
-			// For regular todos, options is undefined
+			// For regular todos (non-virtual), onToggle is called with only 2 args
 			expect(mockOnToggle).toHaveBeenCalledTimes(1);
-			expect(mockOnToggle.mock.calls[0]).toEqual(["1", false, undefined]);
+			expect(mockOnToggle.mock.calls[0]).toEqual(["1", false]);
 		});
 
 		it("calls onToggle with virtualDate when virtual recurring instance is toggled", () => {

@@ -82,8 +82,8 @@ describe("CalendarHeatmap", () => {
 		render(
 			<CalendarHeatmap
 				dailyBreakdown={mockDailyBreakdown}
-				startDate="2024-01-01T00:00:00.000Z"
-				endDate="2024-01-07T00:00:00.000Z"
+				startDate="2024-01-01"
+				endDate="2024-01-07"
 			/>,
 		);
 
@@ -94,8 +94,8 @@ describe("CalendarHeatmap", () => {
 		render(
 			<CalendarHeatmap
 				dailyBreakdown={mockDailyBreakdown}
-				startDate="2024-01-01T00:00:00.000Z"
-				endDate="2024-01-07T00:00:00.000Z"
+				startDate="2024-01-01"
+				endDate="2024-01-07"
 			/>,
 		);
 
@@ -107,8 +107,8 @@ describe("CalendarHeatmap", () => {
 		render(
 			<CalendarHeatmap
 				dailyBreakdown={mockDailyBreakdown}
-				startDate="2024-01-01T00:00:00.000Z"
-				endDate="2024-01-07T00:00:00.000Z"
+				startDate="2024-01-01"
+				endDate="2024-01-07"
 			/>,
 		);
 
@@ -137,8 +137,8 @@ describe("CalendarHeatmap", () => {
 		render(
 			<CalendarHeatmap
 				dailyBreakdown={mockDailyBreakdown}
-				startDate="2024-01-01T00:00:00.000Z"
-				endDate="2024-01-07T00:00:00.000Z"
+				startDate="2024-01-01"
+				endDate="2024-01-07"
 			/>,
 		);
 
@@ -179,8 +179,8 @@ describe("CalendarHeatmap", () => {
 		render(
 			<CalendarHeatmap
 				dailyBreakdown={mockDailyBreakdown}
-				startDate="2024-01-01T00:00:00.000Z"
-				endDate="2024-01-07T00:00:00.000Z"
+				startDate="2024-01-01"
+				endDate="2024-01-07"
 			/>,
 		);
 
@@ -203,8 +203,8 @@ describe("CalendarHeatmap", () => {
 		render(
 			<CalendarHeatmap
 				dailyBreakdown={singleCompletion}
-				startDate="2024-01-01T00:00:00.000Z"
-				endDate="2024-01-01T00:00:00.000Z"
+				startDate="2024-01-01"
+				endDate="2024-01-01"
 			/>,
 		);
 
@@ -215,8 +215,8 @@ describe("CalendarHeatmap", () => {
 		render(
 			<CalendarHeatmap
 				dailyBreakdown={mockDailyBreakdown}
-				startDate="2024-01-01T00:00:00.000Z"
-				endDate="2024-01-07T00:00:00.000Z"
+				startDate="2024-01-01"
+				endDate="2024-01-07"
 			/>,
 		);
 
@@ -233,8 +233,8 @@ describe("CalendarHeatmap", () => {
 		const { container } = render(
 			<CalendarHeatmap
 				dailyBreakdown={undefined}
-				startDate="2024-01-01T00:00:00.000Z"
-				endDate="2024-01-07T00:00:00.000Z"
+				startDate="2024-01-01"
+				endDate="2024-01-07"
 				isLoading={true}
 			/>,
 		);
@@ -247,8 +247,8 @@ describe("CalendarHeatmap", () => {
 		render(
 			<CalendarHeatmap
 				dailyBreakdown={undefined}
-				startDate="2024-01-01T00:00:00.000Z"
-				endDate="2024-01-07T00:00:00.000Z"
+				startDate="2024-01-01"
+				endDate="2024-01-07"
 			/>,
 		);
 
@@ -259,8 +259,8 @@ describe("CalendarHeatmap", () => {
 		render(
 			<CalendarHeatmap
 				dailyBreakdown={[]}
-				startDate="2024-01-01T00:00:00.000Z"
-				endDate="2024-01-07T00:00:00.000Z"
+				startDate="2024-01-01"
+				endDate="2024-01-07"
 			/>,
 		);
 
@@ -280,8 +280,8 @@ describe("CalendarHeatmap", () => {
 		render(
 			<CalendarHeatmap
 				dailyBreakdown={sparseData}
-				startDate="2024-01-01T00:00:00.000Z"
-				endDate="2024-01-05T00:00:00.000Z"
+				startDate="2024-01-01"
+				endDate="2024-01-05"
 			/>,
 		);
 
@@ -307,8 +307,8 @@ describe("CalendarHeatmap", () => {
 		render(
 			<CalendarHeatmap
 				dailyBreakdown={mockDailyBreakdown}
-				startDate="2024-01-01T00:00:00.000Z"
-				endDate="2024-01-07T00:00:00.000Z"
+				startDate="2024-01-01"
+				endDate="2024-01-07"
 			/>,
 		);
 
@@ -319,8 +319,8 @@ describe("CalendarHeatmap", () => {
 		render(
 			<CalendarHeatmap
 				dailyBreakdown={mockDailyBreakdown}
-				startDate="2024-01-01T00:00:00.000Z"
-				endDate="2024-01-01T00:00:00.000Z"
+				startDate="2024-01-01"
+				endDate="2024-01-01"
 			/>,
 		);
 
@@ -344,8 +344,8 @@ describe("CalendarHeatmap", () => {
 		render(
 			<CalendarHeatmap
 				dailyBreakdown={longRangeData}
-				startDate="2024-01-01T00:00:00.000Z"
-				endDate="2024-01-30T00:00:00.000Z"
+				startDate="2024-01-01"
+				endDate="2024-01-30"
 			/>,
 		);
 
