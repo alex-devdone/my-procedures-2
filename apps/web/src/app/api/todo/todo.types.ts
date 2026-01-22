@@ -159,6 +159,12 @@ export const completeRecurringInputSchema = z.object({
 	completedOccurrences: z.number().int().nonnegative().optional(),
 });
 
+export const updatePastCompletionInputSchema = z.object({
+	todoId: z.number(),
+	scheduledDate: z.string().datetime(),
+	completed: z.boolean(),
+});
+
 // ============================================================================
 // Input Schemas (Zod) - Local (localStorage) Operations
 // ============================================================================
@@ -207,6 +213,9 @@ export type UpdateTodoScheduleInput = z.infer<
 export type GetDueInRangeInput = z.infer<typeof getDueInRangeInputSchema>;
 export type CompleteRecurringInput = z.infer<
 	typeof completeRecurringInputSchema
+>;
+export type UpdatePastCompletionInput = z.infer<
+	typeof updatePastCompletionInputSchema
 >;
 
 // ============================================================================
