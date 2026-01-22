@@ -3239,6 +3239,546 @@ describe("GetAnalytics Procedure", () => {
 			expect(isMissed(scheduledDate, null, today)).toBe(false);
 		});
 	});
+
+	describe("Completion Rate Edge Cases", () => {
+		const calculateCompletionRate = (
+			totalCompleted: number,
+			totalExpected: number,
+		): number => {
+			if (totalExpected === 0) {
+				return 100;
+			}
+			return Math.round((totalCompleted / totalExpected) * 100);
+		};
+
+		const calculateAnalyticsCompletionRate = (
+			regularCompleted: number,
+			recurringCompleted: number,
+			recurringMissed: number,
+		): number => {
+			const totalRecurringExpected = recurringCompleted + recurringMissed;
+			const totalCompleted = regularCompleted + recurringCompleted;
+			const totalExpected = regularCompleted + totalRecurringExpected;
+			return calculateCompletionRate(totalCompleted, totalExpected);
+		};
+
+		it("should calculate combined rate with regular and recurring todos", () => {
+			// 5 regular completed, 10 recurring completed, 2 recurring missed
+			// totalCompleted = 5 + 10 = 15
+			// totalExpected = 5 + (10 + 2) = 17
+			// rate = 15/17 * 100 = 88.2 -> 88
+			expect(calculateAnalyticsCompletionRate(5, 10, 2)).toBe(88);
+		});
+
+		it("should handle all regular tasks and no recurring", () => {
+			// 10 regular completed, 0 recurring completed, 0 recurring missed
+			// totalCompleted = 10, totalExpected = 10
+			expect(calculateAnalyticsCompletionRate(10, 0, 0)).toBe(100);
+		});
+
+		it("should handle all recurring tasks and no regular", () => {
+			// 0 regular, 8 recurring completed, 2 recurring missed
+			// totalCompleted = 8, totalExpected = 10
+			expect(calculateAnalyticsCompletionRate(0, 8, 2)).toBe(80);
+		});
+
+		it("should handle perfect completion rate", () => {
+			// 5 regular, 10 recurring completed, 0 missed
+			expect(calculateAnalyticsCompletionRate(5, 10, 0)).toBe(100);
+		});
+
+		it("should handle zero completion rate", () => {
+			// 0 regular, 0 recurring completed, 10 missed
+			expect(calculateAnalyticsCompletionRate(0, 0, 10)).toBe(0);
+		});
+
+		it("should handle large numbers of tasks", () => {
+			// 1000 regular, 5000 recurring completed, 500 missed
+			// totalCompleted = 6000, totalExpected = 6500
+			// rate = 6000/6500 * 100 = 92.3 -> 92
+			expect(calculateAnalyticsCompletionRate(1000, 5000, 500)).toBe(92);
+		});
+
+		it("should return 100 when no tasks expected (empty date range)", () => {
+			// No regular, no recurring - 100% by default
+			expect(calculateAnalyticsCompletionRate(0, 0, 0)).toBe(100);
+		});
+
+		it("should handle single task scenarios", () => {
+			// 1 regular completed only
+			expect(calculateAnalyticsCompletionRate(1, 0, 0)).toBe(100);
+			// 1 recurring completed only
+			expect(calculateAnalyticsCompletionRate(0, 1, 0)).toBe(100);
+			// 1 recurring missed only
+			expect(calculateAnalyticsCompletionRate(0, 0, 1)).toBe(0);
+		});
+	});
+
+	describe("Streak Edge Cases", () => {
+		const calculateStreak = (
+			completionDates: string[],
+			today: Date,
+		): number => {
+			if (completionDates.length === 0) {
+				return 0;
+			}
+
+			const uniqueDates = [...new Set(completionDates)];
+			const sortedDates = uniqueDates.sort(
+				(a, b) => new Date(b).getTime() - new Date(a).getTime(),
+			);
+
+			const todayStr = today.toISOString().split("T")[0] ?? "";
+			const yesterday = new Date(today);
+			yesterday.setDate(yesterday.getDate() - 1);
+			const yesterdayStr = yesterday.toISOString().split("T")[0] ?? "";
+
+			let streak = 0;
+			let checkDate = todayStr;
+
+			if (
+				sortedDates.length > 0 &&
+				sortedDates[0] !== todayStr &&
+				sortedDates[0] === yesterdayStr
+			) {
+				checkDate = yesterdayStr;
+			}
+
+			for (const dateStr of sortedDates) {
+				if (dateStr === checkDate) {
+					streak++;
+					const checkDateObj = new Date(checkDate);
+					checkDateObj.setDate(checkDateObj.getDate() - 1);
+					const newCheckDate = checkDateObj.toISOString().split("T")[0];
+					checkDate = newCheckDate ?? "";
+				} else if (new Date(dateStr) < new Date(checkDate)) {
+					break;
+				}
+			}
+
+			return streak;
+		};
+
+		it("should handle very long streak (30+ days)", () => {
+			const today = new Date("2026-01-31T12:00:00Z");
+			const dates: string[] = [];
+			for (let i = 0; i < 30; i++) {
+				const date = new Date(today);
+				date.setDate(date.getDate() - i);
+				dates.push(date.toISOString().split("T")[0] ?? "");
+			}
+			expect(calculateStreak(dates, today)).toBe(30);
+		});
+
+		it("should handle single completion on boundary (end of day)", () => {
+			const today = new Date("2026-01-22T23:59:59Z");
+			expect(calculateStreak(["2026-01-22"], today)).toBe(1);
+		});
+
+		it("should handle single completion on boundary (start of day)", () => {
+			const today = new Date("2026-01-22T00:00:01Z");
+			expect(calculateStreak(["2026-01-22"], today)).toBe(1);
+		});
+
+		it("should handle multiple completions on same day (deduplication)", () => {
+			const today = new Date("2026-01-22T12:00:00Z");
+			expect(
+				calculateStreak(
+					["2026-01-22", "2026-01-22", "2026-01-22", "2026-01-21"],
+					today,
+				),
+			).toBe(2);
+		});
+
+		it("should not count future dates", () => {
+			const today = new Date("2026-01-22T12:00:00Z");
+			// Future dates should not affect streak starting from today
+			expect(
+				calculateStreak(["2026-01-25", "2026-01-22", "2026-01-21"], today),
+			).toBe(2);
+		});
+
+		it("should return 0 if last completion was more than a day ago", () => {
+			const today = new Date("2026-01-22T12:00:00Z");
+			// Last completion on Jan 15, gap too large
+			expect(calculateStreak(["2026-01-15"], today)).toBe(0);
+		});
+
+		it("should handle month boundary correctly", () => {
+			const today = new Date("2026-02-01T12:00:00Z");
+			expect(
+				calculateStreak(["2026-02-01", "2026-01-31", "2026-01-30"], today),
+			).toBe(3);
+		});
+
+		it("should handle year boundary correctly", () => {
+			const today = new Date("2026-01-01T12:00:00Z");
+			expect(
+				calculateStreak(["2026-01-01", "2025-12-31", "2025-12-30"], today),
+			).toBe(3);
+		});
+	});
+
+	describe("Daily Breakdown Edge Cases", () => {
+		interface DailyStats {
+			date: string;
+			regularCompleted: number;
+			recurringCompleted: number;
+			recurringMissed: number;
+		}
+
+		const buildDailyBreakdown = (
+			startDate: Date,
+			endDate: Date,
+			regularCompletions: Array<{ date: string; count: number }>,
+			recurringCompletions: Array<{ date: string; count: number }>,
+			recurringMissed: Array<{ date: string; count: number }>,
+		): DailyStats[] => {
+			const dailyBreakdownMap = new Map<string, DailyStats>();
+
+			const currentDate = new Date(startDate);
+			while (currentDate <= endDate) {
+				const dateStr = currentDate.toISOString().split("T")[0] ?? "";
+				dailyBreakdownMap.set(dateStr, {
+					date: dateStr,
+					regularCompleted: 0,
+					recurringCompleted: 0,
+					recurringMissed: 0,
+				});
+				currentDate.setDate(currentDate.getDate() + 1);
+			}
+
+			for (const { date, count } of regularCompletions) {
+				const entry = dailyBreakdownMap.get(date);
+				if (entry) {
+					entry.regularCompleted = count;
+				}
+			}
+
+			for (const { date, count } of recurringCompletions) {
+				const entry = dailyBreakdownMap.get(date);
+				if (entry) {
+					entry.recurringCompleted = count;
+				}
+			}
+
+			for (const { date, count } of recurringMissed) {
+				const entry = dailyBreakdownMap.get(date);
+				if (entry) {
+					entry.recurringMissed = count;
+				}
+			}
+
+			return Array.from(dailyBreakdownMap.values()).sort((a, b) =>
+				a.date.localeCompare(b.date),
+			);
+		};
+
+		it("should handle single day range", () => {
+			const startDate = new Date("2026-01-22T00:00:00Z");
+			const endDate = new Date("2026-01-22T23:59:59Z");
+
+			const result = buildDailyBreakdown(
+				startDate,
+				endDate,
+				[{ date: "2026-01-22", count: 5 }],
+				[{ date: "2026-01-22", count: 3 }],
+				[{ date: "2026-01-22", count: 1 }],
+			);
+
+			expect(result).toHaveLength(1);
+			expect(result[0]).toEqual({
+				date: "2026-01-22",
+				regularCompleted: 5,
+				recurringCompleted: 3,
+				recurringMissed: 1,
+			});
+		});
+
+		it("should handle week-long range", () => {
+			const startDate = new Date("2026-01-19T00:00:00Z");
+			const endDate = new Date("2026-01-25T23:59:59Z");
+
+			const result = buildDailyBreakdown(startDate, endDate, [], [], []);
+
+			expect(result).toHaveLength(7);
+			expect(result[0]?.date).toBe("2026-01-19");
+			expect(result[6]?.date).toBe("2026-01-25");
+		});
+
+		it("should ignore data for dates outside range", () => {
+			const startDate = new Date("2026-01-20T00:00:00Z");
+			const endDate = new Date("2026-01-22T23:59:59Z");
+
+			const result = buildDailyBreakdown(
+				startDate,
+				endDate,
+				[
+					{ date: "2026-01-19", count: 10 }, // Before range
+					{ date: "2026-01-21", count: 5 },
+					{ date: "2026-01-23", count: 10 }, // After range
+				],
+				[],
+				[],
+			);
+
+			// Should only have 3 days in range
+			expect(result).toHaveLength(3);
+			// Jan 19 data should be ignored (not in range)
+			expect(result[0]?.regularCompleted).toBe(0); // Jan 20
+			expect(result[1]?.regularCompleted).toBe(5); // Jan 21
+			expect(result[2]?.regularCompleted).toBe(0); // Jan 22
+		});
+
+		it("should handle month boundary crossing", () => {
+			const startDate = new Date("2026-01-30T00:00:00Z");
+			const endDate = new Date("2026-02-02T23:59:59Z");
+
+			const result = buildDailyBreakdown(
+				startDate,
+				endDate,
+				[
+					{ date: "2026-01-30", count: 1 },
+					{ date: "2026-02-01", count: 2 },
+				],
+				[],
+				[],
+			);
+
+			expect(result).toHaveLength(4);
+			expect(result.map((r) => r.date)).toEqual([
+				"2026-01-30",
+				"2026-01-31",
+				"2026-02-01",
+				"2026-02-02",
+			]);
+			expect(result[0]?.regularCompleted).toBe(1);
+			expect(result[2]?.regularCompleted).toBe(2);
+		});
+
+		it("should handle large date range (30 days)", () => {
+			const startDate = new Date("2026-01-01T00:00:00Z");
+			const endDate = new Date("2026-01-30T23:59:59Z");
+
+			const result = buildDailyBreakdown(startDate, endDate, [], [], []);
+
+			expect(result).toHaveLength(30);
+			expect(result[0]?.date).toBe("2026-01-01");
+			expect(result[29]?.date).toBe("2026-01-30");
+		});
+
+		it("should handle sparse data across date range", () => {
+			const startDate = new Date("2026-01-01T00:00:00Z");
+			const endDate = new Date("2026-01-10T23:59:59Z");
+
+			const result = buildDailyBreakdown(
+				startDate,
+				endDate,
+				[{ date: "2026-01-05", count: 3 }],
+				[{ date: "2026-01-01", count: 2 }],
+				[{ date: "2026-01-10", count: 1 }],
+			);
+
+			expect(result).toHaveLength(10);
+			// Most days should be zeros
+			expect(result[0]?.recurringCompleted).toBe(2); // Jan 1
+			expect(result[4]?.regularCompleted).toBe(3); // Jan 5
+			expect(result[9]?.recurringMissed).toBe(1); // Jan 10
+			// Check some zeros in between
+			expect(result[2]?.regularCompleted).toBe(0);
+			expect(result[2]?.recurringCompleted).toBe(0);
+			expect(result[2]?.recurringMissed).toBe(0);
+		});
+
+		it("should handle high activity days with multiple completions", () => {
+			const startDate = new Date("2026-01-20T00:00:00Z");
+			const endDate = new Date("2026-01-20T23:59:59Z");
+
+			const result = buildDailyBreakdown(
+				startDate,
+				endDate,
+				[{ date: "2026-01-20", count: 100 }],
+				[{ date: "2026-01-20", count: 50 }],
+				[{ date: "2026-01-20", count: 25 }],
+			);
+
+			expect(result[0]).toEqual({
+				date: "2026-01-20",
+				regularCompleted: 100,
+				recurringCompleted: 50,
+				recurringMissed: 25,
+			});
+		});
+	});
+
+	describe("Combined Analytics Calculation", () => {
+		interface AnalyticsResult {
+			totalRegularCompleted: number;
+			totalRecurringCompleted: number;
+			totalRecurringMissed: number;
+			completionRate: number;
+			currentStreak: number;
+			dailyBreakdown: Array<{
+				date: string;
+				regularCompleted: number;
+				recurringCompleted: number;
+				recurringMissed: number;
+			}>;
+		}
+
+		const calculateFullAnalytics = (
+			regularCompleted: number,
+			recurringCompleted: number,
+			recurringMissed: number,
+			completionDates: string[],
+			today: Date,
+			startDate: Date,
+			endDate: Date,
+		): AnalyticsResult => {
+			// Completion rate
+			const totalRecurringExpected = recurringCompleted + recurringMissed;
+			const totalCompleted = regularCompleted + recurringCompleted;
+			const totalExpected = regularCompleted + totalRecurringExpected;
+			const completionRate =
+				totalExpected > 0
+					? Math.round((totalCompleted / totalExpected) * 100)
+					: 100;
+
+			// Streak
+			const uniqueDates = [...new Set(completionDates)];
+			const sortedDates = uniqueDates.sort(
+				(a, b) => new Date(b).getTime() - new Date(a).getTime(),
+			);
+			const todayStr = today.toISOString().split("T")[0] ?? "";
+			const yesterday = new Date(today);
+			yesterday.setDate(yesterday.getDate() - 1);
+			const yesterdayStr = yesterday.toISOString().split("T")[0] ?? "";
+
+			let currentStreak = 0;
+			let checkDate = todayStr;
+			if (
+				sortedDates.length > 0 &&
+				sortedDates[0] !== todayStr &&
+				sortedDates[0] === yesterdayStr
+			) {
+				checkDate = yesterdayStr;
+			}
+			for (const dateStr of sortedDates) {
+				if (dateStr === checkDate) {
+					currentStreak++;
+					const checkDateObj = new Date(checkDate);
+					checkDateObj.setDate(checkDateObj.getDate() - 1);
+					checkDate = checkDateObj.toISOString().split("T")[0] ?? "";
+				} else if (new Date(dateStr) < new Date(checkDate)) {
+					break;
+				}
+			}
+
+			// Daily breakdown
+			const dailyBreakdown: AnalyticsResult["dailyBreakdown"] = [];
+			const currentDate = new Date(startDate);
+			while (currentDate <= endDate) {
+				const dateStr = currentDate.toISOString().split("T")[0] ?? "";
+				dailyBreakdown.push({
+					date: dateStr,
+					regularCompleted: 0,
+					recurringCompleted: 0,
+					recurringMissed: 0,
+				});
+				currentDate.setDate(currentDate.getDate() + 1);
+			}
+
+			return {
+				totalRegularCompleted: regularCompleted,
+				totalRecurringCompleted: recurringCompleted,
+				totalRecurringMissed: recurringMissed,
+				completionRate,
+				currentStreak,
+				dailyBreakdown,
+			};
+		};
+
+		it("should calculate comprehensive analytics for active user", () => {
+			const today = new Date("2026-01-22T12:00:00Z");
+			const startDate = new Date("2026-01-20T00:00:00Z");
+			const endDate = new Date("2026-01-22T23:59:59Z");
+
+			const result = calculateFullAnalytics(
+				5, // regular completed
+				10, // recurring completed
+				2, // recurring missed
+				["2026-01-22", "2026-01-21", "2026-01-20"], // streak of 3
+				today,
+				startDate,
+				endDate,
+			);
+
+			expect(result.totalRegularCompleted).toBe(5);
+			expect(result.totalRecurringCompleted).toBe(10);
+			expect(result.totalRecurringMissed).toBe(2);
+			expect(result.completionRate).toBe(88); // 15/17 * 100
+			expect(result.currentStreak).toBe(3);
+			expect(result.dailyBreakdown).toHaveLength(3);
+		});
+
+		it("should handle new user with no activity", () => {
+			const today = new Date("2026-01-22T12:00:00Z");
+			const startDate = new Date("2026-01-20T00:00:00Z");
+			const endDate = new Date("2026-01-22T23:59:59Z");
+
+			const result = calculateFullAnalytics(
+				0,
+				0,
+				0,
+				[],
+				today,
+				startDate,
+				endDate,
+			);
+
+			expect(result.completionRate).toBe(100);
+			expect(result.currentStreak).toBe(0);
+			expect(result.dailyBreakdown).toHaveLength(3);
+		});
+
+		it("should handle user with all missed tasks", () => {
+			const today = new Date("2026-01-22T12:00:00Z");
+			const startDate = new Date("2026-01-20T00:00:00Z");
+			const endDate = new Date("2026-01-22T23:59:59Z");
+
+			const result = calculateFullAnalytics(
+				0,
+				0,
+				5,
+				[],
+				today,
+				startDate,
+				endDate,
+			);
+
+			expect(result.completionRate).toBe(0);
+			expect(result.currentStreak).toBe(0);
+		});
+
+		it("should handle user with perfect completion", () => {
+			const today = new Date("2026-01-22T12:00:00Z");
+			const startDate = new Date("2026-01-20T00:00:00Z");
+			const endDate = new Date("2026-01-22T23:59:59Z");
+
+			const result = calculateFullAnalytics(
+				10,
+				20,
+				0,
+				["2026-01-22", "2026-01-21", "2026-01-20"],
+				today,
+				startDate,
+				endDate,
+			);
+
+			expect(result.completionRate).toBe(100);
+			expect(result.currentStreak).toBe(3);
+		});
+	});
 });
 
 describe("UpdatePastCompletion Procedure", () => {
