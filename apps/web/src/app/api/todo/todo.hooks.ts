@@ -408,6 +408,13 @@ export function useTodoStorage(): UseTodoStorageReturn {
 						const isCurrentOccurrence =
 							options?.virtualDate && todoDateKey === options.virtualDate;
 
+						// Check if the virtualDate is in the past (overdue)
+						const today = new Date();
+						today.setHours(0, 0, 0, 0);
+						const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+						const isOverdueOccurrence =
+							options?.virtualDate && options.virtualDate < todayKey;
+
 						// If virtualDate is provided but does NOT match the todo's dueDate,
 						// use updatePastCompletion for pattern-generated virtual occurrences
 						if (options?.virtualDate && !isCurrentOccurrence) {
@@ -416,6 +423,13 @@ export function useTodoStorage(): UseTodoStorageReturn {
 								scheduledDate: options.virtualDate,
 								completed: true,
 							});
+							// For overdue occurrences, also advance the recurring pattern
+							// by calling completeRecurring to create the next occurrence
+							if (isOverdueOccurrence) {
+								await completeRecurringMutation.mutateAsync({
+									id: id as number,
+								});
+							}
 							return;
 						}
 						// Otherwise use completeRecurring mutation for current occurrence
@@ -439,6 +453,13 @@ export function useTodoStorage(): UseTodoStorageReturn {
 					const isCurrentOccurrence =
 						options?.virtualDate && todoDateKey === options.virtualDate;
 
+					// Check if the virtualDate is in the past (overdue)
+					const today = new Date();
+					today.setHours(0, 0, 0, 0);
+					const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+					const isOverdueOccurrence =
+						options?.virtualDate && options.virtualDate < todayKey;
+
 					// If virtualDate is provided but does NOT match the todo's dueDate,
 					// toggle specific occurrence in completion history
 					if (options?.virtualDate && !isCurrentOccurrence) {
@@ -449,6 +470,11 @@ export function useTodoStorage(): UseTodoStorageReturn {
 						);
 						// Also notify analytics listeners since completion history changed
 						notifyLocalAnalyticsListeners();
+						// For overdue occurrences, also advance the recurring pattern
+						// by calling completeRecurring to create the next occurrence
+						if (isOverdueOccurrence && completed) {
+							localTodoStorage.completeRecurring(id as string);
+						}
 					} else if (completed) {
 						// Complete the recurring todo and create next occurrence
 						localTodoStorage.completeRecurring(id as string);
