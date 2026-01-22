@@ -9,6 +9,7 @@ import {
 	useState,
 	useSyncExternalStore,
 } from "react";
+import { notifyLocalAnalyticsListeners } from "@/app/api/analytics";
 import { useTodoRealtimeWithAuth } from "@/hooks/use-todo-realtime";
 import { useSession } from "@/lib/auth-client";
 import * as localTodoStorage from "@/lib/local-todo-storage";
@@ -421,11 +422,25 @@ export function useTodoStorage(): UseTodoStorageReturn {
 				const localTodos = localTodoStorage.getAll();
 				const todo = localTodos.find((t) => t.id === id);
 
-				if (todo?.recurringPattern && completed) {
-					// Complete the recurring todo and create next occurrence
-					localTodoStorage.completeRecurring(id as string);
+				if (todo?.recurringPattern) {
+					// If virtualDate is provided, toggle specific occurrence in completion history
+					if (options?.virtualDate) {
+						localTodoStorage.toggleLocalOccurrence(
+							id as string,
+							options.virtualDate,
+							completed,
+						);
+						// Also notify analytics listeners since completion history changed
+						notifyLocalAnalyticsListeners();
+					} else if (completed) {
+						// Complete the recurring todo and create next occurrence
+						localTodoStorage.completeRecurring(id as string);
+					} else {
+						// For uncompleting without virtualDate, just toggle normally
+						localTodoStorage.toggle(id as string);
+					}
 				} else {
-					// Regular toggle for non-recurring todos or unchecking
+					// Regular toggle for non-recurring todos
 					localTodoStorage.toggle(id as string);
 				}
 				notifyLocalTodosListeners();

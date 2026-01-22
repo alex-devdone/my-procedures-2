@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 
 import type {
 	Folder,
@@ -98,6 +98,31 @@ const folderColorIconClasses: Record<FolderColor, string> = {
 };
 
 export default function TodosPage() {
+	return (
+		<Suspense fallback={<TodosPageSkeleton />}>
+			<TodosPageContent />
+		</Suspense>
+	);
+}
+
+function TodosPageSkeleton() {
+	return (
+		<div className="flex min-h-full">
+			<div className="fixed inset-y-0 left-0 z-50 w-64 -translate-x-full transform transition-transform duration-200 lg:static lg:translate-x-0 lg:translate-x-0">
+				<Skeleton className="h-full w-full" />
+			</div>
+			<div className="relative min-h-full flex-1 px-4 py-8 sm:px-6 lg:px-8">
+				<div className="mx-auto max-w-3xl">
+					<Skeleton className="mb-8 h-12 w-48" />
+					<Skeleton className="mb-6 h-20 w-full" />
+					<Skeleton className="h-64 w-full" />
+				</div>
+			</div>
+		</div>
+	);
+}
+
+function TodosPageContent() {
 	const searchParams = useSearchParams();
 	const [newTodoText, setNewTodoText] = useState("");
 	const [searchQuery, setSearchQuery] = useState("");

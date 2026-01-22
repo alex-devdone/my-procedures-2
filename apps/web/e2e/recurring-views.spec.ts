@@ -576,20 +576,76 @@ test.describe("Recurring Todos in Smart Views (localStorage mode)", () => {
 			).toHaveAttribute("aria-current", "page");
 
 			// Count the todos after toggling - should still be 1 (no new todo created)
+			// Completing an occurrence in Today view doesn't create new todos
 			const todosAfterToggle = await page
 				.locator('[data-testid^="todo-item-"]')
 				.filter({ hasText: todoText })
 				.count();
 			expect(todosAfterToggle).toBe(1);
 
-			// The single todo should be the completed original
-			const completedTodo = page
+			// In Inbox view, recurring todos show their base state (not per-occurrence completion)
+			// The todo should remain active (not strikethrough) because only the occurrence was completed
+			const inboxTodo = page
 				.locator('[data-testid^="todo-item-"]')
 				.filter({ hasText: todoText });
-			await expect(completedTodo).toBeVisible();
+			await expect(inboxTodo).toBeVisible();
+			// The todo should NOT have line-through - completion is per-occurrence in smart views
 			await expect(
-				completedTodo.locator('[data-testid="todo-text"]'),
-			).toHaveClass(/line-through/);
+				inboxTodo.locator('[data-testid="todo-text"]'),
+			).not.toHaveClass(/line-through/);
+		});
+
+		test("should toggle completed occurrence back to incomplete", async ({
+			page,
+		}) => {
+			// Create a daily recurring todo
+			const todoText = "Daily status check";
+			const todoItem = await createTodo(page, todoText);
+			await setDailyRecurring(todoItem);
+
+			// Navigate to Today view
+			await page.click('[data-testid="smart-view-today"]');
+			await expect(page.locator('[data-testid="today-view"]')).toBeVisible();
+
+			// Find the recurring todo in Today view (should be only one initially)
+			const todayTodoList = page.locator('[data-testid="today-todo-list"]');
+			let todayTodo = todayTodoList
+				.locator('[data-testid^="todo-item-"]')
+				.filter({ hasText: todoText });
+			await expect(todayTodo).toBeVisible();
+
+			// Store the todo's testid for later reference
+			const todoTestId = await todayTodo.getAttribute("data-testid");
+
+			// Toggle to complete
+			await todayTodo.locator('[data-testid="todo-toggle"]').click();
+
+			// Re-locate the specific todo by its testid (it may have moved in the list)
+			todayTodo = page.locator(`[data-testid="${todoTestId}"]`);
+
+			// Verify it's completed (strikethrough and "Mark as incomplete" label)
+			await expect(
+				todayTodo.locator('[data-testid="todo-toggle"]'),
+			).toHaveAttribute("aria-label", "Mark as incomplete");
+			const todoTextElement = todayTodo.locator('[data-testid="todo-text"]');
+			await expect(todoTextElement).toHaveClass(/line-through/);
+
+			// Toggle back to incomplete
+			await todayTodo.locator('[data-testid="todo-toggle"]').click();
+
+			// Verify it's now active again (no strikethrough and "Mark as complete" label)
+			await expect(
+				todayTodo.locator('[data-testid="todo-toggle"]'),
+			).toHaveAttribute("aria-label", "Mark as complete");
+			await expect(todoTextElement).not.toHaveClass(/line-through/);
+
+			// The todo should still be visible in Today view (not filtered out)
+			await expect(todayTodo).toBeVisible();
+
+			// Verify the recurring indicator is still present
+			await expect(
+				todayTodo.locator('[data-testid="due-date-badge"]'),
+			).toContainText("Daily");
 		});
 	});
 });

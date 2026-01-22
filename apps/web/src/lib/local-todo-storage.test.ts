@@ -3006,14 +3006,25 @@ describe("local-todo-storage", () => {
 			expect(stored[0].completedAt).toBeNull();
 		});
 
-		it("should return null when entry does not exist", () => {
+		it("should create entry when it does not exist", () => {
 			const result = localTodoStorage.toggleLocalOccurrence(
 				"non-existent",
 				"2024-01-15T10:00:00.000Z",
 				true,
 			);
 
-			expect(result).toBeNull();
+			// Should create a new entry when it doesn't exist
+			expect(result).not.toBeNull();
+			expect(result.todoId).toBe("non-existent");
+			expect(result.scheduledDate).toBe("2024-01-15T10:00:00.000Z");
+			expect(result.completedAt).not.toBeNull();
+
+			// Verify entry was actually stored
+			const stored = JSON.parse(
+				localStorageMock._store[COMPLETION_HISTORY_KEY] ?? "[]",
+			);
+			expect(stored).toHaveLength(1);
+			expect(stored[0].todoId).toBe("non-existent");
 		});
 
 		it("should only update the matching entry by todoId and scheduledDate", () => {
