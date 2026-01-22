@@ -400,8 +400,17 @@ export function useTodoStorage(): UseTodoStorageReturn {
 					const todo = currentTodos.find((t) => t.id === id);
 
 					if (todo?.recurringPattern) {
-						// If virtualDate is provided, use updatePastCompletion for past occurrences
-						if (options?.virtualDate) {
+						// Check if the virtualDate matches the todo's actual dueDate
+						// If so, we should use completeRecurring to create the next occurrence
+						const todoDateKey = todo.dueDate
+							? todo.dueDate.split("T")[0]
+							: null;
+						const isCurrentOccurrence =
+							options?.virtualDate && todoDateKey === options.virtualDate;
+
+						// If virtualDate is provided but does NOT match the todo's dueDate,
+						// use updatePastCompletion for pattern-generated virtual occurrences
+						if (options?.virtualDate && !isCurrentOccurrence) {
 							await updatePastCompletionMutation.mutateAsync({
 								todoId: id as number,
 								scheduledDate: options.virtualDate,
@@ -409,7 +418,8 @@ export function useTodoStorage(): UseTodoStorageReturn {
 							});
 							return;
 						}
-						// Otherwise use completeRecurring mutation for recurring todos
+						// Otherwise use completeRecurring mutation for current occurrence
+						// This creates the next occurrence todo
 						await completeRecurringMutation.mutateAsync({ id: id as number });
 						return;
 					}
@@ -423,8 +433,15 @@ export function useTodoStorage(): UseTodoStorageReturn {
 				const todo = localTodos.find((t) => t.id === id);
 
 				if (todo?.recurringPattern) {
-					// If virtualDate is provided, toggle specific occurrence in completion history
-					if (options?.virtualDate) {
+					// Check if the virtualDate matches the todo's actual dueDate
+					// If so, we should use completeRecurring to create the next occurrence
+					const todoDateKey = todo.dueDate ? todo.dueDate.split("T")[0] : null;
+					const isCurrentOccurrence =
+						options?.virtualDate && todoDateKey === options.virtualDate;
+
+					// If virtualDate is provided but does NOT match the todo's dueDate,
+					// toggle specific occurrence in completion history
+					if (options?.virtualDate && !isCurrentOccurrence) {
 						localTodoStorage.toggleLocalOccurrence(
 							id as string,
 							options.virtualDate,
