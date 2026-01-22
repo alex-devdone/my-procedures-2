@@ -1,6 +1,119 @@
 "use client";
 
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import type { UseFolderStorageReturn } from "@/app/api/folder";
+import type { SubtaskProgress } from "@/app/api/subtask";
+
+// Mock the navigation hook
+vi.mock("next/navigation", () => ({
+	useSearchParams: () => ({
+		get: vi.fn().mockReturnValue(null),
+	}),
+	useRouter: () => ({
+		push: vi.fn(),
+		replace: vi.fn(),
+	}),
+}));
+
+// Mock the folder navigation hook
+vi.mock("@/hooks/use-folder-navigation", () => ({
+	useFolderNavigation: () => ({
+		navigateToFolder: vi.fn(),
+	}),
+}));
+
+// Mock the folder storage hook
+const mockUseFolderStorage = vi.fn<() => UseFolderStorageReturn>();
+vi.mock("@/app/api/folder", () => ({
+	useFolderStorage: () => mockUseFolderStorage(),
+	// Include constants used by FolderCreateDialog
+	FOLDER_COLORS: [
+		"slate",
+		"red",
+		"orange",
+		"amber",
+		"yellow",
+		"lime",
+		"green",
+		"emerald",
+		"teal",
+		"cyan",
+		"sky",
+		"blue",
+		"indigo",
+		"violet",
+		"purple",
+		"fuchsia",
+		"pink",
+		"rose",
+	],
+	folderColorSchema: {
+		parse: (v: string) => v,
+	},
+}));
+
+// Mock toggle function to verify how it's called
+const mockToggle = vi.fn();
+
+// Mock the todo storage hook
+vi.mock("@/hooks/use-todo-storage", () => ({
+	useTodoStorage: () => ({
+		create: vi.fn(),
+		toggle: mockToggle,
+		deleteTodo: vi.fn(),
+		updateSchedule: vi.fn(),
+		isLoading: false,
+		isAuthenticated: false,
+		selectedFolderId: "inbox",
+		setSelectedFolderId: vi.fn(),
+		filteredTodos: [
+			{
+				id: "recurring-1",
+				text: "Daily Standup",
+				completed: false,
+				folderId: null,
+				dueDate: null,
+				reminderAt: null,
+				recurringPattern: {
+					type: "daily",
+				},
+			},
+		],
+		todos: [],
+	}),
+}));
+
+// Mock the subtask progress hook
+const mockGetProgress =
+	vi.fn<(id: number | string) => SubtaskProgress | null>();
+vi.mock("@/app/api/subtask", () => ({
+	useAllSubtasksProgress: () => ({
+		getProgress: mockGetProgress,
+	}),
+	useSubtaskStorage: () => ({
+		subtasks: [],
+		create: vi.fn(),
+		update: vi.fn(),
+		toggle: vi.fn(),
+		deleteSubtask: vi.fn(),
+		reorder: vi.fn(),
+		isLoading: false,
+	}),
+}));
+
+// Mock the reminder provider to avoid supabase dependency
+vi.mock("@/components/notifications/reminder-provider", () => ({
+	useDueReminders: () => ({
+		dueReminderIds: new Set<string>(),
+		dueReminders: [],
+		dismissReminder: vi.fn(),
+	}),
+}));
+
+// Import after mocks
+import TodosPage from "./page";
 
 describe("TodosPage (Folder View) - Recurring Todo Toggle Behavior", () => {
 	/**
@@ -43,10 +156,46 @@ describe("TodosPage (Folder View) - Recurring Todo Toggle Behavior", () => {
 
 	beforeEach(() => {
 		vi.clearAllMocks();
+		mockUseFolderStorage.mockReturnValue({
+			folders: [],
+			create: vi.fn(),
+			update: vi.fn(),
+			deleteFolder: vi.fn(),
+			reorder: vi.fn(),
+			isLoading: false,
+			isAuthenticated: false,
+		});
+		mockGetProgress.mockReturnValue(null);
 	});
 
 	afterEach(() => {
 		vi.restoreAllMocks();
+	});
+
+	describe("Functional verification", () => {
+		it("calls toggle without virtualDate when completing recurring todo in folder view", () => {
+			/**
+			 * This test verifies that folder views (Inbox and custom folders)
+			 * do NOT pass virtualDate when toggling a recurring todo.
+			 *
+			 * When no virtualDate is passed, the toggle function uses the
+			 * completeRecurringMutation which creates the next occurrence.
+			 */
+			render(<TodosPage />);
+
+			// Find and click the toggle button for the recurring todo
+			const toggleButton = screen.getByTestId("todo-toggle");
+			fireEvent.click(toggleButton);
+
+			// Verify toggle was called with just (id, completed) - NO virtualDate option
+			expect(mockToggle).toHaveBeenCalledTimes(1);
+			expect(mockToggle).toHaveBeenCalledWith("recurring-1", true);
+
+			// Verify NO third argument (options with virtualDate) was passed
+			const callArgs = mockToggle.mock.calls[0];
+			expect(callArgs.length).toBe(2);
+			expect(callArgs[2]).toBeUndefined();
+		});
 	});
 
 	describe("Behavior documentation", () => {
