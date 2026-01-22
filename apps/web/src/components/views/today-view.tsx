@@ -3,10 +3,15 @@
 import { CheckCircle2, Circle, Search, Sun, X } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { useCompletionHistory } from "@/app/api/analytics";
 import type { FolderColor } from "@/app/api/folder";
 import { useFolderStorage } from "@/app/api/folder";
 import { useAllSubtasksProgress } from "@/app/api/subtask";
-import type { RecurringPattern, Todo } from "@/app/api/todo/todo.types";
+import type {
+	RecurringPattern,
+	Todo,
+	VirtualTodo,
+} from "@/app/api/todo/todo.types";
 import { isToday } from "@/components/scheduling/due-date-badge";
 import { TodoExpandableItem } from "@/components/todos";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,6 +21,54 @@ import { isDateMatchingPattern } from "@/lib/recurring-utils";
 import { cn } from "@/lib/utils";
 
 type FilterType = "all" | "active" | "completed";
+
+/** A todo entry that may be a regular todo or a virtual recurring instance */
+export type TodayTodoEntry = Todo | VirtualTodo;
+
+/**
+ * Type guard to check if a todo entry is a virtual recurring instance.
+ */
+export function isVirtualTodo(todo: TodayTodoEntry): todo is VirtualTodo {
+	return "isRecurringInstance" in todo && todo.isRecurringInstance === true;
+}
+
+/**
+ * Helper to check if a todo entry is effectively completed.
+ * For virtual todos, checks occurrenceCompleted; for regular todos, checks completed.
+ */
+export function isEntryCompleted(entry: TodayTodoEntry): boolean {
+	if (isVirtualTodo(entry)) {
+		return entry.occurrenceCompleted === true;
+	}
+	return entry.completed;
+}
+
+/**
+ * Returns a date key (YYYY-MM-DD) for grouping.
+ */
+function getDateKey(date: Date | string): string {
+	const d = typeof date === "string" ? new Date(date) : date;
+	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/**
+ * Creates a virtual todo entry for a recurring pattern on today's date.
+ * @param todo - The original recurring todo
+ * @param occurrenceCompleted - Whether today's occurrence was completed
+ */
+function createVirtualTodo(
+	todo: Todo,
+	occurrenceCompleted?: boolean,
+): VirtualTodo {
+	const dateKey = getDateKey(new Date());
+	return {
+		...todo,
+		isRecurringInstance: true,
+		virtualDate: dateKey,
+		virtualKey: `${todo.id}-${dateKey}`,
+		occurrenceCompleted,
+	};
+}
 
 /**
  * Maps folder colors to Tailwind CSS classes for badges.
@@ -64,28 +117,73 @@ export interface TodayViewProps {
 }
 
 /**
+ * Completion record for a recurring todo occurrence.
+ * Used to track which specific dates have been completed.
+ * todoId can be string (local storage) or number (remote).
+ */
+export interface CompletionRecord {
+	todoId: string | number;
+	scheduledDate: Date;
+	completedAt: Date | null;
+}
+
+/**
  * Filters todos to return only those due today.
  * Includes both todos with an explicit dueDate of today and
  * recurring todos that match today's date.
+ * For recurring todos, creates virtual todo entries with per-occurrence completion status.
+ *
+ * @param todos - All todos to filter
+ * @param completionHistory - Optional completion history for recurring todos
+ * @param now - Current date (for testing)
  */
 export function getTodosDueToday(
 	todos: Todo[],
+	completionHistory?: CompletionRecord[],
 	now: Date = new Date(),
-): Todo[] {
-	return todos.filter((todo) => {
+): TodayTodoEntry[] {
+	const todayKey = getDateKey(now);
+
+	// Create a map for quick lookup of completion status by todoId and date
+	const completionMap = new Map<string, boolean>();
+	if (completionHistory) {
+		for (const record of completionHistory) {
+			const dateKey = getDateKey(record.scheduledDate);
+			const key = `${record.todoId}-${dateKey}`;
+			completionMap.set(key, record.completedAt !== null);
+		}
+	}
+
+	const result: TodayTodoEntry[] = [];
+
+	for (const todo of todos) {
 		// Check explicit dueDate
 		if (todo.dueDate && isToday(todo.dueDate)) {
-			return true;
+			// Non-recurring todo with dueDate today - add as-is
+			if (!todo.recurringPattern) {
+				result.push(todo);
+			} else {
+				// Recurring todo with explicit dueDate matching today
+				// Create virtual entry with occurrence completion status
+				const completionKey = `${todo.id}-${todayKey}`;
+				const occurrenceCompleted = completionMap.get(completionKey);
+				result.push(createVirtualTodo(todo, occurrenceCompleted));
+			}
+			continue;
 		}
 
 		// Check recurring pattern (if today matches the pattern)
-		// Include both active and completed recurring todos
 		if (todo.recurringPattern) {
-			return isDateMatchingPattern(todo.recurringPattern, now);
+			if (isDateMatchingPattern(todo.recurringPattern, now)) {
+				// Create virtual entry with occurrence completion status
+				const completionKey = `${todo.id}-${todayKey}`;
+				const occurrenceCompleted = completionMap.get(completionKey);
+				result.push(createVirtualTodo(todo, occurrenceCompleted));
+			}
 		}
+	}
 
-		return false;
-	});
+	return result;
 }
 
 /**
@@ -113,18 +211,47 @@ export function TodayView({
 	const { folders } = useFolderStorage();
 	const { getProgress } = useAllSubtasksProgress();
 
-	// Filter todos due today
+	// Calculate date range for completion history (today only)
+	const dateRange = useMemo(() => {
+		const today = new Date();
+		today.setHours(0, 0, 0, 0);
+		const endDate = new Date(today);
+		endDate.setHours(23, 59, 59, 999);
+		return {
+			startDate: today.toISOString(),
+			endDate: endDate.toISOString(),
+		};
+	}, []);
+
+	// Fetch completion history for recurring todos
+	const { data: completionHistoryData } = useCompletionHistory(
+		dateRange.startDate,
+		dateRange.endDate,
+	);
+
+	// Convert completion history to the format expected by getTodosDueToday
+	const completionHistory = useMemo(() => {
+		if (!completionHistoryData) return undefined;
+		return completionHistoryData.map((record) => ({
+			todoId: record.todoId,
+			scheduledDate: new Date(record.scheduledDate),
+			completedAt: record.completedAt ? new Date(record.completedAt) : null,
+		}));
+	}, [completionHistoryData]);
+
+	// Filter todos due today (with virtual entries for recurring todos)
 	const todayTodos = useMemo(() => {
-		return getTodosDueToday(todos);
-	}, [todos]);
+		return getTodosDueToday(todos, completionHistory);
+	}, [todos, completionHistory]);
 
 	// Apply status and search filters
 	const filteredTodos = useMemo(() => {
 		return todayTodos.filter((todo) => {
+			const isCompleted = isEntryCompleted(todo);
 			const matchesFilter =
 				filter === "all" ||
-				(filter === "active" && !todo.completed) ||
-				(filter === "completed" && todo.completed);
+				(filter === "active" && !isCompleted) ||
+				(filter === "completed" && isCompleted);
 
 			const matchesSearch =
 				!searchQuery ||
@@ -137,7 +264,7 @@ export function TodayView({
 	// Stats for today's todos
 	const stats = useMemo(() => {
 		const total = todayTodos.length;
-		const completed = todayTodos.filter((t) => t.completed).length;
+		const completed = todayTodos.filter((t) => isEntryCompleted(t)).length;
 		const active = total - completed;
 		return { total, completed, active };
 	}, [todayTodos]);
@@ -252,10 +379,18 @@ export function TodayView({
 						<ul className="space-y-2" data-testid="today-todo-list">
 							{filteredTodos.map((todo, index) => {
 								const todoFolder = getFolderForTodo(todo.folderId);
+								// Use virtualKey for recurring instances, otherwise use id
+								const itemKey = isVirtualTodo(todo) ? todo.virtualKey : todo.id;
+								// For virtual todos, use occurrenceCompleted for display
+								const displayCompleted = isEntryCompleted(todo);
 								return (
 									<TodoExpandableItem
-										key={todo.id}
-										todo={todo}
+										key={itemKey}
+										todo={{
+											...todo,
+											// Override completed with the effective completion status
+											completed: displayCompleted,
+										}}
 										subtaskProgress={getProgress(todo.id)}
 										onToggle={handleToggleTodo}
 										onDelete={onDelete}
@@ -264,6 +399,10 @@ export function TodayView({
 										showFolderBadge={true}
 										folderColorBgClasses={folderColorBgClasses}
 										animationDelay={`${index * 0.03}s`}
+										isRecurringInstance={isVirtualTodo(todo)}
+										virtualDate={
+											isVirtualTodo(todo) ? todo.virtualDate : undefined
+										}
 									/>
 								);
 							})}
