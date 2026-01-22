@@ -100,7 +100,11 @@ export interface TodayViewProps {
 	/** Whether todos are loading */
 	isLoading?: boolean;
 	/** Callback when a todo is toggled */
-	onToggle: (id: number | string, completed: boolean) => void;
+	onToggle: (
+		id: number | string,
+		completed: boolean,
+		options?: { virtualDate?: string },
+	) => void;
 	/** Callback when a todo is deleted */
 	onDelete: (id: number | string) => void;
 	/** Callback when a todo's schedule is updated */
@@ -334,10 +338,14 @@ export function TodayView({
 		return folders.find((f) => f.id === folderId) ?? null;
 	};
 
-	const handleToggleTodo = (id: number | string, completed: boolean) => {
-		// Pass through - TodoExpandableItem already passes current state,
-		// parent will invert to get desired state
-		onToggle(id, completed);
+	const handleToggleTodo = (entry: TodayTodoEntry, completed: boolean) => {
+		const id = entry.id;
+		// Detect virtual recurring instances and pass virtualDate option
+		if (isVirtualTodo(entry)) {
+			onToggle(id, completed, { virtualDate: entry.virtualDate });
+		} else {
+			onToggle(id, completed);
+		}
 	};
 
 	return (
@@ -453,7 +461,9 @@ export function TodayView({
 											completed: displayCompleted,
 										}}
 										subtaskProgress={getProgress(todo.id)}
-										onToggle={handleToggleTodo}
+										onToggle={(_id, completed) =>
+											handleToggleTodo(todo, completed)
+										}
 										onDelete={onDelete}
 										onScheduleChange={onScheduleChange}
 										folder={todoFolder}

@@ -846,6 +846,40 @@ describe("TodayView", () => {
 			expect(mockOnToggle).toHaveBeenCalledWith("1", true);
 		});
 
+		it("calls onToggle with virtualDate option for virtual recurring instances", () => {
+			const today = new Date();
+			const dayOfWeek = today.getDay();
+
+			const todos = [
+				createMockTodo({
+					id: "recurring-1",
+					text: "Daily Standup",
+					recurringPattern: {
+						type: "weekly",
+						daysOfWeek: [dayOfWeek],
+					},
+					completed: false,
+				}),
+			];
+
+			render(
+				<TodayView
+					todos={todos}
+					onToggle={mockOnToggle}
+					onDelete={mockOnDelete}
+				/>,
+			);
+
+			const toggleButton = screen.getByTestId("todo-toggle");
+			fireEvent.click(toggleButton);
+
+			// For virtual recurring instances, onToggle should be called with virtualDate option
+			const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+			expect(mockOnToggle).toHaveBeenCalledWith("recurring-1", true, {
+				virtualDate: todayKey,
+			});
+		});
+
 		it("calls onDelete when todo is deleted", () => {
 			const todos = [
 				createMockTodo({
