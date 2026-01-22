@@ -186,9 +186,10 @@ export function createVirtualTodo(
 /**
  * Completion record for a recurring todo occurrence.
  * Used to track which specific dates have been completed.
+ * todoId can be string (local storage) or number (remote).
  */
 export interface CompletionRecord {
-	todoId: number;
+	todoId: string | number;
 	scheduledDate: Date;
 	completedAt: Date | null;
 }

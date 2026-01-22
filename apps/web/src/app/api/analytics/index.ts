@@ -8,6 +8,7 @@ export {
 } from "./analytics.api";
 // Hooks
 export {
+	notifyLocalAnalyticsListeners,
 	useAnalytics,
 	useCompletionHistory,
 	useUpdatePastCompletion,
@@ -20,6 +21,7 @@ export type {
 	DailyStats,
 	GetAnalyticsInput,
 	GetCompletionHistoryInput,
+	UnifiedCompletionHistoryRecord,
 	UpdatePastCompletionInput,
 } from "./analytics.types";
 export {

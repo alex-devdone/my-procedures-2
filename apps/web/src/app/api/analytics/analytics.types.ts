@@ -41,6 +41,16 @@ export type UpdatePastCompletionInput = z.infer<
 	typeof updatePastCompletionInputSchema
 >;
 
+/**
+ * Local storage compatible version of UpdatePastCompletionInput
+ * that supports string todoId for local storage
+ */
+export interface UpdatePastCompletionInputLocal {
+	todoId: string | number;
+	scheduledDate: string;
+	completed: boolean;
+}
+
 // ============================================================================
 // Output Types
 // ============================================================================
@@ -107,4 +117,17 @@ export interface CompletionHistoryRecord {
 	completedAt: Date | null;
 	createdAt: Date;
 	todoText: string;
+}
+
+/**
+ * Unified completion history record that works for both local and remote storage.
+ * Components should use this type and convert dates as needed using new Date().
+ */
+export interface UnifiedCompletionHistoryRecord {
+	id: string | number;
+	todoId: string | number;
+	scheduledDate: string | Date;
+	completedAt: string | Date | null;
+	todoText?: string;
+	createdAt?: string | Date;
 }

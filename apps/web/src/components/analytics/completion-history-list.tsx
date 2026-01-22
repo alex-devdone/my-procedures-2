@@ -2,13 +2,13 @@
 
 import { CheckCircle2, Clock, XCircle } from "lucide-react";
 import { useUpdatePastCompletion } from "@/app/api/analytics";
-import type { CompletionHistoryRecord } from "@/app/api/analytics/analytics.types";
+import type { UnifiedCompletionHistoryRecord } from "@/app/api/analytics/analytics.types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 export interface CompletionHistoryListProps {
-	history: CompletionHistoryRecord[] | undefined;
+	history: UnifiedCompletionHistoryRecord[] | undefined;
 	isLoading?: boolean;
 }
 
@@ -81,7 +81,7 @@ function CompletionToggle({
 }
 
 interface CompletionRowProps {
-	record: CompletionHistoryRecord;
+	record: UnifiedCompletionHistoryRecord;
 	onToggle: () => void;
 	isPending: boolean;
 }
@@ -148,7 +148,7 @@ export function CompletionHistoryList({
 	const updatePastCompletion = useUpdatePastCompletion();
 
 	const handleToggle = (
-		todoId: number,
+		todoId: string | number,
 		scheduledDate: Date,
 		completedAt: Date | null,
 	) => {
