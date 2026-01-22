@@ -158,6 +158,120 @@ describe("getTodosDueToday", () => {
 		const result = getTodosDueToday(todos);
 		expect(result).toHaveLength(2);
 	});
+
+	describe("recurring todos", () => {
+		it("includes active recurring todos that match today", () => {
+			const today = new Date();
+			const dayOfWeek = today.getDay(); // 0-6 (Sunday-Saturday)
+
+			const todos = [
+				createMockTodo({
+					id: "recurring-active",
+					recurringPattern: {
+						type: "weekly",
+						daysOfWeek: [dayOfWeek],
+					},
+					completed: false,
+				}),
+			];
+
+			const result = getTodosDueToday(todos, today);
+			expect(result).toHaveLength(1);
+			expect(result[0].id).toBe("recurring-active");
+		});
+
+		it("includes completed recurring todos that match today", () => {
+			const today = new Date();
+			const dayOfWeek = today.getDay();
+
+			const todos = [
+				createMockTodo({
+					id: "recurring-completed",
+					recurringPattern: {
+						type: "weekly",
+						daysOfWeek: [dayOfWeek],
+					},
+					completed: true,
+				}),
+			];
+
+			const result = getTodosDueToday(todos, today);
+			expect(result).toHaveLength(1);
+			expect(result[0].id).toBe("recurring-completed");
+		});
+
+		it("includes both active and completed recurring todos that match today", () => {
+			const today = new Date();
+			const dayOfWeek = today.getDay();
+
+			const todos = [
+				createMockTodo({
+					id: "recurring-active",
+					recurringPattern: {
+						type: "weekly",
+						daysOfWeek: [dayOfWeek],
+					},
+					completed: false,
+				}),
+				createMockTodo({
+					id: "recurring-completed",
+					recurringPattern: {
+						type: "weekly",
+						daysOfWeek: [dayOfWeek],
+					},
+					completed: true,
+				}),
+			];
+
+			const result = getTodosDueToday(todos, today);
+			expect(result).toHaveLength(2);
+			expect(result.map((t) => t.id)).toContain("recurring-active");
+			expect(result.map((t) => t.id)).toContain("recurring-completed");
+		});
+
+		it("excludes recurring todos that do not match today", () => {
+			const today = new Date();
+			const dayOfWeek = today.getDay();
+			// Get a different day of the week
+			const differentDayIndex = (dayOfWeek + 1) % 7;
+
+			const todos = [
+				createMockTodo({
+					id: "recurring-different-day",
+					recurringPattern: {
+						type: "weekly",
+						daysOfWeek: [differentDayIndex],
+					},
+					completed: false,
+				}),
+			];
+
+			const result = getTodosDueToday(todos, today);
+			expect(result).toHaveLength(0);
+		});
+
+		it("includes daily recurring todos regardless of completion status", () => {
+			const today = new Date();
+
+			const todos = [
+				createMockTodo({
+					id: "daily-active",
+					recurringPattern: { type: "daily" },
+					completed: false,
+				}),
+				createMockTodo({
+					id: "daily-completed",
+					recurringPattern: { type: "daily" },
+					completed: true,
+				}),
+			];
+
+			const result = getTodosDueToday(todos, today);
+			expect(result).toHaveLength(2);
+			expect(result.map((t) => t.id)).toContain("daily-active");
+			expect(result.map((t) => t.id)).toContain("daily-completed");
+		});
+	});
 });
 
 describe("TodayView", () => {

@@ -79,7 +79,8 @@ export function getTodosDueToday(
 		}
 
 		// Check recurring pattern (if today matches the pattern)
-		if (todo.recurringPattern && !todo.completed) {
+		// Include both active and completed recurring todos
+		if (todo.recurringPattern) {
 			return isDateMatchingPattern(todo.recurringPattern, now);
 		}
 
