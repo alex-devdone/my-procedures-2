@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
 	DAY_LABELS,
+	DEFAULT_RECURRING_NOTIFY_TIME,
 	DEFAULT_RECURRING_PRESETS,
 	FULL_DAY_LABELS,
 	formatOrdinal,
@@ -269,7 +270,10 @@ describe("RecurringPicker", () => {
 			await user.click(screen.getByTestId("recurring-picker-preset-daily"));
 
 			expect(onChange).toHaveBeenCalledTimes(1);
-			expect(onChange).toHaveBeenCalledWith({ type: "daily" });
+			expect(onChange).toHaveBeenCalledWith({
+				type: "daily",
+				notifyAt: DEFAULT_RECURRING_NOTIFY_TIME,
+			});
 		});
 
 		it("calls onChange with weekdays pattern", async () => {
@@ -290,6 +294,7 @@ describe("RecurringPicker", () => {
 			expect(onChange).toHaveBeenCalledWith({
 				type: "weekly",
 				daysOfWeek: [1, 2, 3, 4, 5],
+				notifyAt: DEFAULT_RECURRING_NOTIFY_TIME,
 			});
 		});
 
@@ -703,7 +708,12 @@ describe("RecurringPicker", () => {
 			// Click Apply
 			await user.click(screen.getByTestId("recurring-picker-apply"));
 
-			expect(onChange).toHaveBeenCalledWith({ type: "daily", interval: 3 });
+			// Default editing pattern includes notifyAt: "09:00"
+			expect(onChange).toHaveBeenCalledWith({
+				type: "daily",
+				interval: 3,
+				notifyAt: DEFAULT_RECURRING_NOTIFY_TIME,
+			});
 		});
 
 		it("closes popover after Apply is clicked", async () => {
@@ -989,19 +999,19 @@ describe("RecurringPicker", () => {
 
 			await waitFor(() => {
 				expect(
-					screen.getByTestId("time-picker-preset-morning"),
+					screen.getByTestId("time-picker-preset-noon"),
 				).toBeInTheDocument();
 			});
 
-			// Click morning preset (09:00)
-			await user.click(screen.getByTestId("time-picker-preset-morning"));
+			// Click noon preset (12:00) since morning (09:00) is already the default
+			await user.click(screen.getByTestId("time-picker-preset-noon"));
 
 			// Click Apply to save the pattern with the time
 			await user.click(screen.getByTestId("recurring-picker-apply"));
 
 			expect(onChange).toHaveBeenCalledWith({
 				type: "daily",
-				notifyAt: "09:00",
+				notifyAt: "12:00",
 			});
 		});
 
@@ -1130,6 +1140,8 @@ describe("RecurringPicker", () => {
 			});
 
 			const input = screen.getByTestId("time-picker-input");
+			// Clear existing default time first, then type new time
+			await user.clear(input);
 			await user.type(input, "14:30");
 
 			// Click Apply
@@ -1141,7 +1153,7 @@ describe("RecurringPicker", () => {
 			});
 		});
 
-		it("selects evening preset correctly", async () => {
+		it("selects evening preset correctly (overriding default 09:00)", async () => {
 			const onChange = vi.fn();
 			const user = userEvent.setup();
 			render(<RecurringPicker {...defaultProps} onChange={onChange} />);
@@ -1154,7 +1166,7 @@ describe("RecurringPicker", () => {
 				).toBeInTheDocument();
 			});
 
-			// Click evening preset (18:00)
+			// Click evening preset (18:00) to override default 09:00
 			await user.click(screen.getByTestId("time-picker-preset-evening"));
 
 			// Click Apply
@@ -1267,7 +1279,7 @@ describe("RecurringPicker", () => {
 			});
 		});
 
-		it("shows clear button only when time is set", async () => {
+		it("shows clear button when time is set (default 09:00)", async () => {
 			const user = userEvent.setup();
 			render(<RecurringPicker {...defaultProps} />);
 
@@ -1277,13 +1289,7 @@ describe("RecurringPicker", () => {
 				expect(screen.getByTestId("time-picker-input")).toBeInTheDocument();
 			});
 
-			// Clear button should not be visible initially
-			expect(screen.queryByTestId("time-picker-clear")).not.toBeInTheDocument();
-
-			// Set a time via preset
-			await user.click(screen.getByTestId("time-picker-preset-morning"));
-
-			// Clear button should now be visible
+			// Clear button should be visible since default time is set
 			await waitFor(() => {
 				expect(screen.getByTestId("time-picker-clear")).toBeInTheDocument();
 			});
@@ -1319,7 +1325,7 @@ describe("RecurringPicker", () => {
 			expect(onChange).toHaveBeenCalledWith({ type: "daily" });
 		});
 
-		it("combines pattern type, interval, and time correctly", async () => {
+		it("combines pattern type, interval, days, and time correctly", async () => {
 			const onChange = vi.fn();
 			const user = userEvent.setup();
 			render(<RecurringPicker {...defaultProps} onChange={onChange} />);
@@ -1367,7 +1373,7 @@ describe("RecurringPicker", () => {
 			await user.click(screen.getByTestId("recurring-picker-day-1"));
 			await user.click(screen.getByTestId("recurring-picker-day-5"));
 
-			// Set time
+			// Set time to noon (overriding default 09:00)
 			await user.click(screen.getByTestId("time-picker-preset-noon"));
 
 			// Click Apply
@@ -1378,6 +1384,119 @@ describe("RecurringPicker", () => {
 				interval: 2,
 				daysOfWeek: [1, 5],
 				notifyAt: "12:00",
+			});
+		});
+	});
+
+	describe("Default Notification Time", () => {
+		it("defaults editing pattern to 09:00 notification time when no value", async () => {
+			const user = userEvent.setup();
+			render(<RecurringPicker {...defaultProps} />);
+
+			await user.click(screen.getByTestId("recurring-picker-trigger"));
+
+			await waitFor(() => {
+				const input = screen.getByTestId("time-picker-input");
+				expect(input).toHaveValue(DEFAULT_RECURRING_NOTIFY_TIME);
+			});
+		});
+
+		it("uses default notification time in editing pattern when popover opens without value", async () => {
+			const onChange = vi.fn();
+			const user = userEvent.setup();
+			render(<RecurringPicker {...defaultProps} onChange={onChange} />);
+
+			await user.click(screen.getByTestId("recurring-picker-trigger"));
+
+			await waitFor(() => {
+				expect(
+					screen.getByTestId("recurring-picker-apply"),
+				).toBeInTheDocument();
+			});
+
+			// Apply without changing anything - should include default notification time
+			await user.click(screen.getByTestId("recurring-picker-apply"));
+
+			expect(onChange).toHaveBeenCalledWith({
+				type: "daily",
+				notifyAt: DEFAULT_RECURRING_NOTIFY_TIME,
+			});
+		});
+
+		it("preserves existing notification time when editing existing pattern", async () => {
+			const user = userEvent.setup();
+			render(
+				<RecurringPicker
+					{...defaultProps}
+					value={{ type: "daily", notifyAt: "14:00" }}
+				/>,
+			);
+
+			await user.click(screen.getByTestId("recurring-picker-trigger"));
+
+			await waitFor(() => {
+				const input = screen.getByTestId("time-picker-input");
+				expect(input).toHaveValue("14:00");
+			});
+		});
+
+		it("allows user to clear default notification time", async () => {
+			const onChange = vi.fn();
+			const user = userEvent.setup();
+			render(<RecurringPicker {...defaultProps} onChange={onChange} />);
+
+			await user.click(screen.getByTestId("recurring-picker-trigger"));
+
+			await waitFor(() => {
+				expect(screen.getByTestId("time-picker-clear")).toBeInTheDocument();
+			});
+
+			// Clear the default time
+			await user.click(screen.getByTestId("time-picker-clear"));
+
+			// Apply
+			await user.click(screen.getByTestId("recurring-picker-apply"));
+
+			// Pattern should not have notifyAt
+			expect(onChange).toHaveBeenCalledWith({ type: "daily" });
+		});
+
+		it("resets to default notification time when reopening popover for new pattern", async () => {
+			const onChange = vi.fn();
+			const user = userEvent.setup();
+			const { rerender } = render(
+				<RecurringPicker {...defaultProps} onChange={onChange} />,
+			);
+
+			// Open popover
+			await user.click(screen.getByTestId("recurring-picker-trigger"));
+
+			await waitFor(() => {
+				expect(screen.getByTestId("time-picker-input")).toHaveValue(
+					DEFAULT_RECURRING_NOTIFY_TIME,
+				);
+			});
+
+			// Clear the time
+			await user.click(screen.getByTestId("time-picker-clear"));
+			expect(screen.getByTestId("time-picker-input")).toHaveValue("");
+
+			// Close popover by clicking apply (without time)
+			await user.click(screen.getByTestId("recurring-picker-apply"));
+
+			// Rerender without a value (simulating state reset)
+			rerender(
+				<RecurringPicker {...defaultProps} value={null} onChange={onChange} />,
+			);
+
+			// Reopen popover
+			await user.click(screen.getByTestId("recurring-picker-trigger"));
+
+			// Should show default time again
+			await waitFor(() => {
+				expect(screen.getByTestId("time-picker-input")).toHaveValue(
+					DEFAULT_RECURRING_NOTIFY_TIME,
+				);
 			});
 		});
 	});
@@ -1651,48 +1770,65 @@ describe("Helper Functions", () => {
 });
 
 describe("Constants", () => {
+	describe("DEFAULT_RECURRING_NOTIFY_TIME", () => {
+		it("is set to 09:00", () => {
+			expect(DEFAULT_RECURRING_NOTIFY_TIME).toBe("09:00");
+		});
+	});
+
 	describe("DEFAULT_RECURRING_PRESETS", () => {
 		it("has 5 default presets", () => {
 			expect(DEFAULT_RECURRING_PRESETS).toHaveLength(5);
 		});
 
-		it("includes Daily preset", () => {
+		it("includes Daily preset with default notification time", () => {
 			const daily = DEFAULT_RECURRING_PRESETS.find((p) => p.label === "Daily");
 			expect(daily).toBeDefined();
 			expect(daily?.pattern.type).toBe("daily");
+			expect(daily?.pattern.notifyAt).toBe(DEFAULT_RECURRING_NOTIFY_TIME);
 		});
 
-		it("includes Weekly preset", () => {
+		it("includes Weekly preset with default notification time", () => {
 			const weekly = DEFAULT_RECURRING_PRESETS.find(
 				(p) => p.label === "Weekly",
 			);
 			expect(weekly).toBeDefined();
 			expect(weekly?.pattern.type).toBe("weekly");
+			expect(weekly?.pattern.notifyAt).toBe(DEFAULT_RECURRING_NOTIFY_TIME);
 		});
 
-		it("includes Weekdays preset", () => {
+		it("includes Weekdays preset with default notification time", () => {
 			const weekdays = DEFAULT_RECURRING_PRESETS.find(
 				(p) => p.label === "Weekdays",
 			);
 			expect(weekdays).toBeDefined();
 			expect(weekdays?.pattern.type).toBe("weekly");
 			expect(weekdays?.pattern.daysOfWeek).toEqual([1, 2, 3, 4, 5]);
+			expect(weekdays?.pattern.notifyAt).toBe(DEFAULT_RECURRING_NOTIFY_TIME);
 		});
 
-		it("includes Monthly preset", () => {
+		it("includes Monthly preset with default notification time", () => {
 			const monthly = DEFAULT_RECURRING_PRESETS.find(
 				(p) => p.label === "Monthly",
 			);
 			expect(monthly).toBeDefined();
 			expect(monthly?.pattern.type).toBe("monthly");
+			expect(monthly?.pattern.notifyAt).toBe(DEFAULT_RECURRING_NOTIFY_TIME);
 		});
 
-		it("includes Yearly preset", () => {
+		it("includes Yearly preset with default notification time", () => {
 			const yearly = DEFAULT_RECURRING_PRESETS.find(
 				(p) => p.label === "Yearly",
 			);
 			expect(yearly).toBeDefined();
 			expect(yearly?.pattern.type).toBe("yearly");
+			expect(yearly?.pattern.notifyAt).toBe(DEFAULT_RECURRING_NOTIFY_TIME);
+		});
+
+		it("all presets have default notification time set", () => {
+			for (const preset of DEFAULT_RECURRING_PRESETS) {
+				expect(preset.pattern.notifyAt).toBe(DEFAULT_RECURRING_NOTIFY_TIME);
+			}
 		});
 	});
 

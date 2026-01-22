@@ -586,13 +586,13 @@ describe("TodoSchedulePopover", () => {
 				).toBeInTheDocument();
 			});
 
-			// Click on Daily preset
+			// Click on Daily preset (now includes default 09:00 notification time)
 			await user.click(screen.getByTestId("recurring-picker-preset-daily"));
 
 			expect(onChange).toHaveBeenCalledWith({
 				dueDate: null,
 				reminderAt: null,
-				recurringPattern: { type: "daily" },
+				recurringPattern: { type: "daily", notifyAt: "09:00" },
 			});
 		});
 	});
