@@ -1,75 +1,138 @@
+import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import AnalyticsPage from "./page";
 
-// Mock the auth module
-const mockGetSession = vi.fn();
-vi.mock("@my-procedures-2/auth", () => ({
-	auth: {
-		api: {
-			getSession: mockGetSession,
-		},
-	},
+// Mock useSession hook
+const mockUseSession = vi.fn();
+vi.mock("@/lib/auth-client", () => ({
+	useSession: () => mockUseSession(),
 }));
 
-// Mock next/navigation
-const mockRedirect = vi.fn();
-vi.mock("next/navigation", () => ({
-	redirect: mockRedirect,
-}));
-
-// Mock the AnalyticsDashboard component
+// Mock AnalyticsDashboard component
 vi.mock("@/components/analytics/analytics-dashboard", () => ({
 	AnalyticsDashboard: () => (
 		<div data-testid="analytics-dashboard">Analytics Dashboard</div>
 	),
 }));
 
-// Mock headers
-const mockHeaders = vi.fn();
-vi.mock("next/headers", () => ({
-	headers: mockHeaders,
+// Mock lucide-react icons
+vi.mock("lucide-react", () => ({
+	Cloud: () => <div data-testid="cloud-icon" />,
+	HardDrive: () => <div data-testid="hard-drive-icon" />,
+	Sparkles: () => <div data-testid="sparkles-icon" />,
 }));
 
 describe("AnalyticsPage", () => {
-	beforeEach(() => {
-		vi.clearAllMocks();
+	describe("Guest User (Unauthenticated)", () => {
+		beforeEach(() => {
+			mockUseSession.mockReturnValue({
+				data: null,
+				isPending: false,
+			});
+		});
+
+		it("renders the page for guest users without redirecting", () => {
+			render(<AnalyticsPage />);
+
+			expect(screen.getByTestId("analytics-dashboard")).toBeInTheDocument();
+		});
+
+		it("shows the Local status badge for guest users", () => {
+			render(<AnalyticsPage />);
+
+			expect(screen.getByTestId("hard-drive-icon")).toBeInTheDocument();
+			expect(screen.getByText("Local")).toBeInTheDocument();
+		});
+
+		it("displays sign-in prompt for guest users", () => {
+			render(<AnalyticsPage />);
+
+			expect(
+				screen.getByText("Want to access your analytics anywhere?"),
+			).toBeInTheDocument();
+			expect(screen.getByText("Sign in")).toBeInTheDocument();
+			expect(
+				screen.getByText("to sync across all your devices."),
+			).toBeInTheDocument();
+		});
+
+		it("sign-in link points to login page", () => {
+			render(<AnalyticsPage />);
+
+			const signInLink = screen.getByRole("link", { name: "Sign in" });
+			expect(signInLink).toHaveAttribute("href", "/login");
+		});
+
+		it("renders the AnalyticsDashboard component", () => {
+			render(<AnalyticsPage />);
+
+			expect(screen.getByTestId("analytics-dashboard")).toBeInTheDocument();
+		});
 	});
 
-	// Note: This is a Next.js 15+ server component, so we test the resolved module
-	// The actual component is a server component that handles authentication
+	describe("Authenticated User", () => {
+		beforeEach(() => {
+			mockUseSession.mockReturnValue({
+				data: { user: { id: "user-123", name: "Test User" } },
+				isPending: false,
+			});
+		});
 
-	it("should redirect to login when user is not authenticated", async () => {
-		mockGetSession.mockResolvedValue(null);
-		mockHeaders.mockResolvedValue(new Headers());
+		it("renders the page for authenticated users", () => {
+			render(<AnalyticsPage />);
 
-		// Import the page module
-		const { default: AnalyticsPage } = await import("./page");
+			expect(screen.getByTestId("analytics-dashboard")).toBeInTheDocument();
+		});
 
-		// Render the server component
-		await AnalyticsPage();
+		it("shows the Synced status badge for authenticated users", () => {
+			render(<AnalyticsPage />);
 
-		expect(mockRedirect).toHaveBeenCalledWith("/login");
+			expect(screen.getByTestId("cloud-icon")).toBeInTheDocument();
+			expect(screen.getByText("Synced")).toBeInTheDocument();
+		});
+
+		it("does not display sign-in prompt for authenticated users", () => {
+			render(<AnalyticsPage />);
+
+			expect(
+				screen.queryByText("Want to access your analytics anywhere?"),
+			).not.toBeInTheDocument();
+			expect(
+				screen.queryByText("to sync across all your devices."),
+			).not.toBeInTheDocument();
+		});
+
+		it("renders the AnalyticsDashboard component", () => {
+			render(<AnalyticsPage />);
+
+			expect(screen.getByTestId("analytics-dashboard")).toBeInTheDocument();
+		});
 	});
 
-	it("should render AnalyticsDashboard when user is authenticated", async () => {
-		const mockSession = {
-			user: {
-				id: "1",
-				name: "Test User",
-				email: "test@example.com",
-			},
-		};
+	describe("Page Structure", () => {
+		beforeEach(() => {
+			mockUseSession.mockReturnValue({
+				data: null,
+				isPending: false,
+			});
+		});
 
-		mockGetSession.mockResolvedValue(mockSession);
-		mockHeaders.mockResolvedValue(new Headers());
+		it("has the correct container structure", () => {
+			const { container } = render(<AnalyticsPage />);
 
-		// Import the page module
-		const { default: AnalyticsPage } = await import("./page");
+			// Check for main container with positioning classes
+			const mainContainer = container.firstChild;
+			expect(mainContainer).toHaveClass("relative", "min-h-full");
+		});
 
-		// Render the server component
-		const result = await AnalyticsPage();
+		it("renders background decoration element", () => {
+			const { container } = render(<AnalyticsPage />);
 
-		// The component should return the AnalyticsDashboard
-		expect(result).toBeDefined();
-		expect(mockRedirect).not.toHaveBeenCalled();
+			// Check for background decoration div
+			const decorationContainer = container.querySelector(
+				".pointer-events-none.absolute.inset-0",
+			);
+			expect(decorationContainer).toBeInTheDocument();
+		});
 	});
 });
