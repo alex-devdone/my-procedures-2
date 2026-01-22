@@ -638,6 +638,125 @@ test.describe("Recurring Todos in Smart Views (localStorage mode)", () => {
 		});
 	});
 
+	test.describe("Overdue view: toggling missed recurring occurrence", () => {
+		test("should retroactively complete missed occurrence when toggled", async ({
+			page,
+		}) => {
+			// Create a daily recurring todo
+			// Daily recurring todos will automatically have "missed" occurrences
+			// in the Overdue view for the past 7 days (since the pattern matches every day)
+			const todoText = "Daily recurring task for overdue test";
+			const todoItem = await createTodo(page, todoText);
+
+			// Store the original todo's testid
+			const originalTodoTestId = await todoItem.getAttribute("data-testid");
+
+			// Set up daily recurring pattern
+			await setDailyRecurring(todoItem);
+
+			// Navigate to Overdue view
+			await page.click('[data-testid="smart-view-overdue"]');
+			await expect(page.locator('[data-testid="overdue-view"]')).toBeVisible();
+
+			// Find a missed occurrence in the Overdue view
+			// The recurring todo should have generated virtual entries for past dates
+			const overdueTodoList = page.locator('[data-testid="overdue-todo-list"]');
+			const missedOccurrence = overdueTodoList
+				.locator('[data-testid^="todo-item-"]')
+				.filter({ hasText: todoText })
+				.first();
+
+			// Verify the missed occurrence is visible
+			await expect(missedOccurrence).toBeVisible();
+
+			// Verify the due date badge shows the overdue date
+			await expect(
+				missedOccurrence.locator('[data-testid="due-date-badge"]'),
+			).toBeVisible();
+
+			// Verify it's not completed initially
+			await expect(
+				missedOccurrence.locator('[data-testid="todo-toggle"]'),
+			).toHaveAttribute("aria-label", "Mark as complete");
+
+			// Toggle the missed occurrence to mark as complete
+			const toggleButton = missedOccurrence.locator(
+				'[data-testid="todo-toggle"]',
+			);
+
+			// Verify toggle is clickable
+			await expect(toggleButton).toBeVisible();
+			await expect(toggleButton).toBeEnabled();
+
+			// Click the toggle
+			await toggleButton.click();
+
+			// Wait a moment for the state to update
+			await page.waitForTimeout(500);
+
+			// Find the completed occurrence (it will be at the bottom due to sorting)
+			// Completed occurrences are sorted after active ones in the Overdue view
+			const completedOccurrence = page
+				.locator('[data-testid="overdue-todo-list"]')
+				.locator('[data-testid^="todo-item-"]')
+				.filter({ hasText: todoText })
+				.filter({
+					has: page.locator(
+						'[data-testid="todo-toggle"][aria-label="Mark as incomplete"]',
+					),
+				})
+				.first();
+
+			// Verify the completion was registered and the occurrence shows as completed
+			await expect(completedOccurrence).toBeVisible({ timeout: 10000 });
+
+			// Verify the completed occurrence has strikethrough text
+			await expect(
+				completedOccurrence.locator('[data-testid="todo-text"]'),
+			).toHaveClass(/line-through/);
+
+			// Navigate back to Inbox to verify the original todo is unchanged
+			await page.click('[data-testid="inbox-folder"]');
+			await expect(
+				page.locator('[data-testid="inbox-folder"]'),
+			).toHaveAttribute("aria-current", "page");
+
+			// The original todo should NOT be completed
+			const originalTodo = page.locator(
+				`[data-testid="${originalTodoTestId}"]`,
+			);
+			await expect(originalTodo).toBeVisible();
+			await expect(
+				originalTodo.locator('[data-testid="todo-toggle"]'),
+			).toHaveAttribute("aria-label", "Mark as complete");
+			await expect(
+				originalTodo.locator('[data-testid="todo-text"]'),
+			).not.toHaveClass(/line-through/);
+
+			// Navigate back to Overdue view to verify the completion persisted
+			await page.click('[data-testid="smart-view-overdue"]');
+			await expect(page.locator('[data-testid="overdue-view"]')).toBeVisible();
+
+			// The completed occurrence should still show as completed
+			// (it will be at the bottom due to sorting)
+			const completedOccurrenceAfter = page
+				.locator('[data-testid="overdue-todo-list"]')
+				.locator('[data-testid^="todo-item-"]')
+				.filter({ hasText: todoText })
+				.filter({
+					has: page.locator(
+						'[data-testid="todo-toggle"][aria-label="Mark as incomplete"]',
+					),
+				})
+				.first();
+
+			await expect(completedOccurrenceAfter).toBeVisible();
+			await expect(
+				completedOccurrenceAfter.locator('[data-testid="todo-text"]'),
+			).toHaveClass(/line-through/);
+		});
+	});
+
 	test.describe("Today view: toggling recurring todo behavior", () => {
 		test("should mark occurrence complete without creating new todo in Inbox", async ({
 			page,
