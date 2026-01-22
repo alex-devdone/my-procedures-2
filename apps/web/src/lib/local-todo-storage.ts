@@ -570,3 +570,17 @@ export function clearCompletionHistory(): void {
 	if (typeof window === "undefined") return;
 	localStorage.removeItem(COMPLETION_HISTORY_KEY);
 }
+
+export function getLocalCompletionHistory(
+	startDate: string,
+	endDate: string,
+): CompletionHistoryEntry[] {
+	const history = getCompletionHistory();
+	const start = new Date(startDate);
+	const end = new Date(endDate);
+
+	return history.filter((entry) => {
+		const entryDate = new Date(entry.scheduledDate);
+		return entryDate >= start && entryDate <= end;
+	});
+}

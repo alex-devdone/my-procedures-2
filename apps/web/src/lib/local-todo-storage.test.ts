@@ -1788,6 +1788,209 @@ describe("local-todo-storage", () => {
 			});
 		});
 
+		describe("getLocalCompletionHistory", () => {
+			beforeEach(() => {
+				// Clear storage before each test
+				localTodoStorage.clearCompletionHistory();
+			});
+
+			it("should return entries within the date range", () => {
+				// Add entries with different scheduled dates
+				localTodoStorage.addCompletionHistoryEntry({
+					todoId: "1",
+					scheduledDate: "2024-01-15T10:00:00.000Z",
+					completedAt: "2024-01-15T10:05:00.000Z",
+				});
+				localTodoStorage.addCompletionHistoryEntry({
+					todoId: "2",
+					scheduledDate: "2024-01-20T10:00:00.000Z",
+					completedAt: "2024-01-20T10:05:00.000Z",
+				});
+				localTodoStorage.addCompletionHistoryEntry({
+					todoId: "3",
+					scheduledDate: "2024-01-25T10:00:00.000Z",
+					completedAt: "2024-01-25T10:05:00.000Z",
+				});
+
+				const result = localTodoStorage.getLocalCompletionHistory(
+					"2024-01-18T00:00:00.000Z",
+					"2024-01-22T00:00:00.000Z",
+				);
+
+				expect(result).toHaveLength(1);
+				expect(result[0].todoId).toBe("2");
+			});
+
+			it("should include entries on the start boundary", () => {
+				localTodoStorage.addCompletionHistoryEntry({
+					todoId: "1",
+					scheduledDate: "2024-01-15T10:00:00.000Z",
+					completedAt: "2024-01-15T10:05:00.000Z",
+				});
+
+				const result = localTodoStorage.getLocalCompletionHistory(
+					"2024-01-15T10:00:00.000Z",
+					"2024-01-20T00:00:00.000Z",
+				);
+
+				expect(result).toHaveLength(1);
+				expect(result[0].todoId).toBe("1");
+			});
+
+			it("should include entries on the end boundary", () => {
+				localTodoStorage.addCompletionHistoryEntry({
+					todoId: "1",
+					scheduledDate: "2024-01-20T10:00:00.000Z",
+					completedAt: "2024-01-20T10:05:00.000Z",
+				});
+
+				const result = localTodoStorage.getLocalCompletionHistory(
+					"2024-01-15T00:00:00.000Z",
+					"2024-01-20T10:00:00.000Z",
+				);
+
+				expect(result).toHaveLength(1);
+				expect(result[0].todoId).toBe("1");
+			});
+
+			it("should exclude entries before the start date", () => {
+				localTodoStorage.addCompletionHistoryEntry({
+					todoId: "1",
+					scheduledDate: "2024-01-10T10:00:00.000Z",
+					completedAt: "2024-01-10T10:05:00.000Z",
+				});
+				localTodoStorage.addCompletionHistoryEntry({
+					todoId: "2",
+					scheduledDate: "2024-01-20T10:00:00.000Z",
+					completedAt: "2024-01-20T10:05:00.000Z",
+				});
+
+				const result = localTodoStorage.getLocalCompletionHistory(
+					"2024-01-15T00:00:00.000Z",
+					"2024-01-25T00:00:00.000Z",
+				);
+
+				expect(result).toHaveLength(1);
+				expect(result[0].todoId).toBe("2");
+			});
+
+			it("should exclude entries after the end date", () => {
+				localTodoStorage.addCompletionHistoryEntry({
+					todoId: "1",
+					scheduledDate: "2024-01-15T10:00:00.000Z",
+					completedAt: "2024-01-15T10:05:00.000Z",
+				});
+				localTodoStorage.addCompletionHistoryEntry({
+					todoId: "2",
+					scheduledDate: "2024-01-30T10:00:00.000Z",
+					completedAt: "2024-01-30T10:05:00.000Z",
+				});
+
+				const result = localTodoStorage.getLocalCompletionHistory(
+					"2024-01-10T00:00:00.000Z",
+					"2024-01-20T00:00:00.000Z",
+				);
+
+				expect(result).toHaveLength(1);
+				expect(result[0].todoId).toBe("1");
+			});
+
+			it("should return empty array when no entries match", () => {
+				localTodoStorage.addCompletionHistoryEntry({
+					todoId: "1",
+					scheduledDate: "2024-01-15T10:00:00.000Z",
+					completedAt: "2024-01-15T10:05:00.000Z",
+				});
+
+				const result = localTodoStorage.getLocalCompletionHistory(
+					"2024-02-01T00:00:00.000Z",
+					"2024-02-28T00:00:00.000Z",
+				);
+
+				expect(result).toHaveLength(0);
+			});
+
+			it("should return empty array when no history exists", () => {
+				const result = localTodoStorage.getLocalCompletionHistory(
+					"2024-01-01T00:00:00.000Z",
+					"2024-12-31T23:59:59.000Z",
+				);
+
+				expect(result).toHaveLength(0);
+			});
+
+			it("should handle entries with null completedAt", () => {
+				// Add entry directly to localStorage to set completedAt to null
+				const mockHistory = [
+					{
+						todoId: "1",
+						scheduledDate: "2024-01-15T10:00:00.000Z",
+						completedAt: null,
+					},
+				];
+				localStorageMock.setItem(
+					"completion_history",
+					JSON.stringify(mockHistory),
+				);
+
+				const result = localTodoStorage.getLocalCompletionHistory(
+					"2024-01-01T00:00:00.000Z",
+					"2024-01-31T23:59:59.000Z",
+				);
+
+				expect(result).toHaveLength(1);
+				expect(result[0].todoId).toBe("1");
+				expect(result[0].completedAt).toBeNull();
+			});
+
+			it("should return multiple entries within range", () => {
+				localTodoStorage.addCompletionHistoryEntry({
+					todoId: "1",
+					scheduledDate: "2024-01-10T10:00:00.000Z",
+					completedAt: "2024-01-10T10:05:00.000Z",
+				});
+				localTodoStorage.addCompletionHistoryEntry({
+					todoId: "2",
+					scheduledDate: "2024-01-15T10:00:00.000Z",
+					completedAt: "2024-01-15T10:05:00.000Z",
+				});
+				localTodoStorage.addCompletionHistoryEntry({
+					todoId: "3",
+					scheduledDate: "2024-01-20T10:00:00.000Z",
+					completedAt: "2024-01-20T10:05:00.000Z",
+				});
+				localTodoStorage.addCompletionHistoryEntry({
+					todoId: "4",
+					scheduledDate: "2024-01-25T10:00:00.000Z",
+					completedAt: "2024-01-25T10:05:00.000Z",
+				});
+
+				const result = localTodoStorage.getLocalCompletionHistory(
+					"2024-01-12T00:00:00.000Z",
+					"2024-01-22T00:00:00.000Z",
+				);
+
+				expect(result).toHaveLength(2);
+				expect(result.map((e) => e.todoId).sort()).toEqual(["2", "3"]);
+			});
+
+			it("should handle ISO date strings correctly", () => {
+				localTodoStorage.addCompletionHistoryEntry({
+					todoId: "1",
+					scheduledDate: "2024-01-15",
+					completedAt: "2024-01-15T10:05:00.000Z",
+				});
+
+				const result = localTodoStorage.getLocalCompletionHistory(
+					"2024-01-01",
+					"2024-01-31",
+				);
+
+				expect(result).toHaveLength(1);
+				expect(result[0].todoId).toBe("1");
+			});
+		});
+
 		describe("Type validation", () => {
 			it("should accept valid entry with all required fields", () => {
 				const entry = {
