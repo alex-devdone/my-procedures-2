@@ -66,6 +66,7 @@ import {
 	getDateKey,
 	getRecurringMatchingDates,
 	getTodosUpcoming,
+	isEntryCompleted,
 	isVirtualTodo,
 	isWithinDays,
 	UpcomingView,
@@ -919,6 +920,68 @@ describe("flattenDateGroups", () => {
 	});
 });
 
+describe("isEntryCompleted", () => {
+	it("returns completed status for regular todos", () => {
+		const activeTodo = createMockTodo({ completed: false });
+		const completedTodo = createMockTodo({ completed: true });
+
+		expect(isEntryCompleted(activeTodo)).toBe(false);
+		expect(isEntryCompleted(completedTodo)).toBe(true);
+	});
+
+	it("returns occurrenceCompleted status for virtual todos", () => {
+		const today = new Date();
+		const dayOfWeek = today.getDay();
+
+		const baseTodo = createMockTodo({
+			id: 1, // Use number ID to match completion history
+			recurringPattern: {
+				type: "weekly",
+				daysOfWeek: [dayOfWeek],
+			},
+			completed: false, // Base todo is not completed
+		});
+
+		// Provide completion history showing this occurrence is completed
+		const completionHistory: CompletionRecord[] = [
+			{
+				todoId: 1,
+				scheduledDate: today,
+				completedAt: new Date(),
+			},
+		];
+
+		const result = getTodosUpcoming([baseTodo], completionHistory);
+		expect(result.length).toBeGreaterThanOrEqual(1);
+		// Even though base todo is not completed, the occurrence is completed
+		const todayGroup = result[0];
+		expect(todayGroup.todos.length).toBeGreaterThanOrEqual(1);
+		expect(isEntryCompleted(todayGroup.todos[0])).toBe(true);
+	});
+
+	it("returns false for virtual todos without occurrenceCompleted", () => {
+		const today = new Date();
+		const dayOfWeek = today.getDay();
+
+		const baseTodo = createMockTodo({
+			id: "recurring-1",
+			recurringPattern: {
+				type: "weekly",
+				daysOfWeek: [dayOfWeek],
+			},
+			completed: true, // Base todo is completed, but occurrence is not tracked
+		});
+
+		// No completion history
+		const result = getTodosUpcoming([baseTodo], undefined);
+		expect(result.length).toBeGreaterThanOrEqual(1);
+		const todayGroup = result[0];
+		expect(todayGroup.todos.length).toBeGreaterThanOrEqual(1);
+		// Even though base todo is completed, the occurrence is not (no history)
+		expect(isEntryCompleted(todayGroup.todos[0])).toBe(false);
+	});
+});
+
 describe("UpcomingView", () => {
 	const mockOnToggle = vi.fn();
 	const mockOnDelete = vi.fn();
@@ -928,6 +991,8 @@ describe("UpcomingView", () => {
 		vi.clearAllMocks();
 		mockUseFolderStorage.mockReturnValue(defaultMockFolderReturn);
 		mockGetProgress.mockReturnValue(null);
+		// Clear completion history data
+		mockCompletionHistoryData.length = 0;
 	});
 
 	describe("Rendering", () => {
@@ -1463,6 +1528,138 @@ describe("UpcomingView", () => {
 			fireEvent.click(deleteButton);
 
 			expect(mockOnDelete).toHaveBeenCalledWith("1");
+		});
+	});
+
+	describe("Recurring Todo Display", () => {
+		it("shows completed recurring todo when occurrence is completed via completion history", () => {
+			const today = new Date();
+			const dayOfWeek = today.getDay();
+
+			const todos = [
+				createMockTodo({
+					id: 1, // Use number ID to match completion history
+					text: "Weekly task",
+					recurringPattern: {
+						type: "weekly",
+						daysOfWeek: [dayOfWeek],
+					},
+					completed: false, // Base todo is not completed
+				}),
+			];
+
+			// Mock completion history to show today's occurrence is completed
+			mockCompletionHistoryData.push({
+				id: 1,
+				todoId: 1,
+				scheduledDate: today,
+				completedAt: new Date(),
+				createdAt: new Date(),
+				todoText: "Weekly task",
+			});
+
+			render(
+				<UpcomingView
+					todos={todos}
+					onToggle={mockOnToggle}
+					onDelete={mockOnDelete}
+				/>,
+			);
+
+			// The todo should be rendered (may appear 1-2 times depending on day of week)
+			expect(screen.getAllByText("Weekly task").length).toBeGreaterThanOrEqual(
+				1,
+			);
+
+			// When filtering by completed, the recurring todo should appear (today's occurrence)
+			fireEvent.click(screen.getByTestId("filter-completed"));
+			expect(screen.getByText("Weekly task")).toBeInTheDocument();
+		});
+
+		it("shows incomplete recurring todo when occurrence is not in completion history", () => {
+			const today = new Date();
+			const dayOfWeek = today.getDay();
+
+			const todos = [
+				createMockTodo({
+					id: 1,
+					text: "Weekly task incomplete",
+					recurringPattern: {
+						type: "weekly",
+						daysOfWeek: [dayOfWeek],
+					},
+					completed: false,
+				}),
+			];
+
+			// No completion history - occurrence is not completed
+
+			render(
+				<UpcomingView
+					todos={todos}
+					onToggle={mockOnToggle}
+					onDelete={mockOnDelete}
+				/>,
+			);
+
+			// The todo should be rendered
+			expect(
+				screen.getAllByText("Weekly task incomplete").length,
+			).toBeGreaterThanOrEqual(1);
+
+			// When filtering by active, the recurring todo should appear
+			fireEvent.click(screen.getByTestId("filter-active"));
+			expect(
+				screen.getAllByText("Weekly task incomplete").length,
+			).toBeGreaterThanOrEqual(1);
+
+			// When filtering by completed, it should NOT appear (no occurrences completed)
+			fireEvent.click(screen.getByTestId("filter-completed"));
+			expect(
+				screen.queryByText("Weekly task incomplete"),
+			).not.toBeInTheDocument();
+		});
+
+		it("filters recurring todos based on occurrence completion status", () => {
+			const today = new Date();
+			const tomorrow = new Date(today);
+			tomorrow.setDate(tomorrow.getDate() + 1);
+
+			const todos = [
+				createMockTodo({
+					id: 1,
+					text: "Daily task",
+					recurringPattern: { type: "daily" },
+					completed: false,
+				}),
+			];
+
+			// Mark today's occurrence as completed
+			mockCompletionHistoryData.push({
+				id: 1,
+				todoId: 1,
+				scheduledDate: today,
+				completedAt: new Date(),
+				createdAt: new Date(),
+				todoText: "Daily task",
+			});
+
+			render(
+				<UpcomingView
+					todos={todos}
+					onToggle={mockOnToggle}
+					onDelete={mockOnDelete}
+				/>,
+			);
+
+			// All filter should show all occurrences (8 days for daily)
+			expect(screen.getByTestId("filter-all")).toHaveTextContent("(8)");
+
+			// Active filter should show 7 (all except today's completed occurrence)
+			expect(screen.getByTestId("filter-active")).toHaveTextContent("(7)");
+
+			// Completed filter should show 1 (just today's completed occurrence)
+			expect(screen.getByTestId("filter-completed")).toHaveTextContent("(1)");
 		});
 	});
 
