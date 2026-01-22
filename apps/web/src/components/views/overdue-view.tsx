@@ -48,7 +48,11 @@ export interface OverdueViewProps {
 	/** Whether todos are loading */
 	isLoading?: boolean;
 	/** Callback when a todo is toggled */
-	onToggle: (id: number | string, completed: boolean) => void;
+	onToggle: (
+		id: number | string,
+		completed: boolean,
+		options?: { virtualDate?: string },
+	) => void;
 	/** Callback when a todo is deleted */
 	onDelete: (id: number | string) => void;
 	/** Callback when a todo's schedule is updated */
@@ -342,10 +346,14 @@ export function OverdueView({
 		return folders.find((f) => f.id === folderId) ?? null;
 	};
 
-	const handleToggleTodo = (id: number | string, completed: boolean) => {
+	const handleToggleTodo = (
+		id: number | string,
+		completed: boolean,
+		options?: { virtualDate?: string },
+	) => {
 		// Pass through - TodoExpandableItem already passes current state,
 		// parent will invert to get desired state
-		onToggle(id, completed);
+		onToggle(id, completed, options);
 	};
 
 	return (

@@ -711,6 +711,44 @@ describe("OverdueView", () => {
 
 			expect(mockOnDelete).toHaveBeenCalledWith("1");
 		});
+
+		it("onToggle callback accepts optional options parameter", () => {
+			// This test verifies that the onToggle callback signature supports
+			// the optional options parameter for virtualDate (for recurring todo instances)
+			const todos = [
+				createMockTodo({
+					id: "1",
+					text: "Test Task",
+					dueDate: getYesterdayISOString(),
+				}),
+			];
+
+			// Mock onToggle that accepts the options parameter
+			const mockOnToggleWithOptions =
+				vi.fn<
+					(
+						id: number | string,
+						completed: boolean,
+						options?: { virtualDate?: string },
+					) => void
+				>();
+
+			render(
+				<OverdueView
+					todos={todos}
+					onToggle={mockOnToggleWithOptions}
+					onDelete={mockOnDelete}
+				/>,
+			);
+
+			const toggleButton = screen.getByTestId("todo-toggle");
+			fireEvent.click(toggleButton);
+
+			// Verify the callback was called with id and completed
+			expect(mockOnToggleWithOptions).toHaveBeenCalledWith("1", true);
+			// The function signature should support the optional options parameter
+			expect(mockOnToggleWithOptions).toHaveBeenCalledTimes(1);
+		});
 	});
 
 	describe("Statistics", () => {
