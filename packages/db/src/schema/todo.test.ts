@@ -68,6 +68,25 @@ describe("todo schema", () => {
 		expect(columns.folderId.notNull).toBe(false);
 	});
 
+	it("has googleTaskId as nullable", () => {
+		const columns = getTableColumns(todo);
+		expect(columns.googleTaskId).toBeDefined();
+		expect(columns.googleTaskId.notNull).toBe(false);
+	});
+
+	it("has googleSyncEnabled with default false", () => {
+		const columns = getTableColumns(todo);
+		expect(columns.googleSyncEnabled).toBeDefined();
+		expect(columns.googleSyncEnabled.notNull).toBe(true);
+		expect(columns.googleSyncEnabled.default).toBe(false);
+	});
+
+	it("has lastSyncedAt as nullable", () => {
+		const columns = getTableColumns(todo);
+		expect(columns.lastSyncedAt).toBeDefined();
+		expect(columns.lastSyncedAt.notNull).toBe(false);
+	});
+
 	it("exports todo relations", () => {
 		expect(todoRelations).toBeDefined();
 	});
