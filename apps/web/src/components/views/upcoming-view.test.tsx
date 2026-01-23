@@ -57,6 +57,11 @@ vi.mock("@/app/api/analytics", () => ({
 	}),
 }));
 
+// Mock the completion realtime hook
+vi.mock("@/hooks/use-completion-realtime", () => ({
+	useCompletionRealtimeWithAuth: vi.fn(),
+}));
+
 // Import after mocks
 import {
 	type CompletionRecord,
@@ -515,7 +520,7 @@ describe("getTodosUpcoming", () => {
 		expect(isVirtualTodo(todayTodo)).toBe(false);
 	});
 
-	it("skips virtual entry for recurring todo on its dueDate", () => {
+	it("creates virtual entry for recurring todo even on its dueDate", () => {
 		const todos = [
 			createMockTodo({
 				id: "1",
@@ -526,17 +531,18 @@ describe("getTodosUpcoming", () => {
 		];
 
 		const result = getTodosUpcoming(todos);
-		// Today's group should have the original todo (not virtual)
+		// Today's group should have a virtual entry (to allow per-occurrence tracking)
 		const todayGroup = result.find((g) => g.label === "Today");
 		expect(todayGroup).toBeDefined();
 		expect(todayGroup?.todos).toHaveLength(1);
 		const todayTodo = todayGroup?.todos[0];
 		expect(todayTodo).toBeDefined();
 		if (todayTodo) {
-			expect(isVirtualTodo(todayTodo)).toBe(false);
+			// Recurring todos with dueDate should also be virtual to track completion by occurrence
+			expect(isVirtualTodo(todayTodo)).toBe(true);
 		}
 
-		// Other days should have virtual entries
+		// Other days should also have virtual entries
 		const otherGroups = result.filter((g) => g.label !== "Today");
 		for (const group of otherGroups) {
 			for (const todo of group.todos) {
@@ -1503,8 +1509,49 @@ describe("UpcomingView", () => {
 			const toggleButton = screen.getByTestId("todo-toggle");
 			fireEvent.click(toggleButton);
 
-			// The handler inverts completed (false -> true)
-			expect(mockOnToggle).toHaveBeenCalledWith("1", true);
+			// onToggle receives current state (false), parent will invert to true
+			// For regular todos (non-virtual), onToggle is called with only 2 args
+			expect(mockOnToggle).toHaveBeenCalledTimes(1);
+			expect(mockOnToggle.mock.calls[0]).toEqual(["1", false]);
+		});
+
+		it("calls onToggle with virtualDate when virtual recurring instance is toggled", () => {
+			const today = new Date();
+			const dayOfWeek = today.getDay();
+
+			const todos = [
+				createMockTodo({
+					id: "1",
+					text: "Recurring Task",
+					recurringPattern: {
+						type: "weekly",
+						daysOfWeek: [dayOfWeek],
+					},
+					completed: false,
+				}),
+			];
+
+			render(
+				<UpcomingView
+					todos={todos}
+					onToggle={mockOnToggle}
+					onDelete={mockOnDelete}
+				/>,
+			);
+
+			// Get all toggle buttons (there will be multiple for recurring instances)
+			const toggleButtons = screen.getAllByTestId("todo-toggle");
+			// Click the first one (today's instance)
+			fireEvent.click(toggleButtons[0]);
+
+			// onToggle receives current state (false) and virtualDate for virtual instances
+			const todayKey = getDateKey(today);
+			expect(mockOnToggle).toHaveBeenCalledTimes(1);
+			expect(mockOnToggle.mock.calls[0]).toEqual([
+				"1",
+				false,
+				{ virtualDate: todayKey },
+			]);
 		});
 
 		it("calls onDelete when todo is deleted", () => {
@@ -1528,6 +1575,90 @@ describe("UpcomingView", () => {
 			fireEvent.click(deleteButton);
 
 			expect(mockOnDelete).toHaveBeenCalledWith("1");
+		});
+
+		it("calls onToggle with virtualDate when recurring todo with dueDate is toggled", () => {
+			// This test verifies the fix for the bug where toggling a recurring todo
+			// in the Upcoming view with a future dueDate would not pass virtualDate,
+			// causing the wrong completion behavior (completeRecurring instead of updatePastCompletion)
+			const tomorrow = new Date();
+			tomorrow.setDate(tomorrow.getDate() + 1);
+			const tomorrowKey = getDateKey(tomorrow);
+
+			const todos = [
+				createMockTodo({
+					id: "1",
+					text: "Recurring with future due date",
+					dueDate: getTomorrowISOString(),
+					recurringPattern: { type: "daily" },
+					completed: false,
+				}),
+			];
+
+			render(
+				<UpcomingView
+					todos={todos}
+					onToggle={mockOnToggle}
+					onDelete={mockOnDelete}
+				/>,
+			);
+
+			// Find the date group for tomorrow (where the dueDate is)
+			const tomorrowGroup = screen.getByTestId(`date-group-${tomorrowKey}`);
+			expect(tomorrowGroup).toBeInTheDocument();
+
+			// Find the toggle button within tomorrow's group
+			// eslint-disable-next-line testing-library/no-node-access
+			const toggleButton = tomorrowGroup.querySelector(
+				'[data-testid="todo-toggle"]',
+			);
+			expect(toggleButton).toBeTruthy();
+			fireEvent.click(toggleButton as HTMLElement);
+
+			// onToggle should be called with virtualDate for recurring todos with dueDate
+			expect(mockOnToggle).toHaveBeenCalledTimes(1);
+			expect(mockOnToggle.mock.calls[0]).toEqual([
+				"1",
+				false,
+				{ virtualDate: tomorrowKey },
+			]);
+		});
+
+		it("calls onToggle with virtualDate when recurring todo with today's dueDate is toggled", () => {
+			// This test verifies that recurring todos with today's dueDate also pass virtualDate
+			// so the toggle function can correctly identify it as the current occurrence
+			const today = new Date();
+			const todayKey = getDateKey(today);
+
+			const todos = [
+				createMockTodo({
+					id: "1",
+					text: "Recurring with today due date",
+					dueDate: getTodayISOString(),
+					recurringPattern: { type: "daily" },
+					completed: false,
+				}),
+			];
+
+			render(
+				<UpcomingView
+					todos={todos}
+					onToggle={mockOnToggle}
+					onDelete={mockOnDelete}
+				/>,
+			);
+
+			// Find the first toggle button (today's entry which has the dueDate)
+			const toggleButtons = screen.getAllByTestId("todo-toggle");
+			fireEvent.click(toggleButtons[0]);
+
+			// onToggle should be called with virtualDate even for the current dueDate
+			expect(mockOnToggle).toHaveBeenCalledTimes(1);
+			expect(mockOnToggle.mock.calls[0]).toEqual([
+				"1",
+				false,
+				{ virtualDate: todayKey },
+			]);
 		});
 	});
 

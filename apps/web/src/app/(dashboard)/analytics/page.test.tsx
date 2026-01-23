@@ -15,10 +15,23 @@ vi.mock("@/components/analytics/analytics-dashboard", () => ({
 	),
 }));
 
+// Mock FolderSidebar component to avoid supabase dependency
+vi.mock("@/components/folders/folder-sidebar", () => ({
+	FolderSidebar: () => <div data-testid="folder-sidebar">Folder Sidebar</div>,
+}));
+
+// Mock useFolderNavigation hook
+vi.mock("@/hooks/use-folder-navigation", () => ({
+	useFolderNavigation: () => ({
+		navigateToFolder: vi.fn(),
+	}),
+}));
+
 // Mock lucide-react icons
 vi.mock("lucide-react", () => ({
 	Cloud: () => <div data-testid="cloud-icon" />,
 	HardDrive: () => <div data-testid="hard-drive-icon" />,
+	Menu: () => <div data-testid="menu-icon" />,
 	Sparkles: () => <div data-testid="sparkles-icon" />,
 }));
 
@@ -120,9 +133,9 @@ describe("AnalyticsPage", () => {
 		it("has the correct container structure", () => {
 			const { container } = render(<AnalyticsPage />);
 
-			// Check for main container with positioning classes
+			// Check for main container with flex layout classes
 			const mainContainer = container.firstChild;
-			expect(mainContainer).toHaveClass("relative", "min-h-full");
+			expect(mainContainer).toHaveClass("flex", "min-h-full");
 		});
 
 		it("renders background decoration element", () => {

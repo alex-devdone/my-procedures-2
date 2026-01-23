@@ -17,6 +17,7 @@ import { TodoExpandableItem } from "@/components/todos";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useCompletionRealtimeWithAuth } from "@/hooks/use-completion-realtime";
 import { isDateMatchingPattern } from "@/lib/recurring-utils";
 import { cn } from "@/lib/utils";
 
@@ -100,7 +101,11 @@ export interface TodayViewProps {
 	/** Whether todos are loading */
 	isLoading?: boolean;
 	/** Callback when a todo is toggled */
-	onToggle: (id: number | string, completed: boolean) => void;
+	onToggle: (
+		id: number | string,
+		completed: boolean,
+		options?: { virtualDate?: string },
+	) => void;
 	/** Callback when a todo is deleted */
 	onDelete: (id: number | string) => void;
 	/** Callback when a todo's schedule is updated */
@@ -211,6 +216,10 @@ export function TodayView({
 	const { folders } = useFolderStorage();
 	const { getProgress } = useAllSubtasksProgress();
 
+	// Enable realtime sync for completion history
+	// This automatically invalidates and refetches when completion records change
+	useCompletionRealtimeWithAuth();
+
 	// Calculate date range for completion history (today only)
 	const dateRange = useMemo(() => {
 		const today = new Date();
@@ -261,6 +270,58 @@ export function TodayView({
 		});
 	}, [todayTodos, filter, searchQuery]);
 
+	// Sort todos: by time in descending order (latest first, no separation by completion status)
+	const sortedTodos = useMemo(() => {
+		return [...filteredTodos].sort((a, b) => {
+			// Sort by time
+			const getTime = (todo: typeof a): number | null => {
+				// Check recurring pattern notifyAt first (e.g., "09:00", "21:00")
+				if (todo.recurringPattern?.notifyAt) {
+					const [hours, minutes] = todo.recurringPattern.notifyAt
+						.split(":")
+						.map(Number);
+					return hours * 60 + minutes;
+				}
+				// Check reminderAt (it has explicit time)
+				if (todo.reminderAt) {
+					const date = new Date(todo.reminderAt);
+					return date.getHours() * 60 + date.getMinutes();
+				}
+				// Check if dueDate has a time component (not midnight)
+				if (todo.dueDate) {
+					const date = new Date(todo.dueDate);
+					const minutes = date.getHours() * 60 + date.getMinutes();
+					// If it's not midnight (00:00), consider it has a time
+					if (minutes > 0) {
+						return minutes;
+					}
+				}
+				return null;
+			};
+
+			const aTime = getTime(a);
+			const bTime = getTime(b);
+
+			// Both have time: sort by time descending (latest first)
+			if (aTime !== null && bTime !== null) {
+				return bTime - aTime;
+			}
+
+			// Only a has time: a comes first
+			if (aTime !== null) {
+				return -1;
+			}
+
+			// Only b has time: b comes first
+			if (bTime !== null) {
+				return 1;
+			}
+
+			// Neither has time: maintain original order
+			return 0;
+		});
+	}, [filteredTodos]);
+
 	// Stats for today's todos
 	const stats = useMemo(() => {
 		const total = todayTodos.length;
@@ -275,8 +336,14 @@ export function TodayView({
 		return folders.find((f) => f.id === folderId) ?? null;
 	};
 
-	const handleToggleTodo = (id: number | string, completed: boolean) => {
-		onToggle(id, !completed);
+	const handleToggleTodo = (entry: TodayTodoEntry, completed: boolean) => {
+		const id = entry.id;
+		// Detect virtual recurring instances and pass virtualDate option
+		if (isVirtualTodo(entry)) {
+			onToggle(id, completed, { virtualDate: entry.virtualDate });
+		} else {
+			onToggle(id, completed);
+		}
 	};
 
 	return (
@@ -369,7 +436,7 @@ export function TodayView({
 								</div>
 							))}
 						</div>
-					) : filteredTodos.length === 0 ? (
+					) : sortedTodos.length === 0 ? (
 						<TodayEmptyState
 							filter={filter}
 							searchQuery={searchQuery}
@@ -377,7 +444,7 @@ export function TodayView({
 						/>
 					) : (
 						<ul className="space-y-2" data-testid="today-todo-list">
-							{filteredTodos.map((todo, index) => {
+							{sortedTodos.map((todo, index) => {
 								const todoFolder = getFolderForTodo(todo.folderId);
 								// Use virtualKey for recurring instances, otherwise use id
 								const itemKey = isVirtualTodo(todo) ? todo.virtualKey : todo.id;
@@ -392,7 +459,9 @@ export function TodayView({
 											completed: displayCompleted,
 										}}
 										subtaskProgress={getProgress(todo.id)}
-										onToggle={handleToggleTodo}
+										onToggle={(_id, completed) =>
+											handleToggleTodo(todo, completed)
+										}
 										onDelete={onDelete}
 										onScheduleChange={onScheduleChange}
 										folder={todoFolder}

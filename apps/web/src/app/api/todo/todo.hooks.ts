@@ -9,6 +9,7 @@ import {
 	useState,
 	useSyncExternalStore,
 } from "react";
+import { notifyLocalAnalyticsListeners } from "@/app/api/analytics";
 import { useTodoRealtimeWithAuth } from "@/hooks/use-todo-realtime";
 import { useSession } from "@/lib/auth-client";
 import * as localTodoStorage from "@/lib/local-todo-storage";
@@ -16,10 +17,12 @@ import { queryClient } from "@/utils/trpc";
 import {
 	getAllTodosQueryOptions,
 	getBulkCreateTodosMutationOptions,
+	getCompleteRecurringMutationOptions,
 	getCreateTodoMutationOptions,
 	getDeleteTodoMutationOptions,
 	getTodosQueryKey,
 	getToggleTodoMutationOptions,
+	getUpdatePastCompletionMutationOptions,
 	getUpdateTodoFolderMutationOptions,
 	getUpdateTodoScheduleMutationOptions,
 } from "./todo.api";
@@ -274,6 +277,156 @@ export function useTodoStorage(): UseTodoStorageReturn {
 		},
 	});
 
+	// Complete recurring mutation with optimistic updates
+	const completeRecurringMutation = useMutation({
+		...getCompleteRecurringMutationOptions(),
+		onMutate: async ({ id }: { id: number }) => {
+			// Cancel outgoing refetches
+			await queryClient.cancelQueries({ queryKey });
+
+			// Snapshot previous value
+			const previousTodos = queryClient.getQueryData<RemoteTodo[]>(queryKey);
+
+			// Optimistically mark the todo as completed
+			queryClient.setQueryData<RemoteTodo[]>(queryKey, (old) =>
+				old?.map((todo) =>
+					todo.id === id ? { ...todo, completed: true } : todo,
+				),
+			);
+
+			return { previousTodos };
+		},
+		onError: (_err, _variables, context) => {
+			// Rollback on error
+			if (context?.previousTodos) {
+				queryClient.setQueryData(queryKey, context.previousTodos);
+			}
+		},
+		onSettled: () => {
+			// Refetch to get the new occurrence created by the backend
+			refetchRemoteTodos();
+		},
+	});
+
+	// Update past completion mutation with optimistic updates
+	const updatePastCompletionMutation = useMutation({
+		mutationFn: getUpdatePastCompletionMutationOptions().mutationFn,
+		onMutate: async ({
+			todoId,
+			scheduledDate,
+			completed,
+		}: {
+			todoId: number;
+			scheduledDate: string;
+			completed: boolean;
+		}) => {
+			// Cancel outgoing refetches for todos
+			await queryClient.cancelQueries({ queryKey });
+
+			const previousTodos = queryClient.getQueryData<RemoteTodo[]>(queryKey);
+
+			// Optimistically update the todo's completed status for past occurrences
+			queryClient.setQueryData<RemoteTodo[]>(queryKey, (old) =>
+				old?.map((todo) =>
+					todo.id === todoId ? { ...todo, completed } : todo,
+				),
+			);
+
+			// Cancel and snapshot all completion history queries (Supabase-based)
+			await queryClient.cancelQueries({ queryKey: ["completionHistory"] });
+
+			const previousCompletionHistories = queryClient.getQueriesData<
+				Array<{
+					id: number;
+					todoId: number;
+					scheduledDate: string;
+					completedAt: string | null;
+				}>
+			>({
+				queryKey: ["completionHistory"],
+			});
+
+			// Normalize scheduled date for comparison (YYYY-MM-DD)
+			const scheduledDateKey = new Date(scheduledDate)
+				.toISOString()
+				.split("T")[0];
+
+			// Optimistically update all completion history queries
+			queryClient.setQueriesData(
+				{ queryKey: ["completionHistory"] },
+				(
+					old:
+						| Array<{
+								id: number;
+								todoId: number;
+								scheduledDate: string;
+								completedAt: string | null;
+						  }>
+						| undefined,
+				) => {
+					if (!old) return old;
+
+					// Check if a record exists for this todoId and scheduledDate
+					const existingIndex = old.findIndex((record) => {
+						const recordDateKey = new Date(record.scheduledDate)
+							.toISOString()
+							.split("T")[0];
+						return (
+							record.todoId === todoId && recordDateKey === scheduledDateKey
+						);
+					});
+
+					if (existingIndex >= 0) {
+						// Update existing record
+						const updated = [...old];
+						updated[existingIndex] = {
+							...updated[existingIndex],
+							completedAt: completed ? new Date().toISOString() : null,
+						};
+						return updated;
+					}
+
+					// If completing and no record exists, add a new one (optimistic)
+					if (completed) {
+						return [
+							...old,
+							{
+								id: -Date.now(), // Temporary optimistic ID
+								todoId,
+								scheduledDate,
+								completedAt: new Date().toISOString(),
+							},
+						];
+					}
+
+					return old;
+				},
+			);
+
+			return { previousTodos, previousCompletionHistories };
+		},
+		onError: (_err, _variables, context) => {
+			// Rollback todos
+			if (context?.previousTodos) {
+				queryClient.setQueryData(queryKey, context.previousTodos);
+			}
+
+			// Rollback all completion history queries
+			if (context?.previousCompletionHistories) {
+				for (const [key, data] of context.previousCompletionHistories) {
+					queryClient.setQueryData(key, data);
+				}
+			}
+		},
+		onSettled: () => {
+			refetchRemoteTodos();
+			// Invalidate all completion history queries to refresh from server
+			queryClient.invalidateQueries({
+				queryKey: ["completionHistory"],
+			});
+		},
+	});
+
 	const create = useCallback(
 		async (
 			text: string,
@@ -314,29 +467,105 @@ export function useTodoStorage(): UseTodoStorageReturn {
 	);
 
 	const toggle = useCallback(
-		async (id: number | string, completed: boolean) => {
+		async (
+			id: number | string,
+			completed: boolean,
+			options?: { virtualDate?: string },
+		) => {
 			if (isAuthenticated) {
 				// Skip server call for optimistic (negative) IDs - they haven't been created yet
 				if (typeof id === "number" && id < 0) {
 					return;
 				}
+
+				// For recurring todos, handle special completion/uncompletion logic
+				const currentTodos = remoteTodos || [];
+				const todo = currentTodos.find((t) => t.id === id);
+
+				if (todo?.recurringPattern) {
+					// Check if the virtualDate matches the todo's actual dueDate
+					// If so, we should use completeRecurring to create the next occurrence
+					const todoDateKey = todo.dueDate ? todo.dueDate.split("T")[0] : null;
+					const isCurrentOccurrence =
+						options?.virtualDate && todoDateKey === options.virtualDate;
+
+					// If virtualDate is provided but does NOT match the todo's dueDate,
+					// use updatePastCompletion for pattern-generated virtual occurrences
+					if (options?.virtualDate && !isCurrentOccurrence) {
+						// Convert YYYY-MM-DD to ISO datetime format (YYYY-MM-DDTHH:mm:ssZ)
+						const scheduledDateTime = `${options.virtualDate}T00:00:00Z`;
+						await updatePastCompletionMutation.mutateAsync({
+							todoId: id as number,
+							scheduledDate: scheduledDateTime,
+							completed,
+						});
+						// Note: We do NOT call completeRecurring for past occurrences
+						// because completing a past missed occurrence should NOT:
+						// 1. Mark the original todo as completed
+						// 2. Create a new occurrence (the pattern should continue as-is)
+						return;
+					}
+
+					// For current occurrence or no virtualDate
+					if (completed) {
+						// Complete the recurring todo and create next occurrence
+						await completeRecurringMutation.mutateAsync({ id: id as number });
+					} else {
+						// For uncompleting without virtualDate, just toggle normally
+						await toggleMutation.mutateAsync({ id: id as number, completed });
+					}
+					return;
+				}
+
+				// Regular toggle for non-recurring todos
 				await toggleMutation.mutateAsync({ id: id as number, completed });
 			} else {
 				// For recurring todos being completed, use completeRecurring to create next occurrence
 				const localTodos = localTodoStorage.getAll();
 				const todo = localTodos.find((t) => t.id === id);
 
-				if (todo?.recurringPattern && completed) {
-					// Complete the recurring todo and create next occurrence
-					localTodoStorage.completeRecurring(id as string);
+				if (todo?.recurringPattern) {
+					// Check if the virtualDate matches the todo's actual dueDate
+					// If so, we should use completeRecurring to create the next occurrence
+					const todoDateKey = todo.dueDate ? todo.dueDate.split("T")[0] : null;
+					const isCurrentOccurrence =
+						options?.virtualDate && todoDateKey === options.virtualDate;
+
+					// If virtualDate is provided but does NOT match the todo's dueDate,
+					// toggle specific occurrence in completion history
+					if (options?.virtualDate && !isCurrentOccurrence) {
+						localTodoStorage.toggleLocalOccurrence(
+							id as string,
+							options.virtualDate,
+							completed,
+						);
+						// Also notify analytics listeners since completion history changed
+						notifyLocalAnalyticsListeners();
+						// Note: We do NOT call completeRecurring for overdue occurrences
+						// because completing a past missed occurrence should NOT:
+						// 1. Mark the original todo as completed
+						// 2. Create a new occurrence (the pattern should continue as-is)
+					} else if (completed) {
+						// Complete the recurring todo and create next occurrence
+						localTodoStorage.completeRecurring(id as string);
+					} else {
+						// For uncompleting without virtualDate, just toggle normally
+						localTodoStorage.toggle(id as string);
+					}
 				} else {
-					// Regular toggle for non-recurring todos or unchecking
+					// Regular toggle for non-recurring todos
 					localTodoStorage.toggle(id as string);
 				}
 				notifyLocalTodosListeners();
 			}
 		},
-		[isAuthenticated, toggleMutation],
+		[
+			isAuthenticated,
+			toggleMutation,
+			remoteTodos,
+			completeRecurringMutation,
+			updatePastCompletionMutation,
+		],
 	);
 
 	const deleteTodo = useCallback(
@@ -403,6 +632,29 @@ export function useTodoStorage(): UseTodoStorageReturn {
 		[isAuthenticated, updateScheduleMutation],
 	);
 
+	const updatePastCompletion = useCallback(
+		async (
+			todoId: number | string,
+			scheduledDate: string,
+			completed: boolean,
+		) => {
+			if (isAuthenticated) {
+				// Skip server call for optimistic (negative) IDs - they haven't been created yet
+				if (typeof todoId === "number" && todoId < 0) {
+					return;
+				}
+				await updatePastCompletionMutation.mutateAsync({
+					todoId: todoId as number,
+					scheduledDate,
+					completed,
+				});
+			}
+			// Note: Local storage does not support past completion updates
+			// This feature is only available for authenticated users
+		},
+		[isAuthenticated, updatePastCompletionMutation],
+	);
+
 	const todos: Todo[] = useMemo(() => {
 		if (isAuthenticated) {
 			return (remoteTodos ?? []).map((t) => ({
@@ -456,6 +708,7 @@ export function useTodoStorage(): UseTodoStorageReturn {
 		deleteTodo,
 		updateFolder,
 		updateSchedule,
+		updatePastCompletion,
 		isLoading,
 		isAuthenticated,
 		selectedFolderId,

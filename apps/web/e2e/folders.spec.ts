@@ -826,6 +826,126 @@ test.describe("Folder functionality (localStorage mode)", () => {
 		});
 	});
 
+	test.describe("Recurring todo in folder view", () => {
+		test("should create next occurrence when completing recurring todo in folder view", async ({
+			page,
+		}) => {
+			// Create a folder
+			await page.click('[data-testid="create-folder-button"]');
+			await page.fill('[data-testid="folder-name-input"]', "Work");
+			await page
+				.locator('label:has([data-testid="folder-color-blue"])')
+				.click();
+			await page.click('[data-testid="folder-create-submit"]');
+
+			// Select the folder
+			const folderButton = page
+				.locator('button[data-testid^="folder-item-"]')
+				.filter({ hasText: "Work" });
+			await folderButton.click();
+			await expect(folderButton).toHaveAttribute("aria-current", "page");
+
+			// Create a todo in the folder
+			const todoText = "Daily recurring in folder";
+			await page.fill('input[placeholder^="Add task to"]', todoText);
+			await page.click('button[type="submit"]:has-text("Add")');
+
+			const todoItem = page
+				.locator('[data-testid^="todo-item-"]')
+				.filter({ hasText: todoText });
+			await expect(todoItem).toBeVisible();
+
+			// Store the original todo's testid for later reference
+			const originalTodoTestId = await todoItem.getAttribute("data-testid");
+
+			// Open the schedule popover
+			await todoItem.hover();
+			await todoItem
+				.locator('[data-testid="todo-schedule-popover-trigger"]')
+				.click();
+			await expect(
+				page.locator('[data-testid="todo-schedule-popover"]'),
+			).toBeVisible();
+
+			// Set due date to today
+			await page.click('[data-testid="date-picker-trigger"]');
+			await page.click('[data-testid="date-picker-preset-today"]');
+
+			// Set daily recurring
+			await page.click('[data-testid="recurring-picker-trigger"]');
+			await page.click('[data-testid="recurring-picker-preset-daily"]');
+			await page.keyboard.press("Escape");
+
+			// Verify the todo has due date and recurring indicator
+			await expect(
+				todoItem.locator('[data-testid="due-date-badge"]'),
+			).toContainText("Today");
+			await expect(
+				todoItem.locator('[data-testid="recurring-indicator"]'),
+			).toBeVisible();
+
+			// Complete the todo by clicking the toggle
+			await todoItem.locator('[data-testid="todo-toggle"]').click();
+
+			// The original todo should be marked as completed
+			const originalTodo = page.locator(
+				`[data-testid="${originalTodoTestId}"]`,
+			);
+			await expect(
+				originalTodo.locator('[data-testid="todo-toggle"]'),
+			).toHaveAttribute("aria-label", "Mark as incomplete");
+
+			// A new todo with the same text should be created for the next occurrence
+			// There should now be 2 todos with the same text in this folder view
+			const todosWithText = page
+				.locator('[data-testid^="todo-item-"]')
+				.filter({ hasText: todoText });
+			await expect(todosWithText).toHaveCount(2);
+
+			// Find the new uncompleted todo
+			const newTodoItem = page
+				.locator('[data-testid^="todo-item-"]')
+				.filter({ hasText: todoText })
+				.filter({
+					has: page.locator(
+						'[data-testid="todo-toggle"][aria-label="Mark as complete"]',
+					),
+				});
+			await expect(newTodoItem).toBeVisible();
+
+			// The new todo should have a due date badge showing "Tomorrow"
+			await expect(
+				newTodoItem.locator('[data-testid="due-date-badge"]'),
+			).toContainText("Tomorrow");
+
+			// The new todo should also have the recurring indicator
+			await expect(
+				newTodoItem.locator('[data-testid="recurring-indicator"]'),
+			).toBeVisible();
+
+			// Verify the new todo is NOT in Inbox (wait for folder switch)
+			await page.click('[data-testid="inbox-folder"]');
+			await expect(
+				page.locator('[data-testid="inbox-folder"]'),
+			).toHaveAttribute("aria-current", "page");
+
+			// Give time for the view to update
+			await page.waitForTimeout(100);
+
+			// Inbox should not have any todos with this text
+			await expect(
+				page
+					.locator('[data-testid^="todo-item-"]')
+					.filter({ hasText: todoText }),
+			).toHaveCount(0);
+
+			// Go back to Work folder and verify both todos are still there
+			await folderButton.click();
+			await expect(folderButton).toHaveAttribute("aria-current", "page");
+			await expect(todosWithText).toHaveCount(2);
+		});
+	});
+
 	test.describe("Empty state", () => {
 		test("should show empty state when no folders exist", async ({ page }) => {
 			// No folders created, empty state should be visible

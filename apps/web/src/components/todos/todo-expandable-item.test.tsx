@@ -241,7 +241,8 @@ describe("TodoExpandableItem", () => {
 
 			fireEvent.click(screen.getByTestId("todo-toggle"));
 
-			expect(mockOnToggle).toHaveBeenCalledWith("todo-1", false);
+			// onToggle now includes optional options parameter (undefined for non-virtual todos)
+			expect(mockOnToggle).toHaveBeenCalledWith("todo-1", false, undefined);
 		});
 
 		it("calls onToggle with completed=true for completed todo", () => {
@@ -256,7 +257,8 @@ describe("TodoExpandableItem", () => {
 
 			fireEvent.click(screen.getByTestId("todo-toggle"));
 
-			expect(mockOnToggle).toHaveBeenCalledWith("todo-1", true);
+			// onToggle now includes optional options parameter (undefined for non-virtual todos)
+			expect(mockOnToggle).toHaveBeenCalledWith("todo-1", true, undefined);
 		});
 	});
 

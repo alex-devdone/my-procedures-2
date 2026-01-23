@@ -1,7 +1,12 @@
 // Smart views for filtering todos by various criteria
 
-export type { OverdueViewProps } from "./overdue-view";
-export { getTodosOverdue, OverdueView } from "./overdue-view";
+export type { OverdueDateGroup, OverdueViewProps } from "./overdue-view";
+export {
+	formatOverdueDateLabel,
+	getTodosOverdue,
+	getTodosOverdueGrouped,
+	OverdueView,
+} from "./overdue-view";
 export type { TodayViewProps } from "./today-view";
 export { getTodosDueToday, TodayView } from "./today-view";
 export type {

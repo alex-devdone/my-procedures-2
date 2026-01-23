@@ -2945,4 +2945,151 @@ describe("local-todo-storage", () => {
 			});
 		});
 	});
+
+	describe("toggleLocalOccurrence", () => {
+		const COMPLETION_HISTORY_KEY = "completion_history";
+
+		it("should mark a past occurrence as completed", () => {
+			const scheduledDate = "2024-01-15T10:00:00.000Z";
+			const history = [
+				{
+					todoId: "todo-1",
+					scheduledDate,
+					completedAt: null,
+				},
+			];
+			localStorageMock.setItem(COMPLETION_HISTORY_KEY, JSON.stringify(history));
+
+			const result = localTodoStorage.toggleLocalOccurrence(
+				"todo-1",
+				scheduledDate,
+				true,
+			);
+
+			expect(result).not.toBeNull();
+			expect(result?.todoId).toBe("todo-1");
+			expect(result?.scheduledDate).toBe(scheduledDate);
+			expect(result?.completedAt).not.toBeNull();
+
+			const stored = JSON.parse(
+				localStorageMock._store[COMPLETION_HISTORY_KEY] ?? "[]",
+			);
+			expect(stored[0].completedAt).not.toBeNull();
+		});
+
+		it("should mark a completed occurrence as uncompleted", () => {
+			const scheduledDate = "2024-01-15T10:00:00.000Z";
+			const completedAt = "2024-01-15T10:05:00.000Z";
+			const history = [
+				{
+					todoId: "todo-1",
+					scheduledDate,
+					completedAt,
+				},
+			];
+			localStorageMock.setItem(COMPLETION_HISTORY_KEY, JSON.stringify(history));
+
+			const result = localTodoStorage.toggleLocalOccurrence(
+				"todo-1",
+				scheduledDate,
+				false,
+			);
+
+			expect(result).not.toBeNull();
+			expect(result?.todoId).toBe("todo-1");
+			expect(result?.scheduledDate).toBe(scheduledDate);
+			expect(result?.completedAt).toBeNull();
+
+			const stored = JSON.parse(
+				localStorageMock._store[COMPLETION_HISTORY_KEY] ?? "[]",
+			);
+			expect(stored[0].completedAt).toBeNull();
+		});
+
+		it("should create entry when it does not exist", () => {
+			const result = localTodoStorage.toggleLocalOccurrence(
+				"non-existent",
+				"2024-01-15T10:00:00.000Z",
+				true,
+			);
+
+			// Should create a new entry when it doesn't exist
+			expect(result).not.toBeNull();
+			expect(result.todoId).toBe("non-existent");
+			expect(result.scheduledDate).toBe("2024-01-15T10:00:00.000Z");
+			expect(result.completedAt).not.toBeNull();
+
+			// Verify entry was actually stored
+			const stored = JSON.parse(
+				localStorageMock._store[COMPLETION_HISTORY_KEY] ?? "[]",
+			);
+			expect(stored).toHaveLength(1);
+			expect(stored[0].todoId).toBe("non-existent");
+		});
+
+		it("should only update the matching entry by todoId and scheduledDate", () => {
+			const history = [
+				{
+					todoId: "todo-1",
+					scheduledDate: "2024-01-15T10:00:00.000Z",
+					completedAt: null,
+				},
+				{
+					todoId: "todo-1",
+					scheduledDate: "2024-01-16T10:00:00.000Z",
+					completedAt: null,
+				},
+				{
+					todoId: "todo-2",
+					scheduledDate: "2024-01-15T10:00:00.000Z",
+					completedAt: null,
+				},
+			];
+			localStorageMock.setItem(COMPLETION_HISTORY_KEY, JSON.stringify(history));
+
+			const result = localTodoStorage.toggleLocalOccurrence(
+				"todo-1",
+				"2024-01-15T10:00:00.000Z",
+				true,
+			);
+
+			expect(result).not.toBeNull();
+			expect(result?.todoId).toBe("todo-1");
+			expect(result?.scheduledDate).toBe("2024-01-15T10:00:00.000Z");
+
+			const stored = JSON.parse(
+				localStorageMock._store[COMPLETION_HISTORY_KEY] ?? "[]",
+			);
+			expect(stored[0].completedAt).not.toBeNull(); // First entry updated
+			expect(stored[1].completedAt).toBeNull(); // Second entry unchanged
+			expect(stored[2].completedAt).toBeNull(); // Third entry unchanged
+		});
+
+		it("should set completedAt to current timestamp when marking completed", () => {
+			const scheduledDate = "2024-01-15T10:00:00.000Z";
+			const history = [
+				{
+					todoId: "todo-1",
+					scheduledDate,
+					completedAt: null,
+				},
+			];
+			localStorageMock.setItem(COMPLETION_HISTORY_KEY, JSON.stringify(history));
+
+			const beforeTime = Date.now();
+			const result = localTodoStorage.toggleLocalOccurrence(
+				"todo-1",
+				scheduledDate,
+				true,
+			);
+			const afterTime = Date.now();
+
+			expect(result).not.toBeNull();
+			if (result?.completedAt) {
+				const completedAtTime = new Date(result.completedAt).getTime();
+				expect(completedAtTime).toBeGreaterThanOrEqual(beforeTime);
+				expect(completedAtTime).toBeLessThanOrEqual(afterTime);
+			}
+		});
+	});
 });

@@ -159,6 +159,12 @@ export const completeRecurringInputSchema = z.object({
 	completedOccurrences: z.number().int().nonnegative().optional(),
 });
 
+export const updatePastCompletionInputSchema = z.object({
+	todoId: z.number(),
+	scheduledDate: z.string().datetime(),
+	completed: z.boolean(),
+});
+
 // ============================================================================
 // Input Schemas (Zod) - Local (localStorage) Operations
 // ============================================================================
@@ -207,6 +213,9 @@ export type UpdateTodoScheduleInput = z.infer<
 export type GetDueInRangeInput = z.infer<typeof getDueInRangeInputSchema>;
 export type CompleteRecurringInput = z.infer<
 	typeof completeRecurringInputSchema
+>;
+export type UpdatePastCompletionInput = z.infer<
+	typeof updatePastCompletionInputSchema
 >;
 
 // ============================================================================
@@ -267,7 +276,11 @@ export interface UseTodoStorageReturn {
 			recurringPattern?: RecurringPattern | null;
 		},
 	) => Promise<void>;
-	toggle: (id: number | string, completed: boolean) => Promise<void>;
+	toggle: (
+		id: number | string,
+		completed: boolean,
+		options?: { virtualDate?: string },
+	) => Promise<void>;
 	deleteTodo: (id: number | string) => Promise<void>;
 	updateFolder: (
 		id: number | string,
@@ -280,6 +293,11 @@ export interface UseTodoStorageReturn {
 			reminderAt?: string | null;
 			recurringPattern?: RecurringPattern | null;
 		},
+	) => Promise<void>;
+	updatePastCompletion: (
+		todoId: number | string,
+		scheduledDate: string,
+		completed: boolean,
 	) => Promise<void>;
 	isLoading: boolean;
 	isAuthenticated: boolean;

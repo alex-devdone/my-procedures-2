@@ -41,7 +41,11 @@ export interface TodoExpandableItemProps {
 	/** Subtask progress for this todo */
 	subtaskProgress?: SubtaskProgress | null;
 	/** Callback when toggle is clicked */
-	onToggle: (id: number | string, completed: boolean) => void;
+	onToggle: (
+		id: number | string,
+		completed: boolean,
+		options?: { virtualDate?: string },
+	) => void;
 	/** Callback when delete is clicked */
 	onDelete: (id: number | string) => void;
 	/** Callback when schedule is updated */
@@ -135,8 +139,12 @@ export function TodoExpandableItem({
 	);
 
 	const handleToggle = useCallback(() => {
-		onToggle(todo.id, todo.completed);
-	}, [todo.id, todo.completed, onToggle]);
+		onToggle(
+			todo.id,
+			todo.completed,
+			_virtualDate ? { virtualDate: _virtualDate } : undefined,
+		);
+	}, [todo.id, todo.completed, onToggle, _virtualDate]);
 
 	const handleDelete = useCallback(() => {
 		onDelete(todo.id);
@@ -156,16 +164,24 @@ export function TodoExpandableItem({
 	const handleAllSubtasksCompleted = useCallback(() => {
 		// Auto-complete parent todo when all subtasks are done
 		if (!todo.completed) {
-			onToggle(todo.id, false); // false means current state, will be toggled to true
+			onToggle(
+				todo.id,
+				false,
+				_virtualDate ? { virtualDate: _virtualDate } : undefined,
+			);
 		}
-	}, [todo.id, todo.completed, onToggle]);
+	}, [todo.id, todo.completed, onToggle, _virtualDate]);
 
 	const handleSubtaskUncompleted = useCallback(() => {
 		// Auto-uncomplete parent todo when a subtask is unchecked
 		if (todo.completed) {
-			onToggle(todo.id, true); // true means current state, will be toggled to false
+			onToggle(
+				todo.id,
+				true,
+				_virtualDate ? { virtualDate: _virtualDate } : undefined,
+			);
 		}
-	}, [todo.id, todo.completed, onToggle]);
+	}, [todo.id, todo.completed, onToggle, _virtualDate]);
 
 	return (
 		<li

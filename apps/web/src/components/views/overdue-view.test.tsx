@@ -7,6 +7,23 @@ import type { Folder, UseFolderStorageReturn } from "@/app/api/folder";
 import type { SubtaskProgress } from "@/app/api/subtask";
 import type { Todo } from "@/app/api/todo/todo.types";
 
+// Mock completion history data
+let mockCompletionHistoryData: Array<{
+	id: string | number;
+	todoId: string | number;
+	scheduledDate: string;
+	completedAt: string | null;
+}> = [];
+
+// Mock the analytics hooks
+vi.mock("@/app/api/analytics", () => ({
+	useCompletionHistory: () => ({
+		data: mockCompletionHistoryData,
+		isLoading: false,
+		isPending: false,
+	}),
+}));
+
 // Mock the folder hooks
 const mockUseFolderStorage = vi.fn<() => UseFolderStorageReturn>();
 vi.mock("@/app/api/folder", () => ({
@@ -38,6 +55,11 @@ vi.mock("@/components/notifications/reminder-provider", () => ({
 		dueReminders: [],
 		dismissReminder: vi.fn(),
 	}),
+}));
+
+// Mock the completion realtime hook
+vi.mock("@/hooks/use-completion-realtime", () => ({
+	useCompletionRealtimeWithAuth: () => undefined,
 }));
 
 // Import after mocks
@@ -198,6 +220,7 @@ describe("OverdueView", () => {
 		vi.clearAllMocks();
 		mockUseFolderStorage.mockReturnValue(defaultMockFolderReturn);
 		mockGetProgress.mockReturnValue(null);
+		mockCompletionHistoryData = [];
 	});
 
 	describe("Rendering", () => {
@@ -470,9 +493,9 @@ describe("OverdueView", () => {
 			const todoList = screen.getByTestId("overdue-todo-list");
 			const items = within(todoList).getAllByTestId(/todo-item-/);
 
-			// Two Days Ago should come first (more overdue)
-			expect(items[0]).toHaveAttribute("data-testid", "todo-item-2");
-			expect(items[1]).toHaveAttribute("data-testid", "todo-item-1");
+			// Yesterday should come first (newest overdue dates first - descending order)
+			expect(items[0]).toHaveAttribute("data-testid", "todo-item-1");
+			expect(items[1]).toHaveAttribute("data-testid", "todo-item-2");
 		});
 
 		it("sorts active before completed", () => {
@@ -685,8 +708,8 @@ describe("OverdueView", () => {
 			const toggleButton = screen.getByTestId("todo-toggle");
 			fireEvent.click(toggleButton);
 
-			// The handler inverts completed (false -> true)
-			expect(mockOnToggle).toHaveBeenCalledWith("1", true);
+			// onToggle receives current state (false), parent will invert to true
+			expect(mockOnToggle).toHaveBeenCalledWith("1", false);
 		});
 
 		it("calls onDelete when todo is deleted", () => {
@@ -710,6 +733,44 @@ describe("OverdueView", () => {
 			fireEvent.click(deleteButton);
 
 			expect(mockOnDelete).toHaveBeenCalledWith("1");
+		});
+
+		it("onToggle callback accepts optional options parameter", () => {
+			// This test verifies that the onToggle callback signature supports
+			// the optional options parameter for virtualDate (for recurring todo instances)
+			const todos = [
+				createMockTodo({
+					id: "1",
+					text: "Test Task",
+					dueDate: getYesterdayISOString(),
+				}),
+			];
+
+			// Mock onToggle that accepts the options parameter
+			const mockOnToggleWithOptions =
+				vi.fn<
+					(
+						id: number | string,
+						completed: boolean,
+						options?: { virtualDate?: string },
+					) => void
+				>();
+
+			render(
+				<OverdueView
+					todos={todos}
+					onToggle={mockOnToggleWithOptions}
+					onDelete={mockOnDelete}
+				/>,
+			);
+
+			const toggleButton = screen.getByTestId("todo-toggle");
+			fireEvent.click(toggleButton);
+
+			// onToggle receives current state (false), parent will invert to true
+			expect(mockOnToggleWithOptions).toHaveBeenCalledWith("1", false);
+			// The function signature should support the optional options parameter
+			expect(mockOnToggleWithOptions).toHaveBeenCalledTimes(1);
 		});
 	});
 
@@ -1022,7 +1083,7 @@ describe("OverdueView", () => {
 			);
 
 			const list = screen.getByTestId("overdue-todo-list");
-			expect(list.tagName).toBe("UL");
+			expect(list.tagName).toBe("DIV");
 		});
 	});
 });

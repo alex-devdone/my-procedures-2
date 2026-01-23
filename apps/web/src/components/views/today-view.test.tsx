@@ -57,6 +57,11 @@ vi.mock("@/components/notifications/reminder-provider", () => ({
 	}),
 }));
 
+// Mock the completion realtime hook
+vi.mock("@/hooks/use-completion-realtime", () => ({
+	useCompletionRealtimeWithAuth: () => undefined,
+}));
+
 // Import after mocks
 import {
 	getTodosDueToday,
@@ -842,8 +847,44 @@ describe("TodayView", () => {
 			const toggleButton = screen.getByTestId("todo-toggle");
 			fireEvent.click(toggleButton);
 
-			// The handler inverts completed (false -> true)
-			expect(mockOnToggle).toHaveBeenCalledWith("1", true);
+			// TodoExpandableItem passes the current completed state (false)
+			// The parent component handles the actual toggle
+			expect(mockOnToggle).toHaveBeenCalledWith("1", false);
+		});
+
+		it("calls onToggle with virtualDate option for virtual recurring instances", () => {
+			const today = new Date();
+			const dayOfWeek = today.getDay();
+
+			const todos = [
+				createMockTodo({
+					id: "recurring-1",
+					text: "Daily Standup",
+					recurringPattern: {
+						type: "weekly",
+						daysOfWeek: [dayOfWeek],
+					},
+					completed: false,
+				}),
+			];
+
+			render(
+				<TodayView
+					todos={todos}
+					onToggle={mockOnToggle}
+					onDelete={mockOnDelete}
+				/>,
+			);
+
+			const toggleButton = screen.getByTestId("todo-toggle");
+			fireEvent.click(toggleButton);
+
+			// For virtual recurring instances, onToggle should be called with virtualDate option
+			// The current completed state (false) is passed, along with virtualDate
+			const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+			expect(mockOnToggle).toHaveBeenCalledWith("recurring-1", false, {
+				virtualDate: todayKey,
+			});
 		});
 
 		it("calls onDelete when todo is deleted", () => {

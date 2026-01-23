@@ -60,6 +60,12 @@ vi.mock("@/utils/trpc", () => ({
 					mutationFn: vi.fn(),
 				})),
 			},
+			updatePastCompletion: {
+				mutationOptions: vi.fn(() => ({
+					mutationKey: ["todo", "updatePastCompletion"],
+					mutationFn: vi.fn(),
+				})),
+			},
 		},
 	},
 }));
@@ -74,6 +80,7 @@ import {
 	getDueInRangeQueryOptions,
 	getTodosQueryKey,
 	getToggleTodoMutationOptions,
+	getUpdatePastCompletionMutationOptions,
 	getUpdateTodoFolderMutationOptions,
 	getUpdateTodoScheduleMutationOptions,
 } from "./todo.api";
@@ -311,6 +318,23 @@ describe("Todo API", () => {
 				expect(options.mutationKey).toContain("completeRecurring");
 			});
 		});
+
+		describe("getUpdatePastCompletionMutationOptions", () => {
+			it("returns mutation options for updating a past recurring todo completion", () => {
+				const options = getUpdatePastCompletionMutationOptions();
+
+				expect(options).toBeDefined();
+				expect(options).toHaveProperty("mutationKey");
+				expect(options).toHaveProperty("mutationFn");
+			});
+
+			it("has correct mutation key", () => {
+				const options = getUpdatePastCompletionMutationOptions();
+
+				expect(options.mutationKey).toContain("todo");
+				expect(options.mutationKey).toContain("updatePastCompletion");
+			});
+		});
 	});
 
 	describe("Module Exports", () => {
@@ -329,6 +353,7 @@ describe("Todo API", () => {
 			expect(typeof getUpdateTodoFolderMutationOptions).toBe("function");
 			expect(typeof getUpdateTodoScheduleMutationOptions).toBe("function");
 			expect(typeof getCompleteRecurringMutationOptions).toBe("function");
+			expect(typeof getUpdatePastCompletionMutationOptions).toBe("function");
 		});
 	});
 });

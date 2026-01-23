@@ -17,6 +17,7 @@ import { TodoExpandableItem } from "@/components/todos";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useCompletionRealtimeWithAuth } from "@/hooks/use-completion-realtime";
 import { isDateMatchingPattern } from "@/lib/recurring-utils";
 import { cn } from "@/lib/utils";
 
@@ -52,7 +53,11 @@ export interface UpcomingViewProps {
 	/** Whether todos are loading */
 	isLoading?: boolean;
 	/** Callback when a todo is toggled */
-	onToggle: (id: number | string, completed: boolean) => void;
+	onToggle: (
+		id: number | string,
+		completed: boolean,
+		options?: { virtualDate?: string },
+	) => void;
 	/** Callback when a todo is deleted */
 	onDelete: (id: number | string) => void;
 	/** Callback when a todo's schedule is updated */
@@ -249,7 +254,22 @@ export function getTodosUpcoming(
 	for (const todo of todos) {
 		// Case 1: Todo has a due date within the next 7 days
 		if (todo.dueDate && isWithinDays(todo.dueDate, 7)) {
-			addTodoToGroup(todo, todo.dueDate, String(todo.id));
+			// Non-recurring todo with dueDate - add as-is
+			if (!todo.recurringPattern) {
+				addTodoToGroup(todo, todo.dueDate, String(todo.id));
+			} else {
+				// Recurring todo with explicit dueDate
+				// Create virtual entry with occurrence completion status
+				const dueDateKey = getDateKey(todo.dueDate);
+				const completionKey = `${todo.id}-${dueDateKey}`;
+				const occurrenceCompleted = completionMap.get(completionKey);
+				const virtualEntry = createVirtualTodo(
+					todo,
+					new Date(todo.dueDate),
+					occurrenceCompleted,
+				);
+				addTodoToGroup(virtualEntry, todo.dueDate, virtualEntry.virtualKey);
+			}
 		}
 
 		// Case 2: Todo has a recurring pattern - create virtual entries for each matching date
@@ -328,6 +348,10 @@ export function UpcomingView({
 	const { folders } = useFolderStorage();
 	const { getProgress } = useAllSubtasksProgress();
 
+	// Enable realtime sync for completion history
+	// This automatically invalidates and refetches when completion records change
+	useCompletionRealtimeWithAuth();
+
 	// Calculate date range for completion history (today to 7 days from now)
 	const dateRange = useMemo(() => {
 		const today = new Date();
@@ -367,12 +391,36 @@ export function UpcomingView({
 		return flattenDateGroups(dateGroups);
 	}, [dateGroups]);
 
-	// Apply status and search filters to groups
+	// Apply status and search filters to groups, then sort todos within each group
 	const filteredGroups = useMemo(() => {
+		const getTime = (todo: UpcomingTodoEntry): number | null => {
+			// Check recurring pattern notifyAt first (e.g., "09:00", "21:00")
+			if (todo.recurringPattern?.notifyAt) {
+				const [hours, minutes] = todo.recurringPattern.notifyAt
+					.split(":")
+					.map(Number);
+				return hours * 60 + minutes;
+			}
+			// Check reminderAt (it has explicit time)
+			if (todo.reminderAt) {
+				const date = new Date(todo.reminderAt);
+				return date.getHours() * 60 + date.getMinutes();
+			}
+			// Check if dueDate has a time component (not midnight)
+			if (todo.dueDate) {
+				const date = new Date(todo.dueDate);
+				const minutes = date.getHours() * 60 + date.getMinutes();
+				// If it's not midnight (00:00), consider it has a time
+				if (minutes > 0) {
+					return minutes;
+				}
+			}
+			return null;
+		};
+
 		return dateGroups
-			.map((group) => ({
-				...group,
-				todos: group.todos.filter((todo) => {
+			.map((group) => {
+				const filtered = group.todos.filter((todo) => {
 					const isCompleted = isEntryCompleted(todo);
 					const matchesFilter =
 						filter === "all" ||
@@ -384,8 +432,45 @@ export function UpcomingView({
 						todo.text.toLowerCase().includes(searchQuery.toLowerCase());
 
 					return matchesFilter && matchesSearch;
-				}),
-			}))
+				});
+
+				// Sort todos within the group: active first, then by time
+				const sorted = filtered.sort((a, b) => {
+					// First, sort by completion status (active first)
+					const aCompleted = isEntryCompleted(a);
+					const bCompleted = isEntryCompleted(b);
+					if (aCompleted !== bCompleted) {
+						return aCompleted ? 1 : -1;
+					}
+
+					// Then sort by time
+					const aTime = getTime(a);
+					const bTime = getTime(b);
+
+					// Both have time: sort by time ascending (earliest first)
+					if (aTime !== null && bTime !== null) {
+						return aTime - bTime;
+					}
+
+					// Only a has time: a comes first
+					if (aTime !== null) {
+						return -1;
+					}
+
+					// Only b has time: b comes first
+					if (bTime !== null) {
+						return 1;
+					}
+
+					// Neither has time: maintain original order
+					return 0;
+				});
+
+				return {
+					...group,
+					todos: sorted,
+				};
+			})
 			.filter((group) => group.todos.length > 0);
 	}, [dateGroups, filter, searchQuery]);
 
@@ -405,8 +490,14 @@ export function UpcomingView({
 		return folders.find((f) => f.id === folderId) ?? null;
 	};
 
-	const handleToggleTodo = (id: number | string, completed: boolean) => {
-		onToggle(id, !completed);
+	const handleToggleTodo = (entry: UpcomingTodoEntry, completed: boolean) => {
+		const id = entry.id;
+		// Detect virtual recurring instances and pass virtualDate option
+		if (isVirtualTodo(entry)) {
+			onToggle(id, completed, { virtualDate: entry.virtualDate });
+		} else {
+			onToggle(id, completed);
+		}
 	};
 
 	return (
@@ -546,7 +637,9 @@ export function UpcomingView({
 														completed: displayCompleted,
 													}}
 													subtaskProgress={getProgress(todo.id)}
-													onToggle={handleToggleTodo}
+													onToggle={(_id, completed) =>
+														handleToggleTodo(todo, completed)
+													}
 													onDelete={onDelete}
 													onScheduleChange={onScheduleChange}
 													folder={todoFolder}

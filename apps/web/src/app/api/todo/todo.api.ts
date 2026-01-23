@@ -86,3 +86,11 @@ export function getUpdateTodoScheduleMutationOptions() {
 export function getCompleteRecurringMutationOptions() {
 	return trpc.todo.completeRecurring.mutationOptions();
 }
+
+/**
+ * Get mutation options for updating a past recurring todo completion.
+ * Used for "forgotten check-ins" where users need to retroactively mark completions.
+ */
+export function getUpdatePastCompletionMutationOptions() {
+	return trpc.todo.updatePastCompletion.mutationOptions();
+}

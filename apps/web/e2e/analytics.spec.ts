@@ -3,14 +3,12 @@ import { expect, test } from "@playwright/test";
 /**
  * Analytics E2E Tests
  *
- * Note: The analytics page (/analytics) requires authentication and redirects
- * unauthenticated users to /login. These tests verify:
+ * Note: The analytics page (/analytics) works in both authenticated and
+ * unauthenticated modes. When unauthenticated, it shows analytics based on
+ * local storage data. These tests verify:
  * 1. The analytics smart view exists in the sidebar
- * 2. The analytics page properly redirects unauthenticated users
- * 3. Basic navigation and UI elements when directly accessing analytics
- *
- * For full analytics functionality testing with local storage data,
- * a test route or authentication mocking would be needed.
+ * 2. The analytics page loads correctly for unauthenticated users
+ * 3. Basic navigation and UI elements when accessing analytics
  */
 test.describe("Analytics (unauthenticated access)", () => {
 	test.describe("Sidebar Analytics Smart View", () => {
@@ -43,7 +41,7 @@ test.describe("Analytics (unauthenticated access)", () => {
 	});
 
 	test.describe("Analytics Page Access", () => {
-		test("should redirect to login when accessing /analytics without auth", async ({
+		test("should load analytics page in local storage mode without auth", async ({
 			page,
 		}) => {
 			// Clear any existing session
@@ -53,8 +51,12 @@ test.describe("Analytics (unauthenticated access)", () => {
 			// Navigate directly to analytics page
 			await page.goto("/analytics");
 
-			// Should redirect to login page
-			await expect(page).toHaveURL(/\/login/);
+			// Should stay on analytics page (works in local storage mode)
+			await expect(page).toHaveURL(/\/analytics/);
+
+			// Should show the local storage indicator
+			const localBadge = page.locator("text=Local");
+			await expect(localBadge).toBeVisible();
 		});
 	});
 });
@@ -63,11 +65,7 @@ test.describe("Analytics (unauthenticated access)", () => {
  * Analytics Dashboard Component Tests
  *
  * These tests verify the analytics dashboard UI when rendered.
- * Since the /analytics page requires auth, we test by navigating to
- * the page and checking what loads (may show briefly before redirect).
- *
- * Note: For comprehensive testing, consider creating a test-only route
- * that renders AnalyticsDashboard without authentication requirement.
+ * The analytics page works in both authenticated and local storage modes.
  */
 test.describe("Analytics Dashboard (direct page test)", () => {
 	test.beforeEach(async ({ page }) => {

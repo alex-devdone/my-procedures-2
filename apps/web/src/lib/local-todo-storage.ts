@@ -100,6 +100,35 @@ export function toggle(id: string): LocalTodo | null {
 	return todo;
 }
 
+/**
+ * Toggle a specific occurrence of a recurring todo by scheduled date.
+ * This is used for marking scheduled occurrences as completed or uncompleted.
+ * Creates the completion history entry if it doesn't exist.
+ *
+ * @param todoId - The ID of the recurring todo
+ * @param scheduledDate - The scheduled date of the occurrence (ISO string)
+ * @param completed - Whether the occurrence is completed (true) or not (false)
+ * @returns The updated or created completion history entry
+ */
+export function toggleLocalOccurrence(
+	todoId: string,
+	scheduledDate: string,
+	completed: boolean,
+): CompletionHistoryEntry {
+	// Try to update existing entry first
+	const updated = updateLocalPastCompletion(todoId, scheduledDate, completed);
+	if (updated) {
+		return updated;
+	}
+
+	// Entry doesn't exist, create it
+	return addCompletionHistoryEntry({
+		todoId,
+		scheduledDate,
+		completedAt: completed ? new Date().toISOString() : null,
+	});
+}
+
 export function deleteTodo(id: string): boolean {
 	const todos = getAll();
 	const index = todos.findIndex((t) => t.id === id);
