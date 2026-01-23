@@ -193,16 +193,8 @@ export function useFilteredAndSortedTodoGroups(
 					return matchesFilter && matchesSearch;
 				});
 
-				// Separate active and completed todos
-				const active = filtered.filter((t) => !isEntryCompleted(t));
-				const completed = filtered.filter((t) => isEntryCompleted(t));
-
-				// Sort both by time descending
-				const sortedActive = sortTodosByTimeDesc(active);
-				const sortedCompleted = sortTodosByTimeDesc(completed);
-
-				// Active todos first, then completed
-				const sorted = [...sortedActive, ...sortedCompleted];
+				// Sort all todos by time descending (no separation by completion status)
+				const sorted = sortTodosByTimeDesc(filtered);
 
 				return { ...group, todos: sorted };
 			})
