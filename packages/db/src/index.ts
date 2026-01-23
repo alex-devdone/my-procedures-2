@@ -22,3 +22,6 @@ export {
 	or,
 	sql,
 } from "drizzle-orm";
+
+// Re-export schema types and tables
+export * from "./schema/index";
