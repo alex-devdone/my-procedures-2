@@ -498,19 +498,25 @@ describe("OverdueView", () => {
 			expect(items[1]).toHaveAttribute("data-testid", "todo-item-2");
 		});
 
-		it("sorts active before completed", () => {
+		it("sorts by time descending (no separation by completion status)", () => {
 			const yesterday = getYesterdayISOString();
+			// Create todos at different times: 21:00 (later) and 09:00 (earlier)
+			const laterTime = new Date(yesterday);
+			laterTime.setHours(21, 0, 0, 0);
+			const earlierTime = new Date(yesterday);
+			earlierTime.setHours(9, 0, 0, 0);
+
 			const todos = [
 				createMockTodo({
 					id: "1",
-					text: "Completed Overdue",
-					dueDate: yesterday,
+					text: "Earlier Task (09:00)",
+					dueDate: earlierTime.toISOString(),
 					completed: true,
 				}),
 				createMockTodo({
 					id: "2",
-					text: "Active Overdue",
-					dueDate: yesterday,
+					text: "Later Task (21:00)",
+					dueDate: laterTime.toISOString(),
 					completed: false,
 				}),
 			];
@@ -526,7 +532,7 @@ describe("OverdueView", () => {
 			const todoList = screen.getByTestId("overdue-todo-list");
 			const items = within(todoList).getAllByTestId(/todo-item-/);
 
-			// Active should come first
+			// Later time (21:00) should come first regardless of completion status
 			expect(items[0]).toHaveAttribute("data-testid", "todo-item-2");
 			expect(items[1]).toHaveAttribute("data-testid", "todo-item-1");
 		});

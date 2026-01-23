@@ -434,22 +434,14 @@ export function UpcomingView({
 					return matchesFilter && matchesSearch;
 				});
 
-				// Sort todos within the group: active first, then by time
-				const sorted = filtered.sort((a, b) => {
-					// First, sort by completion status (active first)
-					const aCompleted = isEntryCompleted(a);
-					const bCompleted = isEntryCompleted(b);
-					if (aCompleted !== bCompleted) {
-						return aCompleted ? 1 : -1;
-					}
-
-					// Then sort by time
+				// Sort all todos by time descending (no separation by completion status)
+				const sorted = [...filtered].sort((a, b) => {
 					const aTime = getTime(a);
 					const bTime = getTime(b);
 
-					// Both have time: sort by time ascending (earliest first)
+					// Both have time: sort by time descending (latest first)
 					if (aTime !== null && bTime !== null) {
-						return aTime - bTime;
+						return bTime - aTime;
 					}
 
 					// Only a has time: a comes first
