@@ -3,6 +3,7 @@ import {
 	count,
 	db,
 	eq,
+	googleTasksIntegration,
 	gte,
 	isNotNull,
 	isNull,
@@ -16,6 +17,7 @@ import { TRPCError } from "@trpc/server";
 import z from "zod";
 
 import { protectedProcedure, router } from "../index";
+import { GoogleTasksClient } from "../lib/google-tasks-client";
 import { getNextOccurrence } from "../lib/recurring";
 
 /**
@@ -220,10 +222,54 @@ export const todoRouter = router({
 				});
 			}
 
-			return await db
+			// Update the local todo
+			const [updated] = await db
 				.update(todo)
 				.set({ completed: input.completed })
-				.where(eq(todo.id, input.id));
+				.where(eq(todo.id, input.id))
+				.returning();
+
+			// Sync to Google Tasks if enabled
+			if (existing.googleSyncEnabled && existing.googleTaskId) {
+				try {
+					// Get the user's Google Tasks integration to find the default list ID
+					const integration = await db.query.googleTasksIntegration.findFirst({
+						where: eq(googleTasksIntegration.userId, ctx.session.user.id),
+					});
+
+					if (!integration || !integration.defaultListId) {
+						// No integration configured or no default list - skip sync
+						return updated;
+					}
+
+					// Create a Google Tasks client and sync the update
+					const client = await GoogleTasksClient.forUser(ctx.session.user.id);
+					await client.upsertTask(
+						integration.defaultListId,
+						{
+							text: existing.text,
+							completed: input.completed,
+							dueDate: existing.dueDate,
+						},
+						existing.googleTaskId,
+					);
+
+					// Update the lastSyncedAt timestamp
+					await db
+						.update(todo)
+						.set({ lastSyncedAt: new Date() })
+						.where(eq(todo.id, input.id));
+				} catch (error) {
+					// Log the error but don't fail the toggle operation
+					// The local todo has already been updated successfully
+					console.error(
+						`Failed to sync todo ${input.id} to Google Tasks:`,
+						error,
+					);
+				}
+			}
+
+			return updated;
 		}),
 
 	delete: protectedProcedure
