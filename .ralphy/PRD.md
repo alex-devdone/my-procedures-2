@@ -1,103 +1,114 @@
-# PRD: Fix Toggle Todos Logic for Recurring Todos
+# PRD: Fix Analytics Hooks Tests After Supabase Migration
 
-**Goal:** Fix recurring todo toggle behavior so completing an occurrence only records completion without creating a new todo
+**Goal:** Fix failing unit tests after Supabase refactoring and ensure all lint, build, and E2E tests pass.
+
 **Date:** 2026-01-22
 
 ---
 
 ## Context
 
-Currently, when toggling a recurring todo (e.g., daily task), the `completeRecurring` mutation marks the todo as completed AND creates a new todo for the next occurrence. This is incorrect behavior for Today/Upcoming/Overdue views where users expect to toggle specific occurrences.
+After refactoring to use Supabase for read operations, 10 unit tests are failing in `analytics.hooks.test.tsx`. The root cause is a test structure issue where `describe("useCompletionHistory")` and `describe("useUpdatePastCompletion")` blocks are outside the `describe("Authenticated User (Remote API)")` block, losing access to `startDate`/`endDate` constants and the authenticated user mock setup.
 
-### Stack
-- **Frontend:** Next.js 16, React 19, shadcn/ui, React Query
-- **Backend:** tRPC, Drizzle ORM, PostgreSQL
-- **Key patterns:** Entity-based API structure in `apps/web/src/app/api/`
+### Current Status
 
-### Key Insight
-The `updatePastCompletion` tRPC procedure (lines 823-900 in `packages/api/src/routers/todo.ts`) already handles occurrence toggling correctly - it inserts/updates `recurringTodoCompletion` records without creating new todos. We just need to route the toggle function to use it for recurring instances in smart views.
+| Check | Status |
+|-------|--------|
+| Lint (`bun run check`) | Passing |
+| Types (`bun run check-types`) | Passing |
+| Build (`bun run build`) | Passing |
+| Unit Tests (`bun test`) | **10 failing** |
+| E2E Tests | Not yet verified |
 
----
+### Failing Tests
 
-## Phase 1: Foundation - Types & API Layer (parallel_group: 1)
+All in `apps/web/src/app/api/analytics/analytics.hooks.test.tsx`:
 
-- [x] Update `UseTodoStorageReturn.toggle` signature in `apps/web/src/app/api/todo/todo.types.ts` to accept optional `options?: { virtualDate?: string }` parameter
-- [x] Add `getUpdatePastCompletionMutationOptions` function to `apps/web/src/app/api/todo/todo.api.ts` if not already present (wraps `trpc.todo.updatePastCompletion`)
+**ReferenceError: startDate is not defined (5 tests)**
+- `useCompletionHistory > returns completion history for the date range`
+- `useCompletionHistory > passes startDate and endDate to query options`
+- `useCompletionHistory > returns isLoading true while fetching`
+- `useCompletionHistory > returns isError true on failure`
+- `useCompletionHistory > returns completion records with correct structure`
 
----
-
-## Phase 2: Core Implementation - Hook & Toggle Logic (parallel_group: 2)
-
-- [x] Add `updatePastCompletionMutation` with optimistic updates in `apps/web/src/app/api/todo/todo.hooks.ts` following the pattern of existing mutations (cancel queries, update cache, rollback on error)
-- [x] Modify `toggle` function in `apps/web/src/app/api/todo/todo.hooks.ts` (lines 348-386) to check for `options.virtualDate` - if provided with recurring todo, use `updatePastCompletion` instead of `completeRecurring`
-- [x] Update local storage toggle logic in `apps/web/src/lib/local-todo-storage.ts` to support `toggleLocalOccurrence(todoId, scheduledDate, completed)` for guest users
-
----
-
-## Phase 3: View Component Integration (parallel_group: 3)
-
-- [x] Update `handleToggleTodo` in `apps/web/src/components/views/today-view.tsx` to detect virtual recurring instances and pass `{ virtualDate: entry.virtualDate }` when calling `onToggle`
-- [x] Update `handleToggleTodo` in `apps/web/src/components/views/upcoming-view.tsx` to pass `virtualDate` for virtual recurring instances
-- [x] Update `handleToggleTodo` in `apps/web/src/components/views/overdue-view.tsx` to pass `virtualDate` for missed recurring occurrences
-- [x] Verify folder views (`apps/web/src/components/folders/folder-content.tsx`) continue using existing behavior (no virtualDate = creates next occurrence)
+**Mock not called - missing authenticated user context (5 tests)**
+- `useUpdatePastCompletion > Optimistic Updates > cancels outgoing queries on mutate`
+- `useUpdatePastCompletion > Optimistic Updates > invalidates queries on success`
+- `useUpdatePastCompletion > Optimistic Updates > updates analytics cache optimistically...`
+- `useUpdatePastCompletion > Optimistic Updates > updates completion history cache optimistically`
+- `useUpdatePastCompletion > Optimistic Updates > handles marking as incomplete (unchecking)`
 
 ---
 
-## Phase 4: E2E Tests (parallel_group: 4)
+## Phase 1: Fix Test Structure (parallel_group: 1)
 
-- [x] Add E2E test in `apps/web/e2e/recurring-views.spec.ts`: "Today view: toggling recurring todo marks occurrence complete without creating new todo" - create daily recurring, toggle in Today, verify no new todo in Inbox, verify occurrence shows completed
-- [x] Add E2E test: "Today view: toggle recurring occurrence back to incomplete" - toggle completed occurrence, verify it shows as active again
-- [x] Add E2E test: "Upcoming view: toggling future occurrence marks it complete" - create daily recurring, toggle tomorrow's occurrence, verify shows completed, original todo unchanged
-- [x] Add E2E test: "Overdue view: toggling missed occurrence retroactively completes it" - create recurring with past due date, navigate to Overdue, toggle, verify marked completed
-- [x] Add E2E test: "Folder view: completing recurring todo creates next occurrence" - create recurring in folder, complete via folder view, verify new todo created (existing Inbox behavior)
-- [x] Add E2E test: "Toggle persistence: recurring occurrence completion persists after reload" - toggle occurrence, reload, verify status persisted
+- [x] Fix test scoping in `apps/web/src/app/api/analytics/analytics.hooks.test.tsx`
+  - Remove premature closing `});` at line 287 that ends `describe("Authenticated User")` too early
+  - Move `describe("useCompletionHistory")` block (lines 289-370) inside `describe("Authenticated User (Remote API)")`
+  - Move `describe("useUpdatePastCompletion")` block (lines 372-649) inside `describe("Authenticated User (Remote API)")`
+  - Add closing `});` after line 649 to properly close the Authenticated User block
 
 ---
 
-## Phase 5: Quality Assurance (parallel_group: 5)
+## Phase 2: Verify Tests Pass (parallel_group: 2)
 
-- [x] Run `bun run check-types` and fix any TypeScript errors
-- [x] Run `bun run check` and fix any Biome linting/formatting issues
-- [x] Run `bun run test` and ensure all unit tests pass
-- [x] Run `bun run test:e2e` and ensure all E2E tests pass including new toggle tests
+- [x] Run unit tests: `cd apps/web && bun run test -- --run` - expect 0 failures
+- [x] Run E2E tests: `cd apps/web && bun run test:e2e` - verify all pass
+
+---
+
+## Phase 3: Final Verification (parallel_group: 3)
+
+- [x] Run lint check: `bun run check`
+- [x] Run type check: `bun run check-types`
+- [x] Run build: `bun run build`
 
 ---
 
 ## Acceptance Criteria
 
-- [x] Toggling a recurring todo in Today view only records the occurrence completion (no new todo created)
-- [x] Toggling a recurring todo in Upcoming view marks future occurrence as complete
-- [x] Toggling a recurring todo in Overdue view retroactively marks missed occurrence as completed
-- [x] Toggling in folder/Inbox views maintains existing behavior (creates next occurrence)
-- [x] Guest users (localStorage) have same toggle behavior as authenticated users
-- [x] All tests pass (`bun run test`)
-- [x] No type errors (`bun run check-types`)
-- [x] Linting passes (`bun run check`)
+- [x] All 10 failing unit tests now pass
+- [x] No new test failures introduced
+- [x] E2E tests pass
+- [x] Lint passes (`bun run check`)
+- [x] Types pass (`bun run check-types`)
 - [x] Build succeeds (`bun run build`)
-- [x] All new E2E tests pass (`bun run test:e2e`)
+
+---
+
+## Key Files
+
+| File | Change |
+|------|--------|
+| `apps/web/src/app/api/analytics/analytics.hooks.test.tsx` | Fix describe block nesting structure |
 
 ---
 
 ## Notes
 
-### Key Files to Modify
+### Root Cause Analysis
 
-| File | Change |
-|------|--------|
-| `apps/web/src/app/api/todo/todo.types.ts` | Update toggle signature type |
-| `apps/web/src/app/api/todo/todo.api.ts` | Add mutation options wrapper |
-| `apps/web/src/app/api/todo/todo.hooks.ts` | Update `toggle` function, add mutation |
-| `apps/web/src/lib/local-todo-storage.ts` | Add `toggleLocalOccurrence` for guest users |
-| `apps/web/src/components/views/today-view.tsx` | Pass `virtualDate` on toggle |
-| `apps/web/src/components/views/upcoming-view.tsx` | Pass `virtualDate` on toggle |
-| `apps/web/src/components/views/overdue-view.tsx` | Pass `virtualDate` on toggle |
-| `apps/web/e2e/recurring-views.spec.ts` | Add comprehensive E2E tests |
+The test file structure was broken during the Supabase migration commit (`9fef3ae`). The `describe("useAnalytics")` block was closed at line 248, but the parent `describe("Authenticated User (Remote API)")` block was also accidentally closed at line 287, leaving subsequent test blocks orphaned:
 
-### Virtual Todos
-Virtual todos (`VirtualTodo` type) have a `virtualDate` property that identifies which occurrence they represent. Views already create these for displaying recurring instances.
+**Broken structure:**
+```
+describe("Analytics Hooks")
+  describe("Authenticated User (Remote API)")  // startDate/endDate defined here
+    describe("useAnalytics") { ... }
+  });  // CLOSES at line 287 - too early!
 
-### Analytics History
-The analytics history toggle already works correctly via `useUpdatePastCompletion` hook - no changes needed there.
+  describe("useCompletionHistory") { ... }     // OUTSIDE - no access to startDate/endDate
+  describe("useUpdatePastCompletion") { ... }  // OUTSIDE - no authenticated user mock
+});
+```
 
-### Testing Strategy
-E2E tests are prioritized because they verify the complete user flow. The toggle logic changes affect multiple layers (hooks -> views -> API), so end-to-end verification is most valuable.
+**Fixed structure:**
+```
+describe("Analytics Hooks")
+  describe("Authenticated User (Remote API)")  // startDate/endDate defined here
+    describe("useAnalytics") { ... }
+    describe("useCompletionHistory") { ... }     // INSIDE - has access
+    describe("useUpdatePastCompletion") { ... }  // INSIDE - has auth mock
+  });  // Closes after all authenticated user tests
+});
+```

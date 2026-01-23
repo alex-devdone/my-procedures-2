@@ -251,241 +251,197 @@ describe("Analytics Hooks", () => {
 					);
 				});
 			});
-		});
 
-		it("returns isLoading true while fetching", () => {
-			// Create a pending promise to simulate loading state
-			mockAnalyticsQueryFn.mockReturnValue(new Promise(() => {}));
+			it("returns isLoading true while fetching", () => {
+				// Create a pending promise to simulate loading state
+				mockAnalyticsQueryFn.mockReturnValue(new Promise(() => {}));
 
-			const { result } = renderHook(() => useAnalytics(startDate, endDate), {
-				wrapper: createWrapper(),
+				const { result } = renderHook(() => useAnalytics(startDate, endDate), {
+					wrapper: createWrapper(),
+				});
+
+				expect(result.current.isLoading).toBe(true);
 			});
 
-			expect(result.current.isLoading).toBe(true);
-		});
+			it("returns isError true on failure", async () => {
+				mockAnalyticsQueryFn.mockRejectedValue(new Error("Failed to fetch"));
 
-		it("returns isError true on failure", async () => {
-			mockAnalyticsQueryFn.mockRejectedValue(new Error("Failed to fetch"));
+				const { result } = renderHook(() => useAnalytics(startDate, endDate), {
+					wrapper: createWrapper(),
+				});
 
-			const { result } = renderHook(() => useAnalytics(startDate, endDate), {
-				wrapper: createWrapper(),
+				await waitFor(() => {
+					expect(result.current.isError).toBe(true);
+				});
 			});
 
-			await waitFor(() => {
-				expect(result.current.isError).toBe(true);
-			});
-		});
+			it("handles different date ranges", async () => {
+				const monthStart = "2026-01-01T00:00:00.000Z";
+				const monthEnd = "2026-01-31T23:59:59.999Z";
 
-		it("handles different date ranges", async () => {
-			const monthStart = "2026-01-01T00:00:00.000Z";
-			const monthEnd = "2026-01-31T23:59:59.999Z";
+				const { result } = renderHook(
+					() => useAnalytics(monthStart, monthEnd),
+					{
+						wrapper: createWrapper(),
+					},
+				);
 
-			const { result } = renderHook(() => useAnalytics(monthStart, monthEnd), {
-				wrapper: createWrapper(),
-			});
+				await waitFor(() => {
+					expect(result.current.isSuccess).toBe(true);
+				});
 
-			await waitFor(() => {
-				expect(result.current.isSuccess).toBe(true);
-			});
-
-			expect(result.current.data).toEqual(mockAnalyticsData);
-		});
-	});
-
-	describe("useCompletionHistory", () => {
-		it("returns completion history for the date range", async () => {
-			const { result } = renderHook(
-				() => useCompletionHistory(startDate, endDate),
-				{ wrapper: createWrapper() },
-			);
-
-			await waitFor(() => {
-				expect(result.current.isSuccess).toBe(true);
-			});
-
-			// Supabase returns transformed data (snake_case -> camelCase, ISO strings)
-			expect(result.current.data).toEqual(
-				mockCompletionHistory.map((r) => ({
-					id: r.id,
-					todoId: r.todoId,
-					scheduledDate: r.scheduledDate.toISOString(),
-					completedAt: r.completedAt?.toISOString() || null,
-				})),
-			);
-		});
-
-		it("passes startDate and endDate to query options", async () => {
-			const { getCompletionHistoryQueryOptions } = await import(
-				"./analytics.api"
-			);
-
-			renderHook(() => useCompletionHistory(startDate, endDate), {
-				wrapper: createWrapper(),
-			});
-
-			expect(getCompletionHistoryQueryOptions).toHaveBeenCalledWith({
-				startDate,
-				endDate,
+				expect(result.current.data).toEqual(mockAnalyticsData);
 			});
 		});
 
-		it("returns isLoading true while fetching", () => {
-			mockGetCompletionHistorySupabase.mockReturnValue(new Promise(() => {}));
+		describe("useCompletionHistory", () => {
+			it("returns completion history for the date range", async () => {
+				const { result } = renderHook(
+					() => useCompletionHistory(startDate, endDate),
+					{ wrapper: createWrapper() },
+				);
 
-			const { result } = renderHook(
-				() => useCompletionHistory(startDate, endDate),
-				{ wrapper: createWrapper() },
-			);
+				await waitFor(() => {
+					expect(result.current.isSuccess).toBe(true);
+				});
 
-			expect(result.current.isLoading).toBe(true);
-		});
+				// Supabase returns transformed data (snake_case -> camelCase, ISO strings)
+				expect(result.current.data).toEqual(
+					mockCompletionHistory.map((r) => ({
+						id: r.id,
+						todoId: r.todoId,
+						scheduledDate: r.scheduledDate.toISOString(),
+						completedAt: r.completedAt?.toISOString() || null,
+					})),
+				);
+			});
 
-		it("returns isError true on failure", async () => {
-			mockGetCompletionHistorySupabase.mockRejectedValue(
-				new Error("Failed to fetch"),
-			);
+			it("passes startDate and endDate to Supabase function", async () => {
+				renderHook(() => useCompletionHistory(startDate, endDate), {
+					wrapper: createWrapper(),
+				});
 
-			const { result } = renderHook(
-				() => useCompletionHistory(startDate, endDate),
-				{ wrapper: createWrapper() },
-			);
+				await waitFor(() => {
+					expect(mockGetCompletionHistorySupabase).toHaveBeenCalledWith(
+						"user-123",
+						startDate,
+						endDate,
+					);
+				});
+			});
 
-			await waitFor(() => {
-				expect(result.current.isError).toBe(true);
+			it("returns isLoading true while fetching", () => {
+				mockGetCompletionHistorySupabase.mockReturnValue(new Promise(() => {}));
+
+				const { result } = renderHook(
+					() => useCompletionHistory(startDate, endDate),
+					{ wrapper: createWrapper() },
+				);
+
+				expect(result.current.isLoading).toBe(true);
+			});
+
+			it("returns isError true on failure", async () => {
+				mockGetCompletionHistorySupabase.mockRejectedValue(
+					new Error("Failed to fetch"),
+				);
+
+				const { result } = renderHook(
+					() => useCompletionHistory(startDate, endDate),
+					{ wrapper: createWrapper() },
+				);
+
+				await waitFor(() => {
+					expect(result.current.isError).toBe(true);
+				});
+			});
+
+			it("returns completion records with correct structure", async () => {
+				const { result } = renderHook(
+					() => useCompletionHistory(startDate, endDate),
+					{ wrapper: createWrapper() },
+				);
+
+				await waitFor(() => {
+					expect(result.current.isSuccess).toBe(true);
+				});
+
+				const data = result.current.data;
+				expect(data).toHaveLength(3);
+				expect(data?.[0]).toHaveProperty("id");
+				expect(data?.[0]).toHaveProperty("todoId");
+				expect(data?.[0]).toHaveProperty("scheduledDate");
+				expect(data?.[0]).toHaveProperty("completedAt");
+				// todoText is not returned by Supabase implementation
 			});
 		});
 
-		it("returns completion records with correct structure", async () => {
-			const { result } = renderHook(
-				() => useCompletionHistory(startDate, endDate),
-				{ wrapper: createWrapper() },
-			);
+		describe("useUpdatePastCompletion", () => {
+			it("returns mutation function", () => {
+				const { result } = renderHook(() => useUpdatePastCompletion(), {
+					wrapper: createWrapper(),
+				});
 
-			await waitFor(() => {
-				expect(result.current.isSuccess).toBe(true);
+				expect(typeof result.current.mutate).toBe("function");
+				expect(typeof result.current.mutateAsync).toBe("function");
 			});
 
-			const data = result.current.data;
-			expect(data).toHaveLength(3);
-			expect(data?.[0]).toHaveProperty("id");
-			expect(data?.[0]).toHaveProperty("todoId");
-			expect(data?.[0]).toHaveProperty("scheduledDate");
-			expect(data?.[0]).toHaveProperty("completedAt");
-			// todoText is not returned by Supabase implementation
-		});
-	});
+			it("calls mutation with correct input", async () => {
+				const { result } = renderHook(() => useUpdatePastCompletion(), {
+					wrapper: createWrapper(),
+				});
 
-	describe("useUpdatePastCompletion", () => {
-		it("returns mutation function", () => {
-			const { result } = renderHook(() => useUpdatePastCompletion(), {
-				wrapper: createWrapper(),
-			});
-
-			expect(typeof result.current.mutate).toBe("function");
-			expect(typeof result.current.mutateAsync).toBe("function");
-		});
-
-		it("calls mutation with correct input", async () => {
-			const { result } = renderHook(() => useUpdatePastCompletion(), {
-				wrapper: createWrapper(),
-			});
-
-			const input = {
-				todoId: 1,
-				scheduledDate: "2026-01-16T00:00:00.000Z",
-				completed: true,
-			};
-
-			await act(async () => {
-				await result.current.mutateAsync(input);
-			});
-
-			// React Query passes additional context as second argument
-			expect(mockUpdatePastCompletionMutationFn).toHaveBeenCalled();
-			expect(mockUpdatePastCompletionMutationFn.mock.calls[0][0]).toEqual(
-				input,
-			);
-		});
-
-		it("returns isPending true during mutation", async () => {
-			// Create a promise that we can control
-			let resolvePromise: (value: unknown) => void;
-			mockUpdatePastCompletionMutationFn.mockReturnValue(
-				new Promise((resolve) => {
-					resolvePromise = resolve;
-				}),
-			);
-
-			const { result } = renderHook(() => useUpdatePastCompletion(), {
-				wrapper: createWrapper(),
-			});
-
-			expect(result.current.isPending).toBe(false);
-
-			act(() => {
-				result.current.mutate({
+				const input = {
 					todoId: 1,
 					scheduledDate: "2026-01-16T00:00:00.000Z",
 					completed: true,
+				};
+
+				await act(async () => {
+					await result.current.mutateAsync(input);
 				});
+
+				// React Query passes additional context as second argument
+				expect(mockUpdatePastCompletionMutationFn).toHaveBeenCalled();
+				expect(mockUpdatePastCompletionMutationFn.mock.calls[0][0]).toEqual(
+					input,
+				);
 			});
 
-			await waitFor(() => {
-				expect(result.current.isPending).toBe(true);
-			});
+			it("returns isPending true during mutation", async () => {
+				// Create a promise that we can control
+				let resolvePromise: (value: unknown) => void;
+				mockUpdatePastCompletionMutationFn.mockReturnValue(
+					new Promise((resolve) => {
+						resolvePromise = resolve;
+					}),
+				);
 
-			// Resolve the promise to complete the mutation
-			await act(async () => {
-				resolvePromise?.({ action: "updated", completion: {} });
-			});
-		});
-
-		it("returns isSuccess true after successful mutation", async () => {
-			const { result } = renderHook(() => useUpdatePastCompletion(), {
-				wrapper: createWrapper(),
-			});
-
-			await act(async () => {
-				await result.current.mutateAsync({
-					todoId: 1,
-					scheduledDate: "2026-01-16T00:00:00.000Z",
-					completed: true,
+				const { result } = renderHook(() => useUpdatePastCompletion(), {
+					wrapper: createWrapper(),
 				});
-			});
 
-			await waitFor(() => {
-				expect(result.current.isSuccess).toBe(true);
-			});
-		});
+				expect(result.current.isPending).toBe(false);
 
-		it("returns isError true on mutation failure", async () => {
-			mockUpdatePastCompletionMutationFn.mockRejectedValue(
-				new Error("Failed to update"),
-			);
-
-			const { result } = renderHook(() => useUpdatePastCompletion(), {
-				wrapper: createWrapper(),
-			});
-
-			await act(async () => {
-				try {
-					await result.current.mutateAsync({
+				act(() => {
+					result.current.mutate({
 						todoId: 1,
 						scheduledDate: "2026-01-16T00:00:00.000Z",
 						completed: true,
 					});
-				} catch {
-					// Expected to throw
-				}
+				});
+
+				await waitFor(() => {
+					expect(result.current.isPending).toBe(true);
+				});
+
+				// Resolve the promise to complete the mutation
+				await act(async () => {
+					resolvePromise?.({ action: "updated", completion: {} });
+				});
 			});
 
-			await waitFor(() => {
-				expect(result.current.isError).toBe(true);
-			});
-		});
-
-		describe("Optimistic Updates", () => {
-			it("cancels outgoing queries on mutate", async () => {
+			it("returns isSuccess true after successful mutation", async () => {
 				const { result } = renderHook(() => useUpdatePastCompletion(), {
 					wrapper: createWrapper(),
 				});
@@ -498,107 +454,14 @@ describe("Analytics Hooks", () => {
 					});
 				});
 
-				expect(mockCancelQueries).toHaveBeenCalled();
+				await waitFor(() => {
+					expect(result.current.isSuccess).toBe(true);
+				});
 			});
 
-			it("invalidates queries on success", async () => {
-				const { result } = renderHook(() => useUpdatePastCompletion(), {
-					wrapper: createWrapper(),
-				});
-
-				await act(async () => {
-					await result.current.mutateAsync({
-						todoId: 1,
-						scheduledDate: "2026-01-16T00:00:00.000Z",
-						completed: true,
-					});
-				});
-
-				expect(mockInvalidateQueries).toHaveBeenCalled();
-			});
-
-			it("updates analytics cache optimistically when marking as completed", async () => {
-				const analyticsQueryKey = [
-					{ path: ["todo", "getAnalytics"] },
-					{
-						input: {
-							startDate: "2026-01-15T00:00:00.000Z",
-							endDate: "2026-01-17T23:59:59.999Z",
-						},
-					},
-				];
-
-				mockGetQueriesData.mockReturnValue([
-					[analyticsQueryKey, mockAnalyticsData],
-				]);
-
-				const { result } = renderHook(() => useUpdatePastCompletion(), {
-					wrapper: createWrapper(),
-				});
-
-				await act(async () => {
-					await result.current.mutateAsync({
-						todoId: 1,
-						scheduledDate: "2026-01-16T00:00:00.000Z",
-						completed: true,
-					});
-				});
-
-				// Should have called setQueryData for analytics
-				expect(mockSetQueryData).toHaveBeenCalled();
-			});
-
-			it("updates completion history cache optimistically", async () => {
-				const completionHistoryQueryKey = [
-					{ path: ["todo", "getCompletionHistory"] },
-					{
-						input: {
-							startDate: "2026-01-15T00:00:00.000Z",
-							endDate: "2026-01-17T23:59:59.999Z",
-						},
-					},
-				];
-
-				mockGetQueriesData.mockImplementation(({ predicate }) => {
-					// Check if predicate matches completion history
-					const mockKey = [{ path: ["todo", "getCompletionHistory"] }];
-					if (predicate?.({ queryKey: mockKey })) {
-						return [[completionHistoryQueryKey, mockCompletionHistory]];
-					}
-					return [];
-				});
-
-				const { result } = renderHook(() => useUpdatePastCompletion(), {
-					wrapper: createWrapper(),
-				});
-
-				await act(async () => {
-					await result.current.mutateAsync({
-						todoId: 1,
-						scheduledDate: "2026-01-16T00:00:00.000Z",
-						completed: true,
-					});
-				});
-
-				expect(mockSetQueryData).toHaveBeenCalled();
-			});
-
-			it("rolls back cache on error", async () => {
-				const analyticsQueryKey = [
-					{ path: ["todo", "getAnalytics"] },
-					{
-						input: {
-							startDate: "2026-01-15T00:00:00.000Z",
-							endDate: "2026-01-17T23:59:59.999Z",
-						},
-					},
-				];
-
-				mockGetQueriesData.mockReturnValue([
-					[analyticsQueryKey, mockAnalyticsData],
-				]);
+			it("returns isError true on mutation failure", async () => {
 				mockUpdatePastCompletionMutationFn.mockRejectedValue(
-					new Error("Network error"),
+					new Error("Failed to update"),
 				);
 
 				const { result } = renderHook(() => useUpdatePastCompletion(), {
@@ -617,39 +480,178 @@ describe("Analytics Hooks", () => {
 					}
 				});
 
-				// Should have called setQueryData for both optimistic update AND rollback
-				expect(mockSetQueryData.mock.calls.length).toBeGreaterThanOrEqual(1);
+				await waitFor(() => {
+					expect(result.current.isError).toBe(true);
+				});
 			});
 
-			it("handles marking as incomplete (unchecking)", async () => {
-				const analyticsQueryKey = [
-					{ path: ["todo", "getAnalytics"] },
-					{
-						input: {
-							startDate: "2026-01-15T00:00:00.000Z",
-							endDate: "2026-01-17T23:59:59.999Z",
-						},
-					},
-				];
-
-				mockGetQueriesData.mockReturnValue([
-					[analyticsQueryKey, mockAnalyticsData],
-				]);
-
-				const { result } = renderHook(() => useUpdatePastCompletion(), {
-					wrapper: createWrapper(),
-				});
-
-				// Mark as incomplete (completed: false)
-				await act(async () => {
-					await result.current.mutateAsync({
-						todoId: 1,
-						scheduledDate: "2026-01-15T00:00:00.000Z",
-						completed: false,
+			describe("Optimistic Updates", () => {
+				it("cancels outgoing queries on mutate", async () => {
+					const { result } = renderHook(() => useUpdatePastCompletion(), {
+						wrapper: createWrapper(),
 					});
+
+					await act(async () => {
+						await result.current.mutateAsync({
+							todoId: 1,
+							scheduledDate: "2026-01-16T00:00:00.000Z",
+							completed: true,
+						});
+					});
+
+					expect(mockCancelQueries).toHaveBeenCalled();
 				});
 
-				expect(mockSetQueryData).toHaveBeenCalled();
+				it("invalidates queries on success", async () => {
+					const { result } = renderHook(() => useUpdatePastCompletion(), {
+						wrapper: createWrapper(),
+					});
+
+					await act(async () => {
+						await result.current.mutateAsync({
+							todoId: 1,
+							scheduledDate: "2026-01-16T00:00:00.000Z",
+							completed: true,
+						});
+					});
+
+					expect(mockInvalidateQueries).toHaveBeenCalled();
+				});
+
+				it("updates analytics cache optimistically when marking as completed", async () => {
+					const analyticsQueryKey = [
+						{ path: ["todo", "getAnalytics"] },
+						{
+							input: {
+								startDate: "2026-01-15T00:00:00.000Z",
+								endDate: "2026-01-17T23:59:59.999Z",
+							},
+						},
+					];
+
+					mockGetQueriesData.mockReturnValue([
+						[analyticsQueryKey, mockAnalyticsData],
+					]);
+
+					const { result } = renderHook(() => useUpdatePastCompletion(), {
+						wrapper: createWrapper(),
+					});
+
+					await act(async () => {
+						await result.current.mutateAsync({
+							todoId: 1,
+							scheduledDate: "2026-01-16T00:00:00.000Z",
+							completed: true,
+						});
+					});
+
+					// Should have called setQueryData for analytics
+					expect(mockSetQueryData).toHaveBeenCalled();
+				});
+
+				it("updates completion history cache optimistically", async () => {
+					const completionHistoryQueryKey = [
+						{ path: ["todo", "getCompletionHistory"] },
+						{
+							input: {
+								startDate: "2026-01-15T00:00:00.000Z",
+								endDate: "2026-01-17T23:59:59.999Z",
+							},
+						},
+					];
+
+					mockGetQueriesData.mockImplementation(({ predicate }) => {
+						// Check if predicate matches completion history
+						const mockKey = [{ path: ["todo", "getCompletionHistory"] }];
+						if (predicate?.({ queryKey: mockKey })) {
+							return [[completionHistoryQueryKey, mockCompletionHistory]];
+						}
+						return [];
+					});
+
+					const { result } = renderHook(() => useUpdatePastCompletion(), {
+						wrapper: createWrapper(),
+					});
+
+					await act(async () => {
+						await result.current.mutateAsync({
+							todoId: 1,
+							scheduledDate: "2026-01-16T00:00:00.000Z",
+							completed: true,
+						});
+					});
+
+					expect(mockSetQueryData).toHaveBeenCalled();
+				});
+
+				it("rolls back cache on error", async () => {
+					const analyticsQueryKey = [
+						{ path: ["todo", "getAnalytics"] },
+						{
+							input: {
+								startDate: "2026-01-15T00:00:00.000Z",
+								endDate: "2026-01-17T23:59:59.999Z",
+							},
+						},
+					];
+
+					mockGetQueriesData.mockReturnValue([
+						[analyticsQueryKey, mockAnalyticsData],
+					]);
+					mockUpdatePastCompletionMutationFn.mockRejectedValue(
+						new Error("Network error"),
+					);
+
+					const { result } = renderHook(() => useUpdatePastCompletion(), {
+						wrapper: createWrapper(),
+					});
+
+					await act(async () => {
+						try {
+							await result.current.mutateAsync({
+								todoId: 1,
+								scheduledDate: "2026-01-16T00:00:00.000Z",
+								completed: true,
+							});
+						} catch {
+							// Expected to throw
+						}
+					});
+
+					// Should have called setQueryData for both optimistic update AND rollback
+					expect(mockSetQueryData.mock.calls.length).toBeGreaterThanOrEqual(1);
+				});
+
+				it("handles marking as incomplete (unchecking)", async () => {
+					const analyticsQueryKey = [
+						{ path: ["todo", "getAnalytics"] },
+						{
+							input: {
+								startDate: "2026-01-15T00:00:00.000Z",
+								endDate: "2026-01-17T23:59:59.999Z",
+							},
+						},
+					];
+
+					mockGetQueriesData.mockReturnValue([
+						[analyticsQueryKey, mockAnalyticsData],
+					]);
+
+					const { result } = renderHook(() => useUpdatePastCompletion(), {
+						wrapper: createWrapper(),
+					});
+
+					// Mark as incomplete (completed: false)
+					await act(async () => {
+						await result.current.mutateAsync({
+							todoId: 1,
+							scheduledDate: "2026-01-15T00:00:00.000Z",
+							completed: false,
+						});
+					});
+
+					expect(mockSetQueryData).toHaveBeenCalled();
+				});
 			});
 		});
 	});
