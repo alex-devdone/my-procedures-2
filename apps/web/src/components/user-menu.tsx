@@ -66,17 +66,19 @@ export default function UserMenu() {
 				<span className="font-semibold text-sm">{initials}</span>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="end" className="w-56">
-				<DropdownMenuLabel className="font-normal">
-					<div className="flex flex-col gap-1">
-						<p className="font-display font-semibold text-sm">
-							{session.user.name}
-						</p>
-						<p className="flex items-center gap-1.5 text-muted-foreground text-xs">
-							<Mail className="h-3 w-3" />
-							{session.user.email}
-						</p>
-					</div>
-				</DropdownMenuLabel>
+				<DropdownMenuGroup>
+					<DropdownMenuLabel className="font-normal">
+						<div className="flex flex-col gap-1">
+							<p className="font-display font-semibold text-sm">
+								{session.user.name}
+							</p>
+							<p className="flex items-center gap-1.5 text-muted-foreground text-xs">
+								<Mail className="h-3 w-3" />
+								{session.user.email}
+							</p>
+						</div>
+					</DropdownMenuLabel>
+				</DropdownMenuGroup>
 				<DropdownMenuSeparator />
 				<DropdownMenuGroup>
 					<DropdownMenuItem className="flex items-center gap-2">

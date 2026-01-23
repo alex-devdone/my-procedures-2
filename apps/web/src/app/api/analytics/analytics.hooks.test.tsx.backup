@@ -154,8 +154,7 @@ vi.mock("./analytics.supabase", () => ({
 }));
 
 // Get a reference to the mocked function for use in tests
-const mockGetCompletionHistorySupabase =
-	getCompletionHistorySupabase as ReturnType<typeof vi.fn>;
+const mockGetCompletionHistorySupabase = getCompletionHistorySupabase as ReturnType<typeof vi.fn>;
 
 // Import after mocks are set up
 import {
@@ -290,102 +289,101 @@ describe("Analytics Hooks", () => {
 
 			expect(result.current.data).toEqual(mockAnalyticsData);
 		});
-	});
-
-	describe("useCompletionHistory", () => {
-		it("returns completion history for the date range", async () => {
-			const { result } = renderHook(
-				() => useCompletionHistory(startDate, endDate),
-				{ wrapper: createWrapper() },
-			);
-
-			await waitFor(() => {
-				expect(result.current.isSuccess).toBe(true);
-			});
-
-			// Supabase returns transformed data (snake_case -> camelCase, ISO strings)
-			expect(result.current.data).toEqual(
-				mockCompletionHistory.map((r) => ({
-					id: r.id,
-					todoId: r.todoId,
-					scheduledDate: r.scheduledDate.toISOString(),
-					completedAt: r.completedAt?.toISOString() || null,
-				})),
-			);
 		});
 
-		it("passes startDate and endDate to query options", async () => {
-			const { getCompletionHistoryQueryOptions } = await import(
-				"./analytics.api"
-			);
+		describe("useCompletionHistory", () => {
+			it("returns completion history for the date range", async () => {
+				const { result } = renderHook(
+					() => useCompletionHistory(startDate, endDate),
+					{ wrapper: createWrapper() },
+				);
 
-			renderHook(() => useCompletionHistory(startDate, endDate), {
-				wrapper: createWrapper(),
+				await waitFor(() => {
+					expect(result.current.isSuccess).toBe(true);
+				});
+
+				// Supabase returns transformed data (snake_case -> camelCase, ISO strings)
+				expect(result.current.data).toEqual(
+					mockCompletionHistory.map((r) => ({
+						id: r.id,
+						todoId: r.todoId,
+						scheduledDate: r.scheduledDate.toISOString(),
+						completedAt: r.completedAt?.toISOString() || null,
+					})),
+				);
 			});
 
-			expect(getCompletionHistoryQueryOptions).toHaveBeenCalledWith({
-				startDate,
-				endDate,
+			it("passes startDate and endDate to query options", async () => {
+				const { getCompletionHistoryQueryOptions } =
+					await import("./analytics.api");
+
+				renderHook(() => useCompletionHistory(startDate, endDate), {
+					wrapper: createWrapper(),
+				});
+
+				expect(getCompletionHistoryQueryOptions).toHaveBeenCalledWith({
+					startDate,
+					endDate,
+				});
+			});
+
+			it("returns isLoading true while fetching", () => {
+				mockGetCompletionHistorySupabase.mockReturnValue(new Promise(() => {}));
+
+				const { result } = renderHook(
+					() => useCompletionHistory(startDate, endDate),
+					{ wrapper: createWrapper() },
+				);
+
+				expect(result.current.isLoading).toBe(true);
+			});
+
+			it("returns isError true on failure", async () => {
+				mockGetCompletionHistorySupabase.mockRejectedValue(
+					new Error("Failed to fetch"),
+				);
+
+				const { result } = renderHook(
+					() => useCompletionHistory(startDate, endDate),
+					{ wrapper: createWrapper() },
+				);
+
+				await waitFor(() => {
+					expect(result.current.isError).toBe(true);
+				});
+			});
+
+			it("returns completion records with correct structure", async () => {
+				const { result } = renderHook(
+					() => useCompletionHistory(startDate, endDate),
+					{ wrapper: createWrapper() },
+				);
+
+				await waitFor(() => {
+					expect(result.current.isSuccess).toBe(true);
+				});
+
+				const data = result.current.data;
+				expect(data).toHaveLength(3);
+				expect(data?.[0]).toHaveProperty("id");
+				expect(data?.[0]).toHaveProperty("todoId");
+				expect(data?.[0]).toHaveProperty("scheduledDate");
+				expect(data?.[0]).toHaveProperty("completedAt");
+				// todoText is not returned by Supabase implementation
 			});
 		});
 
-		it("returns isLoading true while fetching", () => {
-			mockGetCompletionHistorySupabase.mockReturnValue(new Promise(() => {}));
+		describe("useUpdatePastCompletion", () => {
+			it("returns mutation function", () => {
+				const { result } = renderHook(() => useUpdatePastCompletion(), {
+					wrapper: createWrapper(),
+				});
 
-			const { result } = renderHook(
-				() => useCompletionHistory(startDate, endDate),
-				{ wrapper: createWrapper() },
-			);
-
-			expect(result.current.isLoading).toBe(true);
-		});
-
-		it("returns isError true on failure", async () => {
-			mockGetCompletionHistorySupabase.mockRejectedValue(
-				new Error("Failed to fetch"),
-			);
-
-			const { result } = renderHook(
-				() => useCompletionHistory(startDate, endDate),
-				{ wrapper: createWrapper() },
-			);
-
-			await waitFor(() => {
-				expect(result.current.isError).toBe(true);
-			});
-		});
-
-		it("returns completion records with correct structure", async () => {
-			const { result } = renderHook(
-				() => useCompletionHistory(startDate, endDate),
-				{ wrapper: createWrapper() },
-			);
-
-			await waitFor(() => {
-				expect(result.current.isSuccess).toBe(true);
+				expect(typeof result.current.mutate).toBe("function");
+				expect(typeof result.current.mutateAsync).toBe("function");
 			});
 
-			const data = result.current.data;
-			expect(data).toHaveLength(3);
-			expect(data?.[0]).toHaveProperty("id");
-			expect(data?.[0]).toHaveProperty("todoId");
-			expect(data?.[0]).toHaveProperty("scheduledDate");
-			expect(data?.[0]).toHaveProperty("completedAt");
-			// todoText is not returned by Supabase implementation
-		});
-	});
-
-	describe("useUpdatePastCompletion", () => {
-		it("returns mutation function", () => {
-			const { result } = renderHook(() => useUpdatePastCompletion(), {
-				wrapper: createWrapper(),
-			});
-
-			expect(typeof result.current.mutate).toBe("function");
-			expect(typeof result.current.mutateAsync).toBe("function");
-		});
-
-		it("calls mutation with correct input", async () => {
+			it("calls mutation with correct input", async () => {
 			const { result } = renderHook(() => useUpdatePastCompletion(), {
 				wrapper: createWrapper(),
 			});
