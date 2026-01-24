@@ -477,6 +477,102 @@ describe("GoogleTasksClient", () => {
 			);
 			expect(requestBody.due).toBe(dueDate.toISOString());
 		});
+
+		it("should include completed timestamp when creating completed task", async () => {
+			mockDb.query.googleTasksIntegration.findFirst.mockResolvedValue({
+				id: 1,
+				userId: "user-1",
+				accessToken: "valid-token",
+				refreshToken: "refresh-token",
+				tokenExpiresAt: new Date(Date.now() + 3600000),
+			});
+
+			mockFetch.mockResolvedValueOnce({
+				ok: true,
+				json: async () => ({
+					id: "task-1",
+					title: "Completed todo",
+					status: "completed",
+					kind: "tasks#task",
+					etag: "etag1",
+					updated: "2024-01-01T00:00:00Z",
+					selfLink: "https://example.com",
+					parent: "list-1",
+					position: "00000000000000000001",
+					completed: "2024-01-15T10:00:00.000Z",
+				}),
+				status: 200,
+				statusText: "OK",
+			} as Response);
+
+			const beforeCreation = Date.now();
+
+			const client = await GoogleTasksClient.forUser("user-1");
+			await client.upsertTask("list-1", {
+				text: "Completed todo",
+				completed: true,
+			});
+
+			const requestBody = JSON.parse(
+				mockFetch.mock.calls[0]?.[1]?.body as string,
+			);
+			expect(requestBody.status).toBe("completed");
+			expect(requestBody.completed).toBeDefined();
+
+			const completedTime = new Date(requestBody.completed).getTime();
+			expect(completedTime).toBeGreaterThanOrEqual(beforeCreation);
+			expect(completedTime).toBeLessThanOrEqual(Date.now() + 1000);
+		});
+
+		it("should include completed timestamp when updating to completed", async () => {
+			mockDb.query.googleTasksIntegration.findFirst.mockResolvedValue({
+				id: 1,
+				userId: "user-1",
+				accessToken: "valid-token",
+				refreshToken: "refresh-token",
+				tokenExpiresAt: new Date(Date.now() + 3600000),
+			});
+
+			mockFetch.mockResolvedValueOnce({
+				ok: true,
+				json: async () => ({
+					id: "existing-task",
+					title: "Mark as complete",
+					status: "completed",
+					kind: "tasks#task",
+					etag: "etag1",
+					updated: "2024-01-01T00:00:00Z",
+					selfLink: "https://example.com",
+					parent: "list-1",
+					position: "00000000000000000001",
+					completed: "2024-01-15T10:00:00.000Z",
+				}),
+				status: 200,
+				statusText: "OK",
+			} as Response);
+
+			const beforeUpdate = Date.now();
+
+			const client = await GoogleTasksClient.forUser("user-1");
+			await client.upsertTask(
+				"list-1",
+				{
+					text: "Mark as complete",
+					completed: true,
+				},
+				"existing-task",
+			);
+
+			const requestBody = JSON.parse(
+				mockFetch.mock.calls[0]?.[1]?.body as string,
+			);
+			expect(requestBody.status).toBe("completed");
+			expect(requestBody.completed).toBeDefined();
+
+			const completedTime = new Date(requestBody.completed).getTime();
+			expect(completedTime).toBeGreaterThanOrEqual(beforeUpdate);
+			expect(completedTime).toBeLessThanOrEqual(Date.now() + 1000);
+		});
 	});
 
 	describe("deleteTask", () => {
@@ -645,6 +741,305 @@ describe("GoogleTasksClient", () => {
 				expect(error).toBeInstanceOf(GoogleTasksApiError);
 				expect((error as GoogleTasksApiError).statusCode).toBe(404);
 			}
+		});
+
+		it("should extract error message from API error response", async () => {
+			mockDb.query.googleTasksIntegration.findFirst.mockResolvedValue({
+				id: 1,
+				userId: "user-1",
+				accessToken: "valid-token",
+				refreshToken: "refresh-token",
+				tokenExpiresAt: new Date(Date.now() + 3600000),
+			});
+
+			const apiErrorMessage = "Invalid task list ID";
+			mockFetch.mockResolvedValueOnce({
+				ok: false,
+				status: 400,
+				statusText: "Bad Request",
+				json: async () => ({ error: { message: apiErrorMessage } }),
+			} as Response);
+
+			const client = await GoogleTasksClient.forUser("user-1");
+
+			try {
+				await client.listTasks("invalid-list");
+				expect.fail("Should have thrown an error");
+			} catch (error) {
+				expect(error).toBeInstanceOf(GoogleTasksApiError);
+				expect((error as Error).message).toBe(apiErrorMessage);
+			}
+		});
+
+		it("should use default error message when JSON parsing fails", async () => {
+			mockDb.query.googleTasksIntegration.findFirst.mockResolvedValue({
+				id: 1,
+				userId: "user-1",
+				accessToken: "valid-token",
+				refreshToken: "refresh-token",
+				tokenExpiresAt: new Date(Date.now() + 3600000),
+			});
+
+			mockFetch.mockResolvedValueOnce({
+				ok: false,
+				status: 500,
+				statusText: "Internal Server Error",
+				json: async () => {
+					throw new Error("Invalid JSON");
+				},
+			} as Response);
+
+			const client = await GoogleTasksClient.forUser("user-1");
+
+			try {
+				await client.listTasks("list-1");
+				expect.fail("Should have thrown an error");
+			} catch (error) {
+				expect(error).toBeInstanceOf(GoogleTasksApiError);
+				expect((error as Error).message).toContain("500 Internal Server Error");
+			}
+		});
+	});
+});
+
+describe("Token refresh", () => {
+	describe("from integration table", () => {
+		it("should auto-refresh expired token from integration", async () => {
+			const expiredDate = new Date(Date.now() - 1000);
+
+			mockDb.query.googleTasksIntegration.findFirst.mockResolvedValue({
+				id: 1,
+				userId: "user-1",
+				accessToken: "expired-token",
+				refreshToken: "refresh-token",
+				tokenExpiresAt: expiredDate,
+			});
+
+			// Reset and setup fresh mocks for this test
+			vi.clearAllMocks();
+
+			mockFetch
+				.mockResolvedValueOnce({
+					ok: true,
+					json: async () => ({
+						access_token: "new-access-token",
+						expires_in: 3600,
+						token_type: "Bearer",
+					}),
+					status: 200,
+					statusText: "OK",
+				} as Response)
+				.mockResolvedValueOnce({
+					ok: true,
+					json: async () => ({ items: [] }),
+					status: 200,
+					statusText: "OK",
+				} as Response);
+
+			const client = await GoogleTasksClient.forUser("user-1");
+			await client.listTaskLists();
+
+			// First call should be to token endpoint
+			expect(mockFetch.mock.calls[0]?.[0]).toBe(
+				"https://oauth2.googleapis.com/token",
+			);
+			expect(mockFetch.mock.calls[0]?.[1]?.method).toBe("POST");
+		});
+
+		it("should throw error when no refresh token available in integration", async () => {
+			const expiredDate = new Date(Date.now() - 1000);
+
+			mockDb.query.googleTasksIntegration.findFirst.mockResolvedValue({
+				id: 1,
+				userId: "user-1",
+				accessToken: "expired-token",
+				refreshToken: null,
+				tokenExpiresAt: expiredDate,
+			});
+
+			await expect(GoogleTasksClient.forUser("user-1")).rejects.toThrow(
+				"No refresh token available",
+			);
+		});
+
+		it("should throw error when token refresh request fails", async () => {
+			const expiredDate = new Date(Date.now() - 1000);
+
+			mockDb.query.googleTasksIntegration.findFirst.mockResolvedValue({
+				id: 1,
+				userId: "user-1",
+				accessToken: "expired-token",
+				refreshToken: "refresh-token",
+				tokenExpiresAt: expiredDate,
+			});
+
+			vi.clearAllMocks();
+
+			mockFetch.mockResolvedValueOnce({
+				ok: false,
+				status: 400,
+				statusText: "Bad Request",
+				json: async () => ({ error: "invalid_grant" }),
+			} as Response);
+
+			await expect(GoogleTasksClient.forUser("user-1")).rejects.toThrow(
+				"Failed to refresh access token",
+			);
+		});
+
+		it("should update integration record with new token", async () => {
+			const expiredDate = new Date(Date.now() - 1000);
+			const mockWhere = vi.fn();
+
+			mockDb.query.googleTasksIntegration.findFirst.mockResolvedValue({
+				id: 1,
+				userId: "user-1",
+				accessToken: "expired-token",
+				refreshToken: "refresh-token",
+				tokenExpiresAt: expiredDate,
+			});
+
+			// Properly chain the update mock
+			mockDb.update = vi.fn(() => ({
+				set: vi.fn(() => ({ where: mockWhere })),
+			}));
+
+			vi.clearAllMocks();
+
+			mockFetch.mockResolvedValueOnce({
+				ok: true,
+				json: async () => ({
+					access_token: "new-access-token",
+					expires_in: 3600,
+					token_type: "Bearer",
+				}),
+				status: 200,
+				statusText: "OK",
+			} as Response);
+
+			await GoogleTasksClient.forUser("user-1");
+
+			expect(mockDb.update).toHaveBeenCalled();
+		});
+	});
+
+	describe("from account table", () => {
+		it("should auto-refresh expired token from account", async () => {
+			const expiredDate = new Date(Date.now() - 1000);
+
+			mockDb.query.googleTasksIntegration.findFirst.mockResolvedValue(null);
+
+			mockDb.query.account.findFirst.mockResolvedValue({
+				id: "account-1",
+				userId: "user-1",
+				accessToken: "expired-token",
+				refreshToken: "refresh-token",
+				accessTokenExpiresAt: expiredDate,
+			});
+
+			// Properly chain the update mock
+			mockDb.update = vi.fn(() => ({
+				set: vi.fn(() => ({ where: vi.fn() })),
+			}));
+
+			// Reset and setup fresh mocks for this test
+			vi.clearAllMocks();
+
+			mockFetch
+				.mockResolvedValueOnce({
+					ok: true,
+					json: async () => ({
+						access_token: "new-access-token",
+						expires_in: 3600,
+						token_type: "Bearer",
+					}),
+					status: 200,
+					statusText: "OK",
+				} as Response)
+				.mockResolvedValueOnce({
+					ok: true,
+					json: async () => ({ items: [] }),
+					status: 200,
+					statusText: "OK",
+				} as Response);
+
+			const client = await GoogleTasksClient.forUser("user-1");
+			await client.listTaskLists();
+
+			// First call should be to token endpoint
+			expect(mockFetch.mock.calls[0]?.[0]).toBe(
+				"https://oauth2.googleapis.com/token",
+			);
+			expect(mockFetch.mock.calls[0]?.[1]?.method).toBe("POST");
+		});
+
+		it("should throw error when no refresh token available in account", async () => {
+			const expiredDate = new Date(Date.now() - 1000);
+
+			mockDb.query.googleTasksIntegration.findFirst.mockResolvedValue(null);
+
+			mockDb.query.account.findFirst.mockResolvedValue({
+				id: "account-1",
+				userId: "user-1",
+				accessToken: "expired-token",
+				refreshToken: null,
+				accessTokenExpiresAt: expiredDate,
+			});
+
+			await expect(GoogleTasksClient.forUser("user-1")).rejects.toThrow(
+				"No refresh token available",
+			);
+		});
+
+		it("should throw error when account token refresh fails", async () => {
+			const expiredDate = new Date(Date.now() - 1000);
+
+			mockDb.query.googleTasksIntegration.findFirst.mockResolvedValue(null);
+
+			mockDb.query.account.findFirst.mockResolvedValue({
+				id: "account-1",
+				userId: "user-1",
+				accessToken: "expired-token",
+				refreshToken: "refresh-token",
+				accessTokenExpiresAt: expiredDate,
+			});
+
+			// Properly chain the update mock
+			mockDb.update = vi.fn(() => ({
+				set: vi.fn(() => ({ where: vi.fn() })),
+			}));
+
+			vi.clearAllMocks();
+
+			mockFetch.mockResolvedValueOnce({
+				ok: false,
+				status: 400,
+				statusText: "Bad Request",
+				json: async () => ({ error: "invalid_grant" }),
+			} as Response);
+
+			await expect(GoogleTasksClient.forUser("user-1")).rejects.toThrow(
+				"Failed to refresh access token",
+			);
+		});
+	});
+});
+
+describe("Error classes", () => {
+	describe("GoogleTasksApiError", () => {
+		it("should create error with message, status code, and status text", () => {
+			const error = new GoogleTasksApiError("Task not found", 404, "Not Found");
+
+			expect(error.message).toBe("Task not found");
+			expect(error.statusCode).toBe(404);
+			expect(error.statusText).toBe("Not Found");
+			expect(error.name).toBe("GoogleTasksApiError");
+		});
+
+		it("should be instanceof Error", () => {
+			const error = new GoogleTasksApiError("Error", 500, "Server Error");
+
+			expect(error instanceof Error).toBe(true);
 		});
 	});
 });
