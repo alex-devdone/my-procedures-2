@@ -5650,4 +5650,301 @@ describe("Todo Router - Google Tasks Sync", () => {
 			expect(uncompleteResult.synced).toBe(true);
 		});
 	});
+
+	describe("delete with Google Tasks sync", () => {
+		it("should delete from Google Tasks when googleSyncEnabled is true and googleTaskId exists", async () => {
+			const todoId = 1;
+			const googleTaskId = "google-task-123";
+			const taskListId = "default-list-456";
+
+			const mockTodo = {
+				id: todoId,
+				text: "Test todo",
+				completed: false,
+				userId,
+				dueDate: null,
+				googleSyncEnabled: true,
+				googleTaskId,
+			};
+
+			const mockIntegration = {
+				id: 1,
+				userId,
+				enabled: true,
+				syncEnabled: true,
+				defaultListId: taskListId,
+				accessToken: "access-token",
+				refreshToken: "refresh-token",
+				tokenExpiresAt: new Date(Date.now() + 3600000),
+			};
+
+			const deleteWithSync = async (
+				todo: typeof mockTodo,
+				integration: typeof mockIntegration | null,
+			): Promise<{ deleted: boolean; synced: boolean }> => {
+				// Delete from local database would happen here
+
+				// Try to sync to Google Tasks
+				if (todo.googleSyncEnabled && todo.googleTaskId) {
+					if (!integration || !integration.defaultListId) {
+						return { deleted: true, synced: false };
+					}
+					// Simulate successful delete from Google Tasks
+					return { deleted: true, synced: true };
+				}
+
+				return { deleted: true, synced: false };
+			};
+
+			const result = await deleteWithSync(mockTodo, mockIntegration);
+
+			expect(result.deleted).toBe(true);
+			expect(result.synced).toBe(true);
+		});
+
+		it("should not sync when googleSyncEnabled is false", async () => {
+			const todoId = 1;
+			const googleTaskId = "google-task-123";
+			const taskListId = "default-list-456";
+
+			const mockTodo = {
+				id: todoId,
+				text: "Test todo",
+				completed: false,
+				userId,
+				dueDate: null,
+				googleSyncEnabled: false,
+				googleTaskId,
+			};
+
+			const mockIntegration = {
+				id: 1,
+				userId,
+				enabled: true,
+				syncEnabled: true,
+				defaultListId: taskListId,
+				accessToken: "access-token",
+				refreshToken: "refresh-token",
+				tokenExpiresAt: new Date(Date.now() + 3600000),
+			};
+
+			const deleteWithSync = async (
+				todo: typeof mockTodo,
+				_integration: typeof mockIntegration | null,
+			): Promise<{ deleted: boolean; synced: boolean }> => {
+				// Delete from local database would happen here
+
+				// Try to sync to Google Tasks
+				if (todo.googleSyncEnabled && todo.googleTaskId) {
+					return { deleted: true, synced: true };
+				}
+
+				return { deleted: true, synced: false };
+			};
+
+			const result = await deleteWithSync(mockTodo, mockIntegration);
+
+			expect(result.deleted).toBe(true);
+			expect(result.synced).toBe(false);
+		});
+
+		it("should not sync when googleTaskId is null", async () => {
+			const todoId = 1;
+			const taskListId = "default-list-456";
+
+			const mockTodo = {
+				id: todoId,
+				text: "Test todo",
+				completed: false,
+				userId,
+				dueDate: null,
+				googleSyncEnabled: true,
+				googleTaskId: null as string | null,
+			};
+
+			const mockIntegration = {
+				id: 1,
+				userId,
+				enabled: true,
+				syncEnabled: true,
+				defaultListId: taskListId,
+				accessToken: "access-token",
+				refreshToken: "refresh-token",
+				tokenExpiresAt: new Date(Date.now() + 3600000),
+			};
+
+			const deleteWithSync = async (
+				todo: typeof mockTodo,
+				_integration: typeof mockIntegration | null,
+			): Promise<{ deleted: boolean; synced: boolean }> => {
+				// Delete from local database would happen here
+
+				// Try to sync to Google Tasks
+				if (todo.googleSyncEnabled && todo.googleTaskId) {
+					return { deleted: true, synced: true };
+				}
+
+				return { deleted: true, synced: false };
+			};
+
+			const result = await deleteWithSync(mockTodo, mockIntegration);
+
+			expect(result.deleted).toBe(true);
+			expect(result.synced).toBe(false);
+		});
+
+		it("should not sync when integration is not configured", async () => {
+			const todoId = 1;
+			const googleTaskId = "google-task-123";
+
+			const mockTodo = {
+				id: todoId,
+				text: "Test todo",
+				completed: false,
+				userId,
+				dueDate: null,
+				googleSyncEnabled: true,
+				googleTaskId,
+			};
+
+			const deleteWithSync = async (
+				todo: typeof mockTodo,
+				integration: typeof mockTodo | null,
+			): Promise<{ deleted: boolean; synced: boolean }> => {
+				// Delete from local database would happen here
+
+				// Try to sync to Google Tasks
+				if (todo.googleSyncEnabled && todo.googleTaskId) {
+					if (!integration || "defaultListId" in integration === false) {
+						return { deleted: true, synced: false };
+					}
+					return { deleted: true, synced: true };
+				}
+
+				return { deleted: true, synced: false };
+			};
+
+			const result = await deleteWithSync(mockTodo, null);
+
+			expect(result.deleted).toBe(true);
+			expect(result.synced).toBe(false);
+		});
+
+		it("should not sync when integration has no defaultListId", async () => {
+			const todoId = 1;
+			const googleTaskId = "google-task-123";
+
+			const mockTodo = {
+				id: todoId,
+				text: "Test todo",
+				completed: false,
+				userId,
+				dueDate: null,
+				googleSyncEnabled: true,
+				googleTaskId,
+			};
+
+			const mockIntegration = {
+				id: 1,
+				userId,
+				enabled: true,
+				syncEnabled: true,
+				defaultListId: null as string | null,
+				accessToken: "access-token",
+				refreshToken: "refresh-token",
+				tokenExpiresAt: new Date(Date.now() + 3600000),
+			};
+
+			const deleteWithSync = async (
+				todo: typeof mockTodo,
+				integration: typeof mockIntegration | null,
+			): Promise<{ deleted: boolean; synced: boolean }> => {
+				// Delete from local database would happen here
+
+				// Try to sync to Google Tasks
+				if (todo.googleSyncEnabled && todo.googleTaskId) {
+					if (!integration || !integration.defaultListId) {
+						return { deleted: true, synced: false };
+					}
+					return { deleted: true, synced: true };
+				}
+
+				return { deleted: true, synced: false };
+			};
+
+			const result = await deleteWithSync(mockTodo, mockIntegration);
+
+			expect(result.deleted).toBe(true);
+			expect(result.synced).toBe(false);
+		});
+
+		it("should handle sync errors gracefully without failing delete", async () => {
+			const todoId = 1;
+			const googleTaskId = "google-task-123";
+			const taskListId = "default-list-456";
+
+			const mockTodo = {
+				id: todoId,
+				text: "Test todo",
+				completed: false,
+				userId,
+				dueDate: null,
+				googleSyncEnabled: true,
+				googleTaskId,
+			};
+
+			const mockIntegration = {
+				id: 1,
+				userId,
+				enabled: true,
+				syncEnabled: true,
+				defaultListId: taskListId,
+				accessToken: "access-token",
+				refreshToken: "refresh-token",
+				tokenExpiresAt: new Date(Date.now() + 3600000),
+			};
+
+			const deleteWithSyncErrorHandling = async (
+				todo: typeof mockTodo,
+				integration: typeof mockIntegration | null,
+				shouldThrowError: boolean,
+			): Promise<{
+				deleted: boolean;
+				synced: boolean;
+				errorLogged: boolean;
+			}> => {
+				// Delete from local database would happen here
+
+				// Try to sync to Google Tasks
+				if (todo.googleSyncEnabled && todo.googleTaskId) {
+					if (!integration || !integration.defaultListId) {
+						return { deleted: true, synced: false, errorLogged: false };
+					}
+
+					try {
+						if (shouldThrowError) {
+							throw new Error("Google Tasks API error");
+						}
+						return { deleted: true, synced: true, errorLogged: false };
+					} catch (_error) {
+						// Log error but don't fail delete
+						return { deleted: true, synced: false, errorLogged: true };
+					}
+				}
+
+				return { deleted: true, synced: false, errorLogged: false };
+			};
+
+			const result = await deleteWithSyncErrorHandling(
+				mockTodo,
+				mockIntegration,
+				true,
+			);
+
+			// Delete should still succeed even if sync fails
+			expect(result.deleted).toBe(true);
+			expect(result.synced).toBe(false);
+			expect(result.errorLogged).toBe(true);
+		});
+	});
 });

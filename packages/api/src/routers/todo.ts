@@ -289,6 +289,35 @@ export const todoRouter = router({
 				});
 			}
 
+			// Sync to Google Tasks if enabled
+			if (existing.googleSyncEnabled && existing.googleTaskId) {
+				try {
+					// Get the user's Google Tasks integration to find the default list ID
+					const integration = await db.query.googleTasksIntegration.findFirst({
+						where: eq(googleTasksIntegration.userId, ctx.session.user.id),
+					});
+
+					if (!integration || !integration.defaultListId) {
+						// No integration configured or no default list - skip sync
+						// Continue with local deletion
+					} else {
+						// Create a Google Tasks client and delete the task
+						const client = await GoogleTasksClient.forUser(ctx.session.user.id);
+						await client.deleteTask(
+							integration.defaultListId,
+							existing.googleTaskId,
+						);
+					}
+				} catch (error) {
+					// Log the error but don't fail the delete operation
+					// The local todo will still be deleted
+					console.error(
+						`Failed to delete todo ${input.id} from Google Tasks:`,
+						error,
+					);
+				}
+			}
+
 			return await db.delete(todo).where(eq(todo.id, input.id));
 		}),
 
