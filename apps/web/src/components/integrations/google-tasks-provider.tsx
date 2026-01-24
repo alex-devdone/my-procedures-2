@@ -20,7 +20,7 @@ interface GoogleTasksContextValue {
 	/** Whether status is being fetched */
 	isLoading: boolean;
 	/** Whether there was an error fetching status */
-	error: Error | null;
+	error: unknown | null;
 	/** Whether Google Tasks is linked and enabled */
 	isEnabled: boolean;
 	/** Whether auto-sync is enabled */

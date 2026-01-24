@@ -2,9 +2,29 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
+interface VercelHeader {
+	source: string;
+	headers: Array<{ key: string; value: string }>;
+}
+
+interface VercelRewrite {
+	source: string;
+	destination: string;
+}
+
+interface VercelConfig {
+	buildCommand?: string;
+	installCommand?: string;
+	framework?: string;
+	regions?: string[];
+	headers?: VercelHeader[];
+	rewrites?: VercelRewrite[];
+	crons?: unknown[];
+}
+
 const vercelConfig = JSON.parse(
 	readFileSync(resolve(__dirname, "../vercel.json"), "utf-8"),
-);
+) as VercelConfig;
 
 describe("vercel.json", () => {
 	it("should have valid schema", () => {
@@ -36,7 +56,7 @@ describe("vercel.json", () => {
 
 	it("should have CORS headers for API routes", () => {
 		const apiHeaders = vercelConfig.headers?.find(
-			(h) => h.source === "/api/(.*)",
+			(h: VercelHeader) => h.source === "/api/(.*)",
 		);
 		expect(apiHeaders).toBeDefined();
 
@@ -56,7 +76,7 @@ describe("vercel.json", () => {
 
 	it("should have API route rewrite", () => {
 		const apiRewrite = vercelConfig.rewrites?.find(
-			(r) => r.source === "/api/:path*",
+			(r: VercelRewrite) => r.source === "/api/:path*",
 		);
 		expect(apiRewrite).toBeDefined();
 		expect(apiRewrite?.destination).toBe("/api/:path*");

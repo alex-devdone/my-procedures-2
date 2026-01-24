@@ -143,7 +143,7 @@ describe("GoogleSyncToggle", () => {
 
 		it("shows loading spinner during sync operation", async () => {
 			const user = userEvent.setup();
-			let resolvePromise: (value: undefined) => void;
+			let resolvePromise: () => void = () => {};
 			const onSyncChange = vi.fn(
 				() =>
 					new Promise<void>((resolve) => {
@@ -172,7 +172,7 @@ describe("GoogleSyncToggle", () => {
 
 		it("disables button while sync is in progress", async () => {
 			const user = userEvent.setup();
-			let resolvePromise: (value: undefined) => void;
+			let resolvePromise: () => void = () => {};
 			const onSyncChange = vi.fn(
 				() =>
 					new Promise<void>((resolve) => {
@@ -330,7 +330,7 @@ describe("GoogleSyncToggle", () => {
 	describe("Multiple Rapid Clicks", () => {
 		it("debounces rapid clicks by disabling button during operation", async () => {
 			const user = userEvent.setup();
-			let resolvePromise: (value: undefined) => void;
+			let resolvePromise: () => void = () => {};
 			const onSyncChange = vi.fn(
 				() =>
 					new Promise<void>((resolve) => {

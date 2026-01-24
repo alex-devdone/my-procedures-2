@@ -124,6 +124,7 @@ describe("Google Tasks Input Schemas", () => {
 		it("accepts valid input without optional fields", () => {
 			const result = enableIntegrationInputSchema.safeParse({
 				accessToken: "ya29.a0AfH6...",
+				expiresIn: 3600,
 			});
 			expect(result.success).toBe(true);
 			if (result.success) {

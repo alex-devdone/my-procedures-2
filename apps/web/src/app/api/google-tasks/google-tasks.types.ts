@@ -68,10 +68,7 @@ export const createTaskListInputSchema = z.object({
 export const enableIntegrationInputSchema = z.object({
 	accessToken: z.string().min(1, "Access token is required"),
 	refreshToken: z.string().optional(),
-	expiresIn: z
-		.number()
-		.positive("Expiration time must be a positive number")
-		.optional(),
+	expiresIn: z.number().positive("Expiration time must be a positive number"),
 	defaultListId: z.string().optional(),
 });
 

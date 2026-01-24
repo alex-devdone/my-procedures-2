@@ -264,14 +264,20 @@ test.describe("Google Tasks Sync - UI and localStorage behavior", () => {
 			// Set different sync states
 			await page.evaluate(() => {
 				const todos = JSON.parse(localStorage.getItem("todos") || "[]");
-				todos.forEach((todo: { text: string; googleSyncEnabled: boolean }) => {
-					if (todo.text.includes("Synced")) {
-						todo.googleSyncEnabled = true;
-						todo.googleTaskId = `${todo.text.replace(/\s+/g, "-")}-google-id`;
-					} else {
-						todo.googleSyncEnabled = false;
-					}
-				});
+				todos.forEach(
+					(todo: {
+						text: string;
+						googleSyncEnabled: boolean;
+						googleTaskId?: string;
+					}) => {
+						if (todo.text.includes("Synced")) {
+							todo.googleSyncEnabled = true;
+							todo.googleTaskId = `${todo.text.replace(/\s+/g, "-")}-google-id`;
+						} else {
+							todo.googleSyncEnabled = false;
+						}
+					},
+				);
 				localStorage.setItem("todos", JSON.stringify(todos));
 			});
 

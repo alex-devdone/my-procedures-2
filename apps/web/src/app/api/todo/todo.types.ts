@@ -87,6 +87,9 @@ export interface RemoteTodo {
 	dueDate: string | null;
 	reminderAt: string | null;
 	recurringPattern: RecurringPattern | null;
+	googleSyncEnabled: boolean;
+	googleTaskId: string | null;
+	lastSyncedAt: string | null;
 }
 
 /**

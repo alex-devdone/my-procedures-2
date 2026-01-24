@@ -173,6 +173,9 @@ describe("Todo Normalization", () => {
 				dueDate: null,
 				reminderAt: null,
 				recurringPattern: null,
+				googleSyncEnabled: false,
+				googleTaskId: null,
+				lastSyncedAt: null,
 			};
 
 			const result = normalizeRemoteTodo(remoteTodo);
@@ -198,6 +201,9 @@ describe("Todo Normalization", () => {
 					dueDate: null,
 					reminderAt: null,
 					recurringPattern: null,
+					googleSyncEnabled: false,
+					googleTaskId: null,
+					lastSyncedAt: null,
 				},
 				{
 					id: 2,
@@ -208,6 +214,9 @@ describe("Todo Normalization", () => {
 					dueDate: null,
 					reminderAt: null,
 					recurringPattern: null,
+					googleSyncEnabled: false,
+					googleTaskId: null,
+					lastSyncedAt: null,
 				},
 			];
 
@@ -297,6 +306,9 @@ describe("Optimistic Update Helpers", () => {
 			dueDate: null,
 			reminderAt: null,
 			recurringPattern: null,
+			googleSyncEnabled: false,
+			googleTaskId: null,
+			lastSyncedAt: null,
 		},
 		{
 			id: 2,
@@ -307,6 +319,9 @@ describe("Optimistic Update Helpers", () => {
 			dueDate: null,
 			reminderAt: null,
 			recurringPattern: null,
+			googleSyncEnabled: false,
+			googleTaskId: null,
+			lastSyncedAt: null,
 		},
 	];
 
@@ -332,6 +347,9 @@ describe("Optimistic Update Helpers", () => {
 				dueDate: null,
 				reminderAt: null,
 				recurringPattern: null,
+				googleSyncEnabled: false,
+				googleTaskId: null,
+				lastSyncedAt: null,
 			};
 
 			const result = applyOptimisticCreate(baseTodos, newTodo);
@@ -350,6 +368,9 @@ describe("Optimistic Update Helpers", () => {
 				dueDate: null,
 				reminderAt: null,
 				recurringPattern: null,
+				googleSyncEnabled: false,
+				googleTaskId: null,
+				lastSyncedAt: null,
 			};
 
 			applyOptimisticCreate(baseTodos, newTodo);

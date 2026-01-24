@@ -696,6 +696,8 @@ describe("google-tasks.hooks", () => {
 					() =>
 						useGoogleTasks({
 							taskListId: "empty-list",
+							showDeleted: false,
+							showHidden: false,
 						}),
 					{
 						wrapper: createWrapper(),
@@ -788,6 +790,8 @@ describe("google-tasks.hooks", () => {
 					() =>
 						useGoogleTasks({
 							taskListId: "list-1",
+							showDeleted: false,
+							showHidden: false,
 						}),
 					{
 						wrapper: createWrapper(),
