@@ -35,6 +35,7 @@ const createMockTodo = (
 		folderId?: number | string | null;
 		dueDate?: string | null;
 		recurringPattern?: RecurringPattern | null;
+		googleSyncEnabled?: boolean;
 	}> = {},
 ) => ({
 	id: "todo-1",
@@ -43,6 +44,7 @@ const createMockTodo = (
 	folderId: null,
 	dueDate: null,
 	recurringPattern: null,
+	googleSyncEnabled: false,
 	...overrides,
 });
 
@@ -971,6 +973,155 @@ describe("TodoExpandableItem", () => {
 			expect(
 				screen.getByTestId("todo-recurring-indicator"),
 			).toBeInTheDocument();
+		});
+	});
+
+	describe("Google Sync Toggle", () => {
+		it("does not show Google Sync toggle when onGoogleSyncToggle is not provided", () => {
+			render(
+				<TodoExpandableItem
+					todo={createMockTodo({ id: 123 })}
+					onToggle={mockOnToggle}
+					onDelete={mockOnDelete}
+				/>,
+			);
+
+			expect(
+				screen.queryByTestId("google-sync-toggle"),
+			).not.toBeInTheDocument();
+		});
+
+		it("shows Google Sync toggle when onGoogleSyncToggle is provided and todo ID is numeric", () => {
+			const mockOnGoogleSyncToggle = vi.fn();
+			render(
+				<TodoExpandableItem
+					todo={createMockTodo({ id: 123, googleSyncEnabled: false })}
+					onToggle={mockOnToggle}
+					onDelete={mockOnDelete}
+					onGoogleSyncToggle={mockOnGoogleSyncToggle}
+				/>,
+			);
+
+			expect(screen.getByTestId("google-sync-toggle")).toBeInTheDocument();
+		});
+
+		it("does not show Google Sync toggle for string todo IDs (local todos)", () => {
+			const mockOnGoogleSyncToggle = vi.fn();
+			render(
+				<TodoExpandableItem
+					todo={createMockTodo({
+						id: "local-todo-1",
+						googleSyncEnabled: false,
+					})}
+					onToggle={mockOnToggle}
+					onDelete={mockOnDelete}
+					onGoogleSyncToggle={mockOnGoogleSyncToggle}
+				/>,
+			);
+
+			expect(
+				screen.queryByTestId("google-sync-toggle"),
+			).not.toBeInTheDocument();
+		});
+
+		it("calls onGoogleSyncToggle with enabled=true when sync is toggled on", async () => {
+			const mockOnGoogleSyncToggle = vi.fn().mockResolvedValue(undefined);
+			render(
+				<TodoExpandableItem
+					todo={createMockTodo({ id: 123, googleSyncEnabled: false })}
+					onToggle={mockOnToggle}
+					onDelete={mockOnDelete}
+					onGoogleSyncToggle={mockOnGoogleSyncToggle}
+				/>,
+			);
+
+			fireEvent.click(screen.getByTestId("google-sync-toggle"));
+
+			await waitFor(() => {
+				expect(mockOnGoogleSyncToggle).toHaveBeenCalledWith(123, true);
+			});
+		});
+
+		it("calls onGoogleSyncToggle with enabled=false when sync is toggled off", async () => {
+			const mockOnGoogleSyncToggle = vi.fn().mockResolvedValue(undefined);
+			render(
+				<TodoExpandableItem
+					todo={createMockTodo({ id: 123, googleSyncEnabled: true })}
+					onToggle={mockOnToggle}
+					onDelete={mockOnDelete}
+					onGoogleSyncToggle={mockOnGoogleSyncToggle}
+				/>,
+			);
+
+			fireEvent.click(screen.getByTestId("google-sync-toggle"));
+
+			await waitFor(() => {
+				expect(mockOnGoogleSyncToggle).toHaveBeenCalledWith(123, false);
+			});
+		});
+
+		it("shows Cloud icon when googleSyncEnabled is true", () => {
+			const mockOnGoogleSyncToggle = vi.fn();
+			render(
+				<TodoExpandableItem
+					todo={createMockTodo({ id: 123, googleSyncEnabled: true })}
+					onToggle={mockOnToggle}
+					onDelete={mockOnDelete}
+					onGoogleSyncToggle={mockOnGoogleSyncToggle}
+				/>,
+			);
+
+			const toggle = screen.getByTestId("google-sync-toggle");
+			expect(toggle).toHaveClass("text-blue-500");
+		});
+
+		it("shows CloudOff icon when googleSyncEnabled is false", () => {
+			const mockOnGoogleSyncToggle = vi.fn();
+			render(
+				<TodoExpandableItem
+					todo={createMockTodo({ id: 123, googleSyncEnabled: false })}
+					onToggle={mockOnToggle}
+					onDelete={mockOnDelete}
+					onGoogleSyncToggle={mockOnGoogleSyncToggle}
+				/>,
+			);
+
+			const toggle = screen.getByTestId("google-sync-toggle");
+			expect(toggle).toHaveClass("text-muted-foreground");
+		});
+
+		it("has accessible label for enabling sync when not synced", () => {
+			const mockOnGoogleSyncToggle = vi.fn();
+			render(
+				<TodoExpandableItem
+					todo={createMockTodo({ id: 123, googleSyncEnabled: false })}
+					onToggle={mockOnToggle}
+					onDelete={mockOnDelete}
+					onGoogleSyncToggle={mockOnGoogleSyncToggle}
+				/>,
+			);
+
+			expect(screen.getByTestId("google-sync-toggle")).toHaveAttribute(
+				"aria-label",
+				"Enable Google sync",
+			);
+		});
+
+		it("has accessible label for disabling sync when synced", () => {
+			const mockOnGoogleSyncToggle = vi.fn();
+			render(
+				<TodoExpandableItem
+					todo={createMockTodo({ id: 123, googleSyncEnabled: true })}
+					onToggle={mockOnToggle}
+					onDelete={mockOnDelete}
+					onGoogleSyncToggle={mockOnGoogleSyncToggle}
+				/>,
+			);
+
+			expect(screen.getByTestId("google-sync-toggle")).toHaveAttribute(
+				"aria-label",
+				"Disable Google sync",
+			);
 		});
 	});
 
