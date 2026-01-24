@@ -1,36 +1,94 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GoogleTasksProvider, useGoogleTasks } from "./google-tasks-provider";
 
+// Create a QueryClient for testing
+const queryClient = new QueryClient({
+	defaultOptions: {
+		queries: {
+			retry: false,
+		},
+		mutations: {
+			retry: false,
+		},
+	},
+});
+
+function renderWithQueryClient(ui: React.ReactElement) {
+	return render(
+		<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+	);
+}
+
 // ============================================================================
 // Mocks
 // ============================================================================
 
-// Mock useGoogleTasksStatus hook
-const mockUseGoogleTasksStatus = vi.fn();
-vi.mock("@/app/api/google-tasks", () => ({
-	useGoogleTasksStatus: () => mockUseGoogleTasksStatus(),
-	useUpdateGoogleTasksSettings: () => ({
-		updateSettings: mockUpdateSettings,
-		isPending: mockIsUpdatePending,
-	}),
-}));
-
 // Mock updateSettings function
 const mockUpdateSettings = vi.fn();
 const mockIsUpdatePending = vi.fn(() => false);
+
+// Mock useSession
+const mockUseSession = vi.fn();
+
+// Mock useQuery
+const mockUseQuery = vi.fn();
+
+// Mock getStatusQueryOptions
+const mockGetStatusQueryOptions = vi.fn(() => ({
+	queryKey: ["googleTasks", "getStatus"],
+}));
+
+// Mock useGoogleTasksStatus
+const mockUseGoogleTasksStatus = vi.fn(() => ({
+	status: null,
+	isLoading: false,
+	error: null,
+	refetch: vi.fn(),
+}));
+
+vi.mock("@/lib/auth-client", () => ({
+	useSession: () => mockUseSession(),
+}));
+
+vi.mock("@/app/api/google-tasks", async (importOriginal) => {
+	const actual =
+		await importOriginal<typeof import("@/app/api/google-tasks")>();
+	return {
+		...actual,
+		getStatusQueryOptions: () => mockGetStatusQueryOptions(),
+		useGoogleTasksStatus: () => mockUseGoogleTasksStatus(),
+		useUpdateGoogleTasksSettings: () => ({
+			updateSettings: mockUpdateSettings,
+			isPending: mockIsUpdatePending,
+		}),
+	};
+});
+
+vi.mock("@tanstack/react-query", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("@tanstack/react-query")>();
+	return {
+		...actual,
+		useQuery: () => mockUseQuery(),
+	};
+});
 
 // ============================================================================
 // Test Helpers
 // ============================================================================
 
 function setupMocks({
+	session = null,
+	sessionPending = false,
 	status = null,
 	isLoading = false,
 	error = null,
 	isUpdatePending = false,
 }: {
+	session?: { user: { id: string; email: string; name: string } } | null;
+	sessionPending?: boolean;
 	status?: {
 		linked: boolean;
 		enabled: boolean;
@@ -42,8 +100,13 @@ function setupMocks({
 	error?: Error | null;
 	isUpdatePending?: boolean;
 } = {}) {
-	mockUseGoogleTasksStatus.mockReturnValue({
-		status,
+	mockUseSession.mockReturnValue({
+		data: session,
+		isPending: sessionPending,
+	});
+
+	mockUseQuery.mockReturnValue({
+		data: status,
 		isLoading,
 		error,
 		refetch: vi.fn(),
@@ -78,7 +141,7 @@ describe("GoogleTasksProvider", () => {
 		it("renders children", () => {
 			setupMocks();
 
-			render(
+			renderWithQueryClient(
 				<GoogleTasksProvider>
 					<div data-testid="child">Child content</div>
 				</GoogleTasksProvider>,
@@ -91,7 +154,7 @@ describe("GoogleTasksProvider", () => {
 		it("renders multiple children", () => {
 			setupMocks();
 
-			render(
+			renderWithQueryClient(
 				<GoogleTasksProvider>
 					<div data-testid="child-1">First</div>
 					<div data-testid="child-2">Second</div>
@@ -104,7 +167,7 @@ describe("GoogleTasksProvider", () => {
 	});
 
 	describe("context values", () => {
-		it("provides status from useGoogleTasksStatus", () => {
+		it("provides status from useQuery", () => {
 			const status = {
 				linked: true,
 				enabled: true,
@@ -112,9 +175,12 @@ describe("GoogleTasksProvider", () => {
 				lastSyncedAt: "2026-01-24T10:00:00Z",
 				defaultListId: "default-list",
 			};
-			setupMocks({ status });
+			setupMocks({
+				session: { user: { id: "1", email: "test@test.com", name: "Test" } },
+				status,
+			});
 
-			render(
+			renderWithQueryClient(
 				<GoogleTasksProvider>
 					<TestComponent />
 				</GoogleTasksProvider>,
@@ -124,10 +190,10 @@ describe("GoogleTasksProvider", () => {
 			expect(screen.getByTestId("is-sync-enabled")).toHaveTextContent("true");
 		});
 
-		it("provides isLoading from status hook", () => {
+		it("provides isLoading from useQuery", () => {
 			setupMocks({ isLoading: true });
 
-			render(
+			renderWithQueryClient(
 				<GoogleTasksProvider>
 					<TestComponent />
 				</GoogleTasksProvider>,
@@ -139,7 +205,7 @@ describe("GoogleTasksProvider", () => {
 		it("provides isLoading from updateSettings when pending", () => {
 			setupMocks({ isLoading: false, isUpdatePending: true });
 
-			render(
+			renderWithQueryClient(
 				<GoogleTasksProvider>
 					<TestComponent />
 				</GoogleTasksProvider>,
@@ -148,11 +214,11 @@ describe("GoogleTasksProvider", () => {
 			expect(screen.getByTestId("is-loading")).toHaveTextContent("true");
 		});
 
-		it("provides error from status hook", () => {
+		it("provides error from useQuery", () => {
 			const error = new Error("Failed to fetch status");
 			setupMocks({ error });
 
-			render(
+			renderWithQueryClient(
 				<GoogleTasksProvider>
 					<div data-testid="error-test">Test</div>
 				</GoogleTasksProvider>,
@@ -167,7 +233,7 @@ describe("GoogleTasksProvider", () => {
 		it("returns false when status is null", () => {
 			setupMocks({ status: null });
 
-			render(
+			renderWithQueryClient(
 				<GoogleTasksProvider>
 					<TestComponent />
 				</GoogleTasksProvider>,
@@ -187,7 +253,7 @@ describe("GoogleTasksProvider", () => {
 				},
 			});
 
-			render(
+			renderWithQueryClient(
 				<GoogleTasksProvider>
 					<TestComponent />
 				</GoogleTasksProvider>,
@@ -207,7 +273,7 @@ describe("GoogleTasksProvider", () => {
 				},
 			});
 
-			render(
+			renderWithQueryClient(
 				<GoogleTasksProvider>
 					<TestComponent />
 				</GoogleTasksProvider>,
@@ -227,7 +293,7 @@ describe("GoogleTasksProvider", () => {
 				},
 			});
 
-			render(
+			renderWithQueryClient(
 				<GoogleTasksProvider>
 					<TestComponent />
 				</GoogleTasksProvider>,
@@ -241,7 +307,7 @@ describe("GoogleTasksProvider", () => {
 		it("returns false when status is null", () => {
 			setupMocks({ status: null });
 
-			render(
+			renderWithQueryClient(
 				<GoogleTasksProvider>
 					<TestComponent />
 				</GoogleTasksProvider>,
@@ -261,7 +327,7 @@ describe("GoogleTasksProvider", () => {
 				},
 			});
 
-			render(
+			renderWithQueryClient(
 				<GoogleTasksProvider>
 					<TestComponent />
 				</GoogleTasksProvider>,
@@ -281,7 +347,7 @@ describe("GoogleTasksProvider", () => {
 				},
 			});
 
-			render(
+			renderWithQueryClient(
 				<GoogleTasksProvider>
 					<TestComponent />
 				</GoogleTasksProvider>,
@@ -294,7 +360,7 @@ describe("GoogleTasksProvider", () => {
 	describe("useGoogleTasks hook", () => {
 		it("returns default values when used outside provider", () => {
 			// Render without provider
-			render(<TestComponent />);
+			renderWithQueryClient(<TestComponent />);
 
 			expect(screen.getByTestId("is-enabled")).toHaveTextContent("false");
 			expect(screen.getByTestId("is-sync-enabled")).toHaveTextContent("false");
@@ -304,8 +370,8 @@ describe("GoogleTasksProvider", () => {
 		it("provides refetch function", () => {
 			const refetch = vi.fn();
 			setupMocks({});
-			mockUseGoogleTasksStatus.mockReturnValue({
-				status: null,
+			mockUseQuery.mockReturnValue({
+				data: null,
 				isLoading: false,
 				error: null,
 				refetch,
@@ -324,7 +390,7 @@ describe("GoogleTasksProvider", () => {
 				);
 			}
 
-			render(
+			renderWithQueryClient(
 				<GoogleTasksProvider>
 					<TestRefetchComponent />
 				</GoogleTasksProvider>,
@@ -350,7 +416,7 @@ describe("GoogleTasksProvider", () => {
 				);
 			}
 
-			render(
+			renderWithQueryClient(
 				<GoogleTasksProvider>
 					<TestSetSyncComponent />
 				</GoogleTasksProvider>,
@@ -364,6 +430,7 @@ describe("GoogleTasksProvider", () => {
 	describe("setSyncEnabled", () => {
 		it("calls updateSettings with correct value", async () => {
 			mockUpdateSettings.mockResolvedValue(undefined);
+			const refetch = vi.fn();
 			setupMocks({
 				status: {
 					linked: true,
@@ -372,6 +439,18 @@ describe("GoogleTasksProvider", () => {
 					lastSyncedAt: null,
 					defaultListId: null,
 				},
+			});
+			mockUseQuery.mockReturnValue({
+				data: {
+					linked: true,
+					enabled: true,
+					syncEnabled: false,
+					lastSyncedAt: null,
+					defaultListId: null,
+				},
+				isLoading: false,
+				error: null,
+				refetch,
 			});
 
 			function TestSetSyncComponent() {
@@ -389,7 +468,7 @@ describe("GoogleTasksProvider", () => {
 				);
 			}
 
-			render(
+			renderWithQueryClient(
 				<GoogleTasksProvider>
 					<TestSetSyncComponent />
 				</GoogleTasksProvider>,
@@ -407,6 +486,7 @@ describe("GoogleTasksProvider", () => {
 
 		it("handles errors from updateSettings", async () => {
 			mockUpdateSettings.mockRejectedValue(new Error("Update failed"));
+			const refetch = vi.fn();
 			setupMocks({
 				status: {
 					linked: true,
@@ -415,6 +495,18 @@ describe("GoogleTasksProvider", () => {
 					lastSyncedAt: null,
 					defaultListId: null,
 				},
+			});
+			mockUseQuery.mockReturnValue({
+				data: {
+					linked: true,
+					enabled: true,
+					syncEnabled: false,
+					lastSyncedAt: null,
+					defaultListId: null,
+				},
+				isLoading: false,
+				error: null,
+				refetch,
 			});
 
 			function TestSetSyncComponent() {
@@ -436,7 +528,7 @@ describe("GoogleTasksProvider", () => {
 				);
 			}
 
-			render(
+			renderWithQueryClient(
 				<GoogleTasksProvider>
 					<TestSetSyncComponent />
 				</GoogleTasksProvider>,
@@ -457,7 +549,7 @@ describe("GoogleTasksProvider", () => {
 		it("renders without children", () => {
 			setupMocks();
 
-			render(<GoogleTasksProvider>{null}</GoogleTasksProvider>);
+			renderWithQueryClient(<GoogleTasksProvider>{null}</GoogleTasksProvider>);
 
 			// Should not throw
 			expect(document.body).toBeInTheDocument();
@@ -474,7 +566,7 @@ describe("GoogleTasksProvider", () => {
 				},
 			});
 
-			render(
+			renderWithQueryClient(
 				<GoogleTasksProvider>
 					<TestComponent />
 				</GoogleTasksProvider>,
@@ -486,14 +578,14 @@ describe("GoogleTasksProvider", () => {
 
 		it("handles undefined refetch", () => {
 			setupMocks({});
-			mockUseGoogleTasksStatus.mockReturnValue({
-				status: null,
+			mockUseQuery.mockReturnValue({
+				data: null,
 				isLoading: false,
 				error: null,
 				refetch: undefined,
 			});
 
-			render(
+			renderWithQueryClient(
 				<GoogleTasksProvider>
 					<div data-testid="test-div">Test</div>
 				</GoogleTasksProvider>,

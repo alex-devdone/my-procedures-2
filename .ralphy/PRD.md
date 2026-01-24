@@ -166,14 +166,14 @@ This integration allows users to sync individual todos with Google Tasks. When a
 
 - [x] Write hook tests in `apps/web/src/app/api/google-tasks/google-tasks.hooks.test.tsx`
 
-- [ ] Write E2E test for sync flow in `apps/web/e2e/google-tasks.spec.ts`:
+- [x] Write E2E test for sync flow in `apps/web/e2e/google-tasks.spec.ts`:
   - Test config modal opens on first sync toggle
   - Test list selection flow
   - Test sync indicator updates
 
 - [ ] Run `bun run check && bun run check-types` and fix any issues
 
-- [ ] Run `bun run test` and ensure all tests pass
+- [x] Run `bun run test` and ensure all tests pass
 
 - [ ] Run `bun run build` and verify build succeeds
 

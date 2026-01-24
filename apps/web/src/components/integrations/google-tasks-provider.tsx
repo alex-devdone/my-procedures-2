@@ -1,11 +1,21 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import {
+	createContext,
+	useCallback,
+	useContext,
+	useEffect,
+	useMemo,
+	useState,
+} from "react";
 import type { GoogleTasksIntegrationStatus } from "@/app/api/google-tasks";
 import {
-	useGoogleTasksStatus,
+	getStatusQueryOptions,
 	useUpdateGoogleTasksSettings,
 } from "@/app/api/google-tasks";
+import { useSession } from "@/lib/auth-client";
+import { GoogleTasksConfigModal } from "./google-tasks-config-modal";
 
 // ============================================================================
 // Context
@@ -102,15 +112,42 @@ export interface GoogleTasksProviderProps {
  * ```
  */
 export function GoogleTasksProvider({ children }: GoogleTasksProviderProps) {
+	const { data: session, isPending: sessionPending } = useSession();
+	const isAuthenticated = !!session?.user;
+
+	// Only fetch Google Tasks status when user is authenticated
+	const query = useQuery({
+		...getStatusQueryOptions(),
+		enabled: isAuthenticated && !sessionPending,
+	});
+
 	const {
-		status,
+		data: status,
 		isLoading,
 		error,
 		refetch: refetchStatus,
-	} = useGoogleTasksStatus();
+	} = {
+		data: query.data ?? null,
+		isLoading: query.isLoading,
+		error: query.error ?? null,
+		refetch: query.refetch,
+	};
 
 	const { updateSettings, isPending: isUpdatePending } =
 		useUpdateGoogleTasksSettings();
+
+	const [isConfigOpen, setIsConfigOpen] = useState(false);
+
+	useEffect(() => {
+		const handleOpen = () => {
+			setIsConfigOpen(true);
+		};
+
+		window.addEventListener("google-tasks:open-config", handleOpen);
+		return () => {
+			window.removeEventListener("google-tasks:open-config", handleOpen);
+		};
+	}, []);
 
 	// Computed values
 	const isEnabled = Boolean(status?.linked && status?.enabled);
@@ -155,6 +192,10 @@ export function GoogleTasksProvider({ children }: GoogleTasksProviderProps) {
 	return (
 		<GoogleTasksContext.Provider value={contextValue}>
 			{children}
+			<GoogleTasksConfigModal
+				open={isConfigOpen}
+				onOpenChange={setIsConfigOpen}
+			/>
 		</GoogleTasksContext.Provider>
 	);
 }

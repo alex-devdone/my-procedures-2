@@ -18,8 +18,9 @@ export default defineConfig({
 		},
 	],
 	webServer: {
-		command: "bun run build && bun run start --port 8656",
+		command: "next dev --hostname 127.0.0.1 --port 8656",
 		url: "http://localhost:8656",
 		reuseExistingServer: !process.env.CI,
+		timeout: 120_000,
 	},
 });
