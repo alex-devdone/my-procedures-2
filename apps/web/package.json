@@ -20,6 +20,7 @@
 		"@base-ui/react": "^1.0.0",
 		"@my-procedures-2/api": "workspace:*",
 		"@my-procedures-2/auth": "workspace:*",
+		"@my-procedures-2/db": "workspace:*",
 		"@my-procedures-2/env": "workspace:*",
 		"@supabase/supabase-js": "^2.91.0",
 		"@tanstack/react-form": "^1.27.3",

@@ -2,6 +2,17 @@ import { initTRPC, TRPCError } from "@trpc/server";
 
 import type { Context } from "./context";
 
+export { GoogleTasksClient } from "./lib/google-tasks-client";
+export {
+	formatRecurringPattern,
+	getNextNotificationTime,
+	getNextOccurrence,
+	isPatternExpired,
+	parseRecurringDescription,
+	type RecurringPattern,
+	recurringPatternSchema,
+} from "./lib/recurring";
+
 export const t = initTRPC.context<Context>().create();
 
 export const router = t.router;

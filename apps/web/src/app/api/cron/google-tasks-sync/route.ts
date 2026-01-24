@@ -1,4 +1,4 @@
-import { GoogleTasksClient } from "@my-procedures-2/api/lib/google-tasks-client";
+import { GoogleTasksClient } from "@my-procedures-2/api";
 import { and, db, eq, googleTasksIntegration, todo } from "@my-procedures-2/db";
 import { env } from "@my-procedures-2/env/server";
 
