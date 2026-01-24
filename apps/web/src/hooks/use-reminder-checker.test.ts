@@ -1,7 +1,44 @@
-import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Todo } from "@/app/api/todo";
 import { isDateMatchingPattern } from "@/lib/recurring-utils";
+
+// Mock @my-procedures-2/api to avoid importing server-side db
+// Use vi.hoisted to make the mock function available before the mock is hoisted
+const mockGetNextNotificationTime = vi.hoisted(() => vi.fn());
+
+vi.mock("@my-procedures-2/api", () => ({
+	getNextNotificationTime: mockGetNextNotificationTime,
+	GoogleTasksClient: {
+		forUser: vi.fn(),
+	},
+	t: vi.fn(),
+	router: vi.fn(),
+	publicProcedure: vi.fn(),
+	protectedProcedure: vi.fn(),
+}));
+
+// Import actual implementation after mock is defined
+let actualGetNextNotificationTime: (
+	pattern: unknown,
+	date: Date,
+) => Date | null;
+
+// Set up the mock to use the real function
+beforeEach(async () => {
+	// Import the actual module to get the real implementation
+	// Use dynamic import to get the actual implementation after mocks are set up
+	const recurringModule = await vi.importActual<{
+		getNextNotificationTime: (pattern: unknown, date: Date) => Date | null;
+	}>("../../packages/api/src/lib/recurring.ts");
+	actualGetNextNotificationTime = recurringModule.getNextNotificationTime;
+
+	// Update the mock to use the real implementation
+	mockGetNextNotificationTime.mockImplementation((...args: unknown[]) =>
+		actualGetNextNotificationTime(...args),
+	);
+});
+
+import { act, renderHook } from "@testing-library/react";
 import {
 	cleanupShownReminders,
 	DEFAULT_CHECK_INTERVAL,

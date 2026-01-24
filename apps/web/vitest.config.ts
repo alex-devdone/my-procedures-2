@@ -29,17 +29,23 @@ export default defineConfig({
 	resolve: {
 		alias: {
 			"@": path.resolve(__dirname, "./src"),
-			"@my-procedures-2/db": path.resolve(
+			// More specific paths first
+			"@my-procedures-2/api/lib/recurring": path.resolve(
 				__dirname,
-				"../../packages/db/src/index.ts",
-			),
-			"@my-procedures-2/api": path.resolve(
-				__dirname,
-				"../../packages/api/src/index.ts",
+				"../../packages/api/src/lib/recurring.ts",
 			),
 			"@my-procedures-2/api/lib/google-tasks-client": path.resolve(
 				__dirname,
 				"../../packages/api/src/lib/google-tasks-client.ts",
+			),
+			// Then general paths
+			"@my-procedures-2/api": path.resolve(
+				__dirname,
+				"../../packages/api/src/index.ts",
+			),
+			"@my-procedures-2/db": path.resolve(
+				__dirname,
+				"../../packages/db/src/index.ts",
 			),
 			"@my-procedures-2/env/web": path.resolve(
 				__dirname,

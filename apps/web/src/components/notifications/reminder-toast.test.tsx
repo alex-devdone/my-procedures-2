@@ -2,6 +2,18 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { toast } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// Mock @my-procedures-2/api to avoid importing server-side db
+vi.mock("@my-procedures-2/api", () => ({
+	getNextNotificationTime: vi.fn(),
+	GoogleTasksClient: {
+		forUser: vi.fn(),
+	},
+	t: vi.fn(),
+	router: vi.fn(),
+	publicProcedure: vi.fn(),
+	protectedProcedure: vi.fn(),
+}));
+
 import type { DueReminder } from "@/hooks/use-reminder-checker";
 import {
 	formatRecurringLabel,
