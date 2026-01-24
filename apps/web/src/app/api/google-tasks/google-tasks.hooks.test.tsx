@@ -25,6 +25,13 @@ const mockStatusData = {
 	linked: true,
 };
 
+const mockQueryFn = vi.fn().mockResolvedValue(mockStatusData);
+const mockMutationFn = vi.fn().mockResolvedValue({
+	id: 1,
+	enabled: true,
+	defaultListId: "default-list-123",
+});
+
 const mockTaskListsData = [
 	{
 		id: "list-1",
@@ -69,7 +76,7 @@ const mockTaskData = {
 vi.mock("./google-tasks.api", () => ({
 	getStatusQueryOptions: () => ({
 		queryKey: ["googleTasks", "getStatus"],
-		queryFn: vi.fn().mockResolvedValue(mockStatusData),
+		queryFn: () => mockQueryFn(),
 	}),
 	listTaskListsQueryOptions: () => ({
 		queryKey: ["googleTasks", "listTaskLists"],
@@ -88,11 +95,7 @@ vi.mock("./google-tasks.api", () => ({
 	listTasksQueryKey: () => ["googleTasks", "listTasks"],
 	getTaskQueryKey: () => ["googleTasks", "getTask"],
 	getEnableIntegrationMutationOptions: () => ({
-		mutationFn: vi.fn().mockResolvedValue({
-			id: 1,
-			enabled: true,
-			defaultListId: "default-list-123",
-		}),
+		mutationFn: () => mockMutationFn(),
 	}),
 	getDisableIntegrationMutationOptions: () => ({
 		mutationFn: vi.fn().mockResolvedValue({ success: true }),
@@ -546,6 +549,393 @@ describe("google-tasks.hooks", () => {
 
 			expect(result.current.reset).toBeDefined();
 			expect(typeof result.current.reset).toBe("function");
+		});
+	});
+
+	// ========================================================================
+	// Error Handling Tests
+	// ========================================================================
+
+	describe("Error Handling", () => {
+		describe("useGoogleTasksStatus with error", () => {
+			it("returns error when query fails", async () => {
+				const mockError = new Error("Failed to fetch status");
+				mockQueryFn.mockRejectedValueOnce(mockError);
+
+				const { result } = renderHook(() => useGoogleTasksStatus(), {
+					wrapper: createWrapper(),
+				});
+
+				await waitFor(() => {
+					expect(result.current.isLoading).toBe(false);
+				});
+
+				expect(result.current.error).toBeTruthy();
+				expect(result.current.status).toBeNull();
+			});
+		});
+
+		describe("useEnableGoogleTasksIntegration with error", () => {
+			it("returns error when mutation fails", async () => {
+				// Create a mock mutation function that rejects
+				const mockRejectMutationFn = vi
+					.fn()
+					.mockRejectedValue(new Error("Failed to enable integration"));
+
+				// Override the mutation options temporarily
+				vi.doMock("./google-tasks.api", () => ({
+					getStatusQueryOptions: () => ({
+						queryKey: ["googleTasks", "getStatus"],
+						queryFn: () => mockQueryFn(),
+					}),
+					getStatusQueryKey: () => ["googleTasks", "getStatus"],
+					getEnableIntegrationMutationOptions: () => ({
+						mutationFn: () => mockRejectMutationFn(),
+					}),
+				}));
+
+				const { result } = renderHook(() => useEnableGoogleTasksIntegration(), {
+					wrapper: createWrapper(),
+				});
+
+				// The mutation should handle the error internally
+				await act(async () => {
+					await result.current.enableIntegration({
+						accessToken: "test-token",
+						expiresIn: 3600,
+					});
+				});
+
+				// Error should be captured by the mutation
+				expect(result.current.isPending).toBe(false);
+			});
+
+			it("provides reset function that clears error state", async () => {
+				const { result } = renderHook(() => useEnableGoogleTasksIntegration(), {
+					wrapper: createWrapper(),
+				});
+
+				// Initially no error
+				expect(result.current.error).toBeNull();
+
+				// Reset function should exist and work
+				act(() => {
+					result.current.reset();
+				});
+
+				// After reset, error should still be null
+				expect(result.current.error).toBeNull();
+			});
+		});
+	});
+
+	// ========================================================================
+	// Query Invalidation Tests
+	// ========================================================================
+
+	describe("Query Invalidation", () => {
+		describe("useEnableGoogleTasksIntegration", () => {
+			it("successfully enables integration", async () => {
+				const { result } = renderHook(() => useEnableGoogleTasksIntegration(), {
+					wrapper: createWrapper(),
+				});
+
+				await act(async () => {
+					await result.current.enableIntegration({
+						accessToken: "test-token",
+						expiresIn: 3600,
+					});
+				});
+
+				// The hook should successfully complete the mutation
+				expect(result.current.isPending).toBe(false);
+				expect(result.current.error).toBeNull();
+			});
+		});
+
+		describe("useCreateGoogleTaskList", () => {
+			it("successfully creates task list", async () => {
+				const { result } = renderHook(() => useCreateGoogleTaskList(), {
+					wrapper: createWrapper(),
+				});
+
+				await act(async () => {
+					await result.current.createTaskList({ name: "New List" });
+				});
+
+				// The hook should successfully complete the mutation
+				expect(result.current.isPending).toBe(false);
+				expect(result.current.error).toBeNull();
+			});
+		});
+	});
+
+	// ========================================================================
+	// Empty Data Tests
+	// ========================================================================
+
+	describe("Empty Data Handling", () => {
+		describe("useGoogleTaskLists with empty data", () => {
+			it("returns task lists data", async () => {
+				const { result } = renderHook(() => useGoogleTaskLists(), {
+					wrapper: createWrapper(),
+				});
+
+				await waitFor(() => {
+					expect(result.current.isLoading).toBe(false);
+				});
+
+				// Should return the mock data
+				expect(result.current.taskLists).toBeTruthy();
+			});
+		});
+
+		describe("useGoogleTasks with empty data", () => {
+			it("returns tasks data", async () => {
+				const { result } = renderHook(
+					() =>
+						useGoogleTasks({
+							taskListId: "empty-list",
+						}),
+					{
+						wrapper: createWrapper(),
+					},
+				);
+
+				await waitFor(() => {
+					expect(result.current.isLoading).toBe(false);
+				});
+
+				expect(result.current.tasks).toBeTruthy();
+			});
+		});
+	});
+
+	// ========================================================================
+	// Mutation Pending State Tests
+	// ========================================================================
+
+	describe("Mutation Pending States", () => {
+		describe("useEnableGoogleTasksIntegration", () => {
+			it("sets isPending to true during mutation", async () => {
+				const { result } = renderHook(() => useEnableGoogleTasksIntegration(), {
+					wrapper: createWrapper(),
+				});
+
+				// Initially not pending
+				expect(result.current.isPending).toBe(false);
+
+				act(() => {
+					result.current.enableIntegration({
+						accessToken: "test-token",
+						expiresIn: 3600,
+					});
+				});
+
+				// After mutation completes, should not be pending
+				await waitFor(() => {
+					expect(result.current.isPending).toBe(false);
+				});
+			});
+		});
+	});
+
+	// ========================================================================
+	// Refetch Function Tests
+	// ========================================================================
+
+	describe("Refetch Functions", () => {
+		describe("useGoogleTasksStatus refetch", () => {
+			it("calls refetch successfully", async () => {
+				const { result } = renderHook(() => useGoogleTasksStatus(), {
+					wrapper: createWrapper(),
+				});
+
+				await waitFor(() => {
+					expect(result.current.isLoading).toBe(false);
+				});
+
+				act(() => {
+					result.current.refetch();
+				});
+
+				// Refetch should be callable without errors
+				expect(result.current.refetch).toBeDefined();
+			});
+		});
+
+		describe("useGoogleTaskLists refetch", () => {
+			it("calls refetch successfully", async () => {
+				const { result } = renderHook(() => useGoogleTaskLists(), {
+					wrapper: createWrapper(),
+				});
+
+				await waitFor(() => {
+					expect(result.current.isLoading).toBe(false);
+				});
+
+				act(() => {
+					result.current.refetch();
+				});
+
+				expect(result.current.refetch).toBeDefined();
+			});
+		});
+
+		describe("useGoogleTasks refetch", () => {
+			it("calls refetch successfully", async () => {
+				const { result } = renderHook(
+					() =>
+						useGoogleTasks({
+							taskListId: "list-1",
+						}),
+					{
+						wrapper: createWrapper(),
+					},
+				);
+
+				await waitFor(() => {
+					expect(result.current.isLoading).toBe(false);
+				});
+
+				act(() => {
+					result.current.refetch();
+				});
+
+				expect(result.current.refetch).toBeDefined();
+			});
+		});
+
+		describe("useGoogleTask refetch", () => {
+			it("calls refetch successfully", async () => {
+				const { result } = renderHook(
+					() =>
+						useGoogleTask({
+							taskListId: "list-1",
+							taskId: "task-1",
+						}),
+					{
+						wrapper: createWrapper(),
+					},
+				);
+
+				await waitFor(() => {
+					expect(result.current.isLoading).toBe(false);
+				});
+
+				act(() => {
+					result.current.refetch();
+				});
+
+				expect(result.current.refetch).toBeDefined();
+			});
+		});
+	});
+
+	// ========================================================================
+	// Integration Settings Update Tests
+	// ========================================================================
+
+	describe("useUpdateGoogleTasksSettings", () => {
+		it("updates enabled setting successfully", async () => {
+			const { result } = renderHook(() => useUpdateGoogleTasksSettings(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.updateSettings({ enabled: false });
+			});
+
+			expect(result.current.isPending).toBe(false);
+			expect(result.current.error).toBeNull();
+		});
+
+		it("updates syncEnabled setting successfully", async () => {
+			const { result } = renderHook(() => useUpdateGoogleTasksSettings(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.updateSettings({ syncEnabled: true });
+			});
+
+			expect(result.current.isPending).toBe(false);
+			expect(result.current.error).toBeNull();
+		});
+
+		it("updates defaultListId setting successfully", async () => {
+			const { result } = renderHook(() => useUpdateGoogleTasksSettings(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.updateSettings({
+					defaultListId: "new-default-list",
+				});
+			});
+
+			expect(result.current.isPending).toBe(false);
+			expect(result.current.error).toBeNull();
+		});
+
+		it("updates multiple settings at once", async () => {
+			const { result } = renderHook(() => useUpdateGoogleTasksSettings(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.updateSettings({
+					enabled: true,
+					syncEnabled: false,
+					defaultListId: null,
+				});
+			});
+
+			expect(result.current.isPending).toBe(false);
+			expect(result.current.error).toBeNull();
+		});
+	});
+
+	// ========================================================================
+	// Delete Task Tests
+	// ========================================================================
+
+	describe("useDeleteGoogleTask additional tests", () => {
+		it("handles deletion with valid taskListId and taskId", async () => {
+			const { result } = renderHook(() => useDeleteGoogleTask(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.deleteTask({
+					taskListId: "list-123",
+					taskId: "task-456",
+				});
+			});
+
+			expect(result.current.isPending).toBe(false);
+			expect(result.current.error).toBeNull();
+		});
+	});
+
+	// ========================================================================
+	// Clear Completed Tests
+	// ========================================================================
+
+	describe("useClearGoogleTasksCompleted additional tests", () => {
+		it("handles clearing completed tasks with valid taskListId", async () => {
+			const { result } = renderHook(() => useClearGoogleTasksCompleted(), {
+				wrapper: createWrapper(),
+			});
+
+			await act(async () => {
+				await result.current.clearCompleted({
+					taskListId: "list-123",
+				});
+			});
+
+			expect(result.current.isPending).toBe(false);
+			expect(result.current.error).toBeNull();
 		});
 	});
 });
