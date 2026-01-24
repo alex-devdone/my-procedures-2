@@ -1277,3 +1277,5 @@
 - [✓] 2026-01-24 09:27 - Write hook tests in `apps/web/src/app/api/google-tasks/google-tasks.hooks.test.tsx`
 - [✓] 2026-01-24 10:08 - Run `bun run test` and ensure all tests pass
 - [✓] 2026-01-24 14:28 - Write E2E test for sync flow in `apps/web/e2e/google-tasks.spec.ts`:
+- [✓] 2026-01-24 14:31 - Run `bun run check && bun run check-types` and fix any issues
+- [✓] 2026-01-24 14:31 - Run `bun run build` and verify build succeeds
