@@ -1,6 +1,9 @@
-import { resolve } from "node:path";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
 	plugins: [react()],
@@ -25,12 +28,24 @@ export default defineConfig({
 	},
 	resolve: {
 		alias: {
-			"@": resolve(__dirname, "./src"),
-			"@my-procedures-2/env/web": resolve(
+			"@": path.resolve(__dirname, "./src"),
+			"@my-procedures-2/db": path.resolve(
+				__dirname,
+				"../../packages/db/src/index.ts",
+			),
+			"@my-procedures-2/api": path.resolve(
+				__dirname,
+				"../../packages/api/src/index.ts",
+			),
+			"@my-procedures-2/api/lib/google-tasks-client": path.resolve(
+				__dirname,
+				"../../packages/api/src/lib/google-tasks-client.ts",
+			),
+			"@my-procedures-2/env/web": path.resolve(
 				__dirname,
 				"../../packages/env/src/web.ts",
 			),
-			"@my-procedures-2/env/server": resolve(
+			"@my-procedures-2/env/server": path.resolve(
 				__dirname,
 				"../../packages/env/src/server.ts",
 			),

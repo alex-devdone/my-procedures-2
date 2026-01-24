@@ -30,11 +30,26 @@ vi.mock("@my-procedures-2/env/server", () => ({
 	},
 }));
 
-vi.mock("@my-procedures-2/api/lib/google-tasks-client", () => ({
+vi.mock("@my-procedures-2/api", () => ({
 	GoogleTasksClient: {
 		forUser: vi.fn(),
 	},
+	t: vi.fn(),
+	router: vi.fn(),
+	publicProcedure: vi.fn(),
+	protectedProcedure: vi.fn(),
 }));
+
+import { GoogleTasksClient } from "@my-procedures-2/api";
+// Import mocked modules
+import { db } from "@my-procedures-2/db";
+
+// Type helpers for mocked functions
+const mockFindManyIntegrations = vi.mocked(
+	db.query.googleTasksIntegration.findMany,
+);
+const mockFindManyTodos = vi.mocked(db.query.todo.findMany);
+const mockForUser = vi.mocked(GoogleTasksClient.forUser);
 
 describe("Google Tasks Sync Cron Route", () => {
 	beforeEach(() => {
@@ -86,10 +101,7 @@ describe("Google Tasks Sync Cron Route", () => {
 		});
 
 		it("accepts request with valid Bearer token", async () => {
-			const { db } = await import("@my-procedures-2/db");
-			const findMany = db.query.googleTasksIntegration
-				.findMany as unknown as ReturnType<typeof vi.fn>;
-			findMany.mockResolvedValue([]);
+			mockFindManyIntegrations.mockResolvedValue([]);
 
 			const request = new Request(
 				"http://localhost:3000/api/cron/google-tasks-sync",
@@ -107,10 +119,7 @@ describe("Google Tasks Sync Cron Route", () => {
 
 	describe("Sync Behavior", () => {
 		it("returns success message when no integrations to sync", async () => {
-			const { db } = await import("@my-procedures-2/db");
-			const findMany = db.query.googleTasksIntegration
-				.findMany as unknown as ReturnType<typeof vi.fn>;
-			findMany.mockResolvedValue([]);
+			mockFindManyIntegrations.mockResolvedValue([]);
 
 			const request = new Request(
 				"http://localhost:3000/api/cron/google-tasks-sync",
@@ -132,10 +141,7 @@ describe("Google Tasks Sync Cron Route", () => {
 		});
 
 		it("queries for enabled and sync-enabled integrations", async () => {
-			const { db } = await import("@my-procedures-2/db");
-			const findMany = db.query.googleTasksIntegration
-				.findMany as unknown as ReturnType<typeof vi.fn>;
-			findMany.mockResolvedValue([]);
+			mockFindManyIntegrations.mockResolvedValue([]);
 
 			const request = new Request(
 				"http://localhost:3000/api/cron/google-tasks-sync",
@@ -147,7 +153,7 @@ describe("Google Tasks Sync Cron Route", () => {
 			);
 			await GET(request);
 
-			expect(findMany).toHaveBeenCalledWith(
+			expect(mockFindManyIntegrations).toHaveBeenCalledWith(
 				expect.objectContaining({
 					where: expect.anything(),
 				}),
@@ -155,15 +161,8 @@ describe("Google Tasks Sync Cron Route", () => {
 		});
 
 		it("returns summary with sync results when integrations exist", async () => {
-			const { db } = await import("@my-procedures-2/db");
-			const findManyIntegrations = db.query.googleTasksIntegration
-				.findMany as unknown as ReturnType<typeof vi.fn>;
-			const findManyTodos = db.query.todo.findMany as unknown as ReturnType<
-				typeof vi.fn
-			>;
-
 			// Mock integrations
-			findManyIntegrations.mockResolvedValue([
+			mockFindManyIntegrations.mockResolvedValue([
 				{
 					id: 1,
 					userId: "user1",
@@ -180,15 +179,9 @@ describe("Google Tasks Sync Cron Route", () => {
 			]);
 
 			// Mock todos query
-			findManyTodos.mockResolvedValue([]);
+			mockFindManyTodos.mockResolvedValue([]);
 
 			// Mock GoogleTasksClient
-			const { GoogleTasksClient } = await import(
-				"@my-procedures-2/api/lib/google-tasks-client"
-			);
-			const forUser = GoogleTasksClient.forUser as unknown as ReturnType<
-				typeof vi.fn
-			>;
 			const mockClient = {
 				listTaskLists: vi.fn().mockResolvedValue([
 					{
@@ -199,7 +192,7 @@ describe("Google Tasks Sync Cron Route", () => {
 				]),
 				listTasks: vi.fn().mockResolvedValue([]),
 			};
-			forUser.mockResolvedValue(mockClient as never);
+			mockForUser.mockResolvedValue(mockClient as never);
 
 			const request = new Request(
 				"http://localhost:3000/api/cron/google-tasks-sync",
@@ -220,15 +213,8 @@ describe("Google Tasks Sync Cron Route", () => {
 		});
 
 		it("handles sync errors gracefully and continues with other integrations", async () => {
-			const { db } = await import("@my-procedures-2/db");
-			const findManyIntegrations = db.query.googleTasksIntegration
-				.findMany as unknown as ReturnType<typeof vi.fn>;
-			const findManyTodos = db.query.todo.findMany as unknown as ReturnType<
-				typeof vi.fn
-			>;
-
 			// Mock integrations - one will fail, one will succeed
-			findManyIntegrations.mockResolvedValue([
+			mockFindManyIntegrations.mockResolvedValue([
 				{
 					id: 1,
 					userId: "user1",
@@ -257,14 +243,7 @@ describe("Google Tasks Sync Cron Route", () => {
 				},
 			]);
 
-			findManyTodos.mockResolvedValue([]);
-
-			const { GoogleTasksClient } = await import(
-				"@my-procedures-2/api/lib/google-tasks-client"
-			);
-			const forUser = GoogleTasksClient.forUser as unknown as ReturnType<
-				typeof vi.fn
-			>;
+			mockFindManyTodos.mockResolvedValue([]);
 
 			// First user fails
 			const mockClient1 = {
@@ -282,7 +261,7 @@ describe("Google Tasks Sync Cron Route", () => {
 				listTasks: vi.fn().mockResolvedValue([]),
 			};
 
-			forUser
+			mockForUser
 				.mockResolvedValueOnce(mockClient1 as never)
 				.mockResolvedValueOnce(mockClient2 as never);
 
@@ -308,10 +287,9 @@ describe("Google Tasks Sync Cron Route", () => {
 
 	describe("Error Handling", () => {
 		it("returns 500 when database query fails", async () => {
-			const { db } = await import("@my-procedures-2/db");
-			const findMany = db.query.googleTasksIntegration
-				.findMany as unknown as ReturnType<typeof vi.fn>;
-			findMany.mockRejectedValue(new Error("Database connection failed"));
+			mockFindManyIntegrations.mockRejectedValue(
+				new Error("Database connection failed"),
+			);
 
 			const request = new Request(
 				"http://localhost:3000/api/cron/google-tasks-sync",
@@ -331,14 +309,7 @@ describe("Google Tasks Sync Cron Route", () => {
 
 	describe("Response Format", () => {
 		it("returns summary statistics in response", async () => {
-			const { db } = await import("@my-procedures-2/db");
-			const findManyIntegrations = db.query.googleTasksIntegration
-				.findMany as unknown as ReturnType<typeof vi.fn>;
-			const findManyTodos = db.query.todo.findMany as unknown as ReturnType<
-				typeof vi.fn
-			>;
-
-			findManyIntegrations.mockResolvedValue([
+			mockFindManyIntegrations.mockResolvedValue([
 				{
 					id: 1,
 					userId: "user1",
@@ -354,14 +325,8 @@ describe("Google Tasks Sync Cron Route", () => {
 				},
 			]);
 
-			findManyTodos.mockResolvedValue([]);
+			mockFindManyTodos.mockResolvedValue([]);
 
-			const { GoogleTasksClient } = await import(
-				"@my-procedures-2/api/lib/google-tasks-client"
-			);
-			const forUser = GoogleTasksClient.forUser as unknown as ReturnType<
-				typeof vi.fn
-			>;
 			const mockClient = {
 				listTaskLists: vi.fn().mockResolvedValue([
 					{
@@ -372,7 +337,7 @@ describe("Google Tasks Sync Cron Route", () => {
 				]),
 				listTasks: vi.fn().mockResolvedValue([]),
 			};
-			forUser.mockResolvedValue(mockClient as never);
+			mockForUser.mockResolvedValue(mockClient as never);
 
 			const request = new Request(
 				"http://localhost:3000/api/cron/google-tasks-sync",
