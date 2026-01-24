@@ -141,6 +141,9 @@ export function useTodoStorage(): UseTodoStorageReturn {
 					dueDate: newTodo.dueDate ?? null,
 					reminderAt: newTodo.reminderAt ?? null,
 					recurringPattern: newTodo.recurringPattern ?? null,
+					googleSyncEnabled: false,
+					googleTaskId: null,
+					lastSyncedAt: null,
 				},
 			]);
 

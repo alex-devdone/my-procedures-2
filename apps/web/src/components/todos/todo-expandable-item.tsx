@@ -12,6 +12,7 @@ import { useCallback, useMemo, useState } from "react";
 import type { SubtaskProgress } from "@/app/api/subtask";
 import { useSubtaskStorage } from "@/app/api/subtask";
 import type { RecurringPattern } from "@/app/api/todo/todo.types";
+import { GoogleSyncToggle } from "@/components/integrations";
 import { useDueReminders } from "@/components/notifications/reminder-provider";
 import {
 	DueDateBadge,
@@ -37,6 +38,7 @@ export interface TodoExpandableItemProps {
 		dueDate?: string | null;
 		reminderAt?: string | null;
 		recurringPattern?: RecurringPattern | null;
+		googleSyncEnabled?: boolean;
 	};
 	/** Subtask progress for this todo */
 	subtaskProgress?: SubtaskProgress | null;
@@ -57,6 +59,11 @@ export interface TodoExpandableItemProps {
 			recurringPattern?: RecurringPattern | null;
 		},
 	) => void;
+	/** Callback when Google sync state is toggled */
+	onGoogleSyncToggle?: (
+		id: number | string,
+		enabled: boolean,
+	) => void | Promise<void>;
 	/** Optional folder information for display */
 	folder?: {
 		name: string;
@@ -94,6 +101,7 @@ export function TodoExpandableItem({
 	onToggle,
 	onDelete,
 	onScheduleChange,
+	onGoogleSyncToggle,
 	folder,
 	showFolderBadge = false,
 	folderColorBgClasses = {},
@@ -306,6 +314,16 @@ export function TodoExpandableItem({
 							onChange={handleScheduleChange}
 							compact
 							data-testid="todo-schedule-popover"
+						/>
+					)}
+
+					{/* Google Sync toggle - only for numeric IDs (authenticated users) */}
+					{onGoogleSyncToggle && (
+						<GoogleSyncToggle
+							todoId={todo.id}
+							isSynced={todo.googleSyncEnabled ?? false}
+							onSyncChange={onGoogleSyncToggle}
+							show={typeof todo.id === "number"}
 						/>
 					)}
 

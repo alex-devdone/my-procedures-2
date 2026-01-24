@@ -5,6 +5,7 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 
 import { queryClient } from "@/utils/trpc";
 
+import { GoogleTasksProvider } from "./integrations/google-tasks-provider";
 import { ReminderProvider } from "./notifications";
 import { SyncProvider } from "./sync";
 import { ThemeProvider } from "./theme-provider";
@@ -19,9 +20,11 @@ export default function Providers({ children }: { children: React.ReactNode }) {
 			disableTransitionOnChange
 		>
 			<QueryClientProvider client={queryClient}>
-				<SyncProvider>
-					<ReminderProvider>{children}</ReminderProvider>
-				</SyncProvider>
+				<GoogleTasksProvider>
+					<SyncProvider>
+						<ReminderProvider>{children}</ReminderProvider>
+					</SyncProvider>
+				</GoogleTasksProvider>
 				<ReactQueryDevtools />
 			</QueryClientProvider>
 			<Toaster richColors />

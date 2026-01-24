@@ -151,6 +151,9 @@ export function createOptimisticTodo(text: string, userId: string): RemoteTodo {
 		dueDate: null,
 		reminderAt: null,
 		recurringPattern: null,
+		googleSyncEnabled: false,
+		googleTaskId: null,
+		lastSyncedAt: null,
 	};
 }
 

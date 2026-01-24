@@ -1,6 +1,7 @@
 import { relations } from "drizzle-orm";
 import { boolean, index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import { folder } from "./folder";
+import { googleTasksIntegration } from "./google-tasks-integration";
 import { todo } from "./todo";
 
 export const user = pgTable("user", {
@@ -80,6 +81,7 @@ export const userRelations = relations(user, ({ many }) => ({
 	accounts: many(account),
 	todos: many(todo),
 	folders: many(folder),
+	googleTasksIntegrations: many(googleTasksIntegration),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({

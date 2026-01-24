@@ -40,11 +40,15 @@ export const todo = pgTable(
 		folderId: integer("folder_id").references(() => folder.id, {
 			onDelete: "set null",
 		}),
+		googleTaskId: text("google_task_id"),
+		googleSyncEnabled: boolean("google_sync_enabled").default(false).notNull(),
+		lastSyncedAt: timestamp("last_synced_at"),
 	},
 	(table) => [
 		index("todo_userId_idx").on(table.userId),
 		index("todo_dueDate_idx").on(table.dueDate),
 		index("todo_folderId_idx").on(table.folderId),
+		index("todo_googleTaskId_idx").on(table.googleTaskId),
 	],
 );
 

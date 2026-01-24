@@ -269,6 +269,9 @@ describe("INSERT event handling", () => {
 				dueDate: null,
 				reminderAt: null,
 				recurringPattern: null,
+				googleSyncEnabled: false,
+				googleTaskId: null,
+				lastSyncedAt: null,
 			},
 		];
 		queryClient.setQueryData(queryKey, initialTodos);
@@ -302,6 +305,9 @@ describe("UPDATE event handling", () => {
 				dueDate: null,
 				reminderAt: null,
 				recurringPattern: null,
+				googleSyncEnabled: false,
+				googleTaskId: null,
+				lastSyncedAt: null,
 			},
 		];
 		queryClient.setQueryData(queryKey, initialTodos);
@@ -332,6 +338,9 @@ describe("DELETE event handling", () => {
 				dueDate: null,
 				reminderAt: null,
 				recurringPattern: null,
+				googleSyncEnabled: false,
+				googleTaskId: null,
+				lastSyncedAt: null,
 			},
 		];
 		queryClient.setQueryData(queryKey, initialTodos);

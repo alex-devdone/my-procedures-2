@@ -1250,3 +1250,32 @@
 - [✓] 2026-01-22 23:19 - Lint passes (`bun run check`)
 - [✓] 2026-01-22 23:20 - Types pass (`bun run check-types`)
 - [✓] 2026-01-22 23:21 - Build succeeds (`bun run build`)
+- [✓] 2026-01-23 23:12 - Add Google Tasks fields to todo table in `packages/db/src/schema/todo.ts`:
+- [✓] 2026-01-23 23:16 - Create `packages/db/src/schema/google-tasks-integration.ts` with fields:
+- [✓] 2026-01-23 23:20 - Export new schema from `packages/db/src/schema/index.ts`
+- [✓] 2026-01-23 23:23 - Add environment variables to `packages/env/src/server.ts`:
+- [✓] 2026-01-23 23:24 - Run `bun run db:push` to apply schema changes
+- [✓] 2026-01-23 23:31 - Configure Google OAuth in `packages/auth/src/index.ts`:
+- [✓] 2026-01-23 23:43 - Create `packages/api/src/lib/google-tasks-client.ts`:
+- [✓] 2026-01-23 23:52 - Create `packages/api/src/routers/google-tasks.ts` with procedures:
+- [✓] 2026-01-23 23:52 - Register router in `packages/api/src/routers/index.ts`
+- [✓] 2026-01-23 23:59 - Modify `toggle` procedure in `packages/api/src/routers/todo.ts`:
+- [✓] 2026-01-24 00:04 - Modify `delete` procedure in `packages/api/src/routers/todo.ts`:
+- [✓] 2026-01-24 00:13 - Create `apps/web/src/app/api/google-tasks/google-tasks.types.ts`:
+- [✓] 2026-01-24 00:18 - Create `apps/web/src/app/api/google-tasks/google-tasks.api.ts`:
+- [✓] 2026-01-24 00:31 - Create `apps/web/src/app/api/google-tasks/google-tasks.hooks.ts`:
+- [✓] 2026-01-24 00:36 - Create `apps/web/src/app/api/google-tasks/index.ts` barrel file
+- [✓] 2026-01-24 00:49 - Create `apps/web/src/components/integrations/google-tasks-config-modal.tsx`:
+- [✓] 2026-01-24 08:32 - Create `apps/web/src/components/integrations/google-sync-toggle.tsx`:
+- [✓] 2026-01-24 08:41 - Create `apps/web/src/components/integrations/google-tasks-provider.tsx`:
+- [✓] 2026-01-24 08:47 - Modify `apps/web/src/components/todos/todo-expandable-item.tsx`:
+- [✓] 2026-01-24 08:50 - Add `GoogleTasksProvider` to app layout in `apps/web/src/app/layout.tsx`
+- [✓] 2026-01-24 09:01 - Create `apps/web/src/app/api/cron/google-tasks-sync/route.ts`:
+- [✓] 2026-01-24 09:09 - Create/update `apps/web/vercel.json`:
+- [✓] 2026-01-24 09:13 - Add `CRON_SECRET` to environment variables documentation
+- [✓] 2026-01-24 09:20 - Write unit tests for `GoogleTasksClient` in `packages/api/src/lib/google-tasks-client.test.ts`
+- [✓] 2026-01-24 09:27 - Write hook tests in `apps/web/src/app/api/google-tasks/google-tasks.hooks.test.tsx`
+- [✓] 2026-01-24 10:08 - Run `bun run test` and ensure all tests pass
+- [✓] 2026-01-24 14:28 - Write E2E test for sync flow in `apps/web/e2e/google-tasks.spec.ts`:
+- [✓] 2026-01-24 14:31 - Run `bun run check && bun run check-types` and fix any issues
+- [✓] 2026-01-24 14:31 - Run `bun run build` and verify build succeeds

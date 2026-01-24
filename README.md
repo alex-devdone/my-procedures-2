@@ -35,6 +35,17 @@ This project uses PostgreSQL with Drizzle ORM and Supabase for realtime synchron
 DATABASE_URL=postgresql://...
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+
+# Authentication
+BETTER_AUTH_SECRET=your-secret-min-32-chars
+BETTER_AUTH_URL=http://localhost:4757
+
+# Cron Job Secret for background sync (required for Google Tasks integration)
+CRON_SECRET=your-cron-secret
+
+# Google OAuth (optional, for Google Tasks integration)
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
 ```
 
 3. Apply the schema to your database:
