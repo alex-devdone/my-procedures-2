@@ -784,10 +784,11 @@ describe("GoogleTasksClient", () => {
 				ok: false,
 				status: 500,
 				statusText: "Internal Server Error",
+				headers: new Headers(),
 				json: async () => {
 					throw new Error("Invalid JSON");
 				},
-			} as Response);
+			} as unknown as Response);
 
 			const client = await GoogleTasksClient.forUser("user-1");
 

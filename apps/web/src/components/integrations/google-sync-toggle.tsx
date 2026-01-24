@@ -60,6 +60,9 @@ export function GoogleSyncToggle({
 		setIsPending(true);
 		try {
 			await onSyncChange(todoId, newSyncState);
+		} catch (error) {
+			// Log error silently - parent component should handle showing errors
+			console.error("Sync change failed:", error);
 		} finally {
 			setIsPending(false);
 		}

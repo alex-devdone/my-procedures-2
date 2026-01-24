@@ -87,6 +87,7 @@ export class GoogleTasksApiError extends Error {
  */
 export class GoogleTasksClient {
 	private constructor(
+		// @ts-expect-error - userId is stored for future use
 		private readonly userId: string,
 		private accessToken: string,
 		private readonly refreshToken: string | null,

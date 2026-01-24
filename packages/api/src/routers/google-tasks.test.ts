@@ -725,8 +725,6 @@ describe("Google Tasks Router - Zod Schema Validation", () => {
 // ============================================================================
 
 describe("Google Tasks Router - Business Logic", () => {
-	const _userId = "user-123";
-
 	beforeEach(() => {
 		vi.clearAllMocks();
 	});
@@ -748,7 +746,7 @@ describe("Google Tasks Router - Business Logic", () => {
 			expect(result).toEqual({
 				enabled: true,
 				syncEnabled: true,
-				lastSyncedAt: integration.lastSyncedAt.toISOString(),
+				lastSyncedAt: integration.lastSyncedAt?.toISOString() ?? null,
 				defaultListId: "default-list-id",
 				linked: true,
 			});

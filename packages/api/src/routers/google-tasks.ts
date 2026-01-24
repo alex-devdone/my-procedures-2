@@ -160,6 +160,13 @@ export const googleTasksRouter = router({
 					.where(eq(googleTasksIntegration.id, existing.id))
 					.returning();
 
+				if (!updated) {
+					throw new TRPCError({
+						code: "INTERNAL_SERVER_ERROR",
+						message: "Failed to update Google Tasks integration",
+					});
+				}
+
 				return {
 					id: updated.id,
 					enabled: updated.enabled,
@@ -180,6 +187,13 @@ export const googleTasksRouter = router({
 					syncEnabled: true,
 				})
 				.returning();
+
+			if (!created) {
+				throw new TRPCError({
+					code: "INTERNAL_SERVER_ERROR",
+					message: "Failed to create Google Tasks integration",
+				});
+			}
 
 			return {
 				id: created.id,
@@ -265,6 +279,13 @@ export const googleTasksRouter = router({
 				.where(eq(googleTasksIntegration.id, existing.id))
 				.returning();
 
+			if (!updated) {
+				throw new TRPCError({
+					code: "INTERNAL_SERVER_ERROR",
+					message: "Failed to update Google Tasks integration",
+				});
+			}
+
 			return {
 				enabled: updated.enabled,
 				syncEnabled: updated.syncEnabled,
@@ -300,6 +321,13 @@ export const googleTasksRouter = router({
 			.set({ lastSyncedAt: new Date(), updatedAt: new Date() })
 			.where(eq(googleTasksIntegration.id, existing.id))
 			.returning();
+
+		if (!updated) {
+			throw new TRPCError({
+				code: "INTERNAL_SERVER_ERROR",
+				message: "Failed to update last synced time",
+			});
+		}
 
 		return {
 			lastSyncedAt: updated.lastSyncedAt?.toISOString() ?? null,

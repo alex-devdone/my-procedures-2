@@ -5,6 +5,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // Mock Setup
 // ============================================================================
 
+// Mock environment variables before any other imports
+vi.mock("@my-procedures-2/env/server", () => ({
+	env: {
+		DATABASE_URL: "postgresql://test:test@localhost:5432/test",
+		BETTER_AUTH_SECRET: "test-secret-key-that-is-at-least-32-characters-long",
+		BETTER_AUTH_URL: "http://localhost:4757/api/auth",
+		CORS_ORIGIN: "http://localhost:4757",
+		GOOGLE_CLIENT_ID: "test-google-client-id",
+		GOOGLE_CLIENT_SECRET: "test-google-client-secret",
+		CRON_SECRET: "test-cron-secret",
+		NODE_ENV: "test",
+	},
+}));
+
 vi.mock("@my-procedures-2/db", () => ({
 	db: {
 		select: vi.fn(),
@@ -5225,19 +5239,13 @@ describe("Todo Router - Google Tasks Sync", () => {
 				tokenExpiresAt: new Date(Date.now() + 3600000),
 			};
 
-			const _mockUpdatedTodo = {
-				...mockTodo,
-				completed: true,
-			};
-
 			// Simulate the toggle logic with Google Tasks sync
 			const toggleWithSync = async (
 				todo: typeof mockTodo,
 				integration: typeof mockIntegration | null,
-				completed: boolean,
+				_completed: boolean,
 			): Promise<{ success: boolean; synced: boolean }> => {
 				// Update local todo
-				const _updated = { ...todo, completed };
 
 				// Check if sync is enabled and googleTaskId exists
 				if (todo.googleSyncEnabled && todo.googleTaskId) {
@@ -5289,9 +5297,9 @@ describe("Todo Router - Google Tasks Sync", () => {
 			const toggleWithSync = async (
 				todo: typeof mockTodo,
 				integration: typeof mockIntegration | null,
-				completed: boolean,
+				_completed: boolean,
 			): Promise<{ success: boolean; synced: boolean }> => {
-				const _updated = { ...todo, completed };
+				// Update local todo
 
 				if (todo.googleSyncEnabled && todo.googleTaskId) {
 					if (!integration || !integration.defaultListId) {
@@ -5337,9 +5345,9 @@ describe("Todo Router - Google Tasks Sync", () => {
 			const toggleWithSync = async (
 				todo: typeof mockTodo,
 				integration: typeof mockIntegration | null,
-				completed: boolean,
+				_completed: boolean,
 			): Promise<{ success: boolean; synced: boolean }> => {
-				const _updated = { ...todo, completed };
+				// Update local todo
 
 				if (todo.googleSyncEnabled && todo.googleTaskId) {
 					if (!integration || !integration.defaultListId) {
@@ -5374,9 +5382,9 @@ describe("Todo Router - Google Tasks Sync", () => {
 			const toggleWithSync = async (
 				todo: typeof mockTodo,
 				integration: typeof mockTodo | null,
-				completed: boolean,
+				_completed: boolean,
 			): Promise<{ success: boolean; synced: boolean }> => {
-				const _updated = { ...todo, completed };
+				// Update local todo
 
 				if (todo.googleSyncEnabled && todo.googleTaskId) {
 					if (!integration) {
@@ -5422,9 +5430,9 @@ describe("Todo Router - Google Tasks Sync", () => {
 			const toggleWithSync = async (
 				todo: typeof mockTodo,
 				integration: typeof mockIntegration | null,
-				completed: boolean,
+				_completed: boolean,
 			): Promise<{ success: boolean; synced: boolean }> => {
-				const _updated = { ...todo, completed };
+				// Update local todo
 
 				if (todo.googleSyncEnabled && todo.googleTaskId) {
 					if (!integration || !integration.defaultListId) {
@@ -5471,7 +5479,7 @@ describe("Todo Router - Google Tasks Sync", () => {
 			const toggleWithSyncErrorHandling = async (
 				todo: typeof mockTodo,
 				integration: typeof mockIntegration | null,
-				completed: boolean,
+				_completed: boolean,
 				shouldThrowError: boolean,
 			): Promise<{
 				success: boolean;
@@ -5479,7 +5487,6 @@ describe("Todo Router - Google Tasks Sync", () => {
 				errorLogged: boolean;
 			}> => {
 				// Update local todo first
-				const _updated = { ...todo, completed };
 
 				// Try to sync
 				if (todo.googleSyncEnabled && todo.googleTaskId) {
@@ -5544,15 +5551,13 @@ describe("Todo Router - Google Tasks Sync", () => {
 			const toggleWithTimestampUpdate = async (
 				todo: typeof mockTodo,
 				integration: typeof mockIntegration | null,
-				completed: boolean,
+				_completed: boolean,
 			): Promise<{
 				success: boolean;
 				synced: boolean;
 				lastSyncedAt: Date | null;
 			}> => {
 				// Update local todo
-				const _updated = { ...todo, completed };
-
 				let lastSyncedAt = todo.lastSyncedAt;
 
 				// Try to sync
