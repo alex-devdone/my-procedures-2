@@ -171,29 +171,29 @@ This integration allows users to sync individual todos with Google Tasks. When a
   - Test list selection flow
   - Test sync indicator updates
 
-- [ ] Run `bun run check && bun run check-types` and fix any issues
+- [x] Run `bun run check && bun run check-types` and fix any issues
 
 - [x] Run `bun run test` and ensure all tests pass
 
-- [ ] Run `bun run build` and verify build succeeds
+- [x] Run `bun run build` and verify build succeeds
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] User can click sync toggle on any todo to enable Google Tasks sync
-- [ ] First sync attempt opens configuration modal if not already configured
-- [ ] User can link Google account via OAuth from the modal
-- [ ] User can select existing Google Tasks list or create new one
-- [ ] Todos with sync enabled show blue Cloud icon
-- [ ] Toggling a synced todo immediately updates Google Tasks
-- [ ] Deleting a synced todo removes it from Google Tasks
-- [ ] Background sync runs every 15 minutes and pulls changes from Google
-- [ ] Last-write-wins conflict resolution works correctly
-- [ ] All tests pass (`bun run test`)
-- [ ] No type errors (`bun run check-types`)
-- [ ] Linting passes (`bun run check`)
-- [ ] Build succeeds (`bun run build`)
+- [x] User can click sync toggle on any todo to enable Google Tasks sync
+- [x] First sync attempt opens configuration modal if not already configured
+- [x] User can link Google account via OAuth from the modal
+- [x] User can select existing Google Tasks list or create new one
+- [x] Todos with sync enabled show blue Cloud icon
+- [x] Toggling a synced todo immediately updates Google Tasks
+- [x] Deleting a synced todo removes it from Google Tasks
+- [x] Background sync runs every 15 minutes and pulls changes from Google
+- [x] Last-write-wins conflict resolution works correctly
+- [x] All tests pass (`bun run test`)
+- [x] No type errors (`bun run check-types`)
+- [x] Linting passes (`bun run check`)
+- [x] Build succeeds (`bun run build`)
 
 ---
 
