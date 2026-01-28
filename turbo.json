@@ -56,6 +56,11 @@
 		"test:e2e": {
 			"cache": false,
 			"inputs": ["$TURBO_DEFAULT$", "playwright.config.ts"]
+		},
+		"start": {
+			"dependsOn": ["^build"],
+			"cache": false,
+			"persistent": true
 		}
 	}
 }

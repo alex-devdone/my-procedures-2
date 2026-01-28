@@ -5,7 +5,7 @@
 	"scripts": {
 		"dev": "next dev --port 4757",
 		"build": "next build",
-		"start": "next start",
+		"start": "PORT=4757 next start",
 		"test": "vitest",
 		"test:run": "vitest run",
 		"test:coverage": "vitest run --coverage",
